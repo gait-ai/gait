@@ -32,7 +32,7 @@ export interface InlineChatInfo {
 }
 
 
-export interface MatchedRange {
+export interface InlineMatchedRange {
     range: vscode.Range;
     matchedLines: string[];
     inlineChat: InlineChatInfo;

@@ -3,7 +3,8 @@ import * as Inline from './inline';
 import * as Diff from 'diff';
 import * as path from 'path';
 import { getIdToCommitInfo, InlineCommitData } from './inlinegit';
-export async function createHoverContent(markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.MatchedRange | null = null, idToCommitInfo: Map<String, InlineCommitData> | undefined): Promise<vscode.MarkdownString> {
+
+export async function createHoverContent(markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, InlineCommitData> | undefined): Promise<vscode.MarkdownString> {
     const { prompt, diffs, endTimestamp, parent_inline_chat_id } = inlineChat;
     const commitInfo = idToCommitInfo?.get(inlineChat.inline_chat_id);
 
@@ -99,7 +100,7 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     return markdown;
 }
 
-export async function createHover(matchedRange: Inline.MatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
+export async function createHover(matchedRange: Inline.InlineMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
     let markdown = new vscode.MarkdownString();
     let idToCommitInfo = undefined;
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];

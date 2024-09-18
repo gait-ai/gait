@@ -121,7 +121,7 @@ async function parsePanelChatAsync(
  * Reads the stashed panel chats and last appended data from .gait/stashedPanelChats.json.
  * Accounts for cases where the file is empty or contains malformed JSON.
  */
-async function readStashedPanelChats(gaitDir: string): Promise<StashedState> {
+export function readStashedPanelChats(gaitDir: string): StashedState {
   const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
   try {
     if (!fs.existsSync(stashedPath)) {
@@ -272,7 +272,7 @@ export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
       }
 
       // Read the existing stashedPanelChats.json as existingStashedState
-      let existingStashedState = await readStashedPanelChats(gaitDir);
+      let existingStashedState = readStashedPanelChats(gaitDir);
       const lastAppended = existingStashedState.lastAppended; // Access lastAppended
       const existingIds = lastAppended.order;
 
@@ -280,7 +280,9 @@ export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
       const parsedStashedState = await parsePanelChatAsync(context, existingIds);
       const panelChats = parsedStashedState.panelChats;
 
-      // Iterate through each panelChat in order
+      // Read the existing stashedPanelChats.json as existingStashedState
+
+      // Initialize a new order array
       const newOrder: string[] = [];
 
       for (const panelChat of panelChats) {
@@ -329,3 +331,7 @@ export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
     }
   }, 1000);
 }
+
+
+
+
