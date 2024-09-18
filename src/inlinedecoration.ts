@@ -4,6 +4,8 @@ import * as Diff from 'diff';
 import * as levenshtein from 'fast-levenshtein';
 import * as path from 'path';
 import * as InlineHover from './inlinehover';
+import { readStashedPanelChats } from './panelChats';
+import { StashedState } from './types';
 
 /**
  * Utility function to generate different shades of blue color string.
@@ -14,6 +16,53 @@ function generateRandomColor(index: number): string {
     const saturation = 70 + (index * 5) % 30; // Vary saturation between 70% and 100%
     const lightness = 70 + (index * 7) % 30; // Vary lightness between 60% and 90%
     return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.5)`; // Different shades of blue
+}
+
+/**
+ * Extracts code blocks demarcated by triple backticks from a given text.
+ * @param text The text to extract code blocks from.
+ * @returns An array of code blocks.
+ */
+function extractCodeBlocks(text: string): string[] {
+    const codeBlockRegex = /```([\s\S]*?)```/g;
+    const codeBlocks: string[] = [];
+    let match;
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+        codeBlocks.push(match[1].trim());
+    }
+    return codeBlocks;
+}
+
+/**
+ * Matches code blocks to the current document.
+ * @param document The VSCode text document.
+ * @param code The code block to match.
+ * @param similarityThreshold The minimum similarity threshold for a match.
+ * @returns An array of VSCode ranges that match the code block.
+ */
+function matchCodeToCurrentFile(
+    document: vscode.TextDocument,
+    code: string,
+    similarityThreshold: number
+): vscode.Range[] {
+    const documentLines = document.getText().split('\n');
+    const codeLines = code.split('\n').map(line => line.trim());
+
+    const matchedRanges: vscode.Range[] = [];
+    const minBlockSize = Math.min(codeLines.length, 2);
+
+    for (let docStart = 0; docStart <= documentLines.length - codeLines.length; docStart++) {
+        const currentDocBlock = documentLines.slice(docStart, docStart + codeLines.length).map(line => line.trim());
+        const similarity = computeBlockSimilarity(currentDocBlock, codeLines);
+
+        if (similarity >= similarityThreshold) {
+            const startPos = new vscode.Position(docStart, 0);
+            const endPos = new vscode.Position(docStart + codeLines.length - 1, documentLines[docStart + codeLines.length - 1].length);
+            matchedRanges.push(new vscode.Range(startPos, endPos));
+        }
+    }
+
+    return matchedRanges;
 }
 
 /**
@@ -134,7 +183,7 @@ function computeBlockSimilarity(docBlock: string[], addedBlock: string[]): numbe
     return totalSimilarity / docBlock.length;
 }
 
-export function decorateActive(context: vscode.ExtensionContext) {
+export async function decorateActive(context: vscode.ExtensionContext) {
     const editor = vscode.window.activeTextEditor;
     
     if (!editor) {
@@ -142,7 +191,27 @@ export function decorateActive(context: vscode.ExtensionContext) {
     }
 
     const baseName = vscode.workspace.asRelativePath(editor.document.uri);
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        console.error('No workspace folder found');
+        return;
+    }
+
+    const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
+    const stashedState: StashedState = await readStashedPanelChats(gaitDir);
     const fileChats = Inline.loadFileChats(baseName);
+
+    const stashedCodeBlocks: { ranges: vscode.Range, code: string }[] = [];
+
+    for (const panelChat of stashedState.panelChats) {
+        for (const message of panelChat.messages) {
+            const codeBlocks = extractCodeBlocks(message.responseText);
+            for (const code of codeBlocks) {
+                const ranges = matchCodeToCurrentFile(editor.document, code, 0.8);
+                stashedCodeBlocks.push(...ranges.map(range => ({ ranges: range, code })));
+            }
+        }
+    }
 
     const rangesToInline: Inline.MatchedRange[] = [];
     const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
