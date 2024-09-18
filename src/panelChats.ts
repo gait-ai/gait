@@ -37,13 +37,13 @@ async function parsePanelChatAsync(
         // Assign new UUID
         id = uuidv4();
       }
-
+  
       const parent_id: string | null = null;
       const created_on: string = typeof panel.creationDate === 'string' ? panel.creationDate : new Date().toISOString();
 
       // Extract messages
-      console.log(`Parsing panel chat with ${panel.requests.length} sessions.`);
-      console.log(panel);
+      //console.log(`Parsing panel chat with ${panel.requests.length} sessions.`);
+      //console.log(panel);
 
       const messages: MessageEntry[] = panel.requests.map((request: any) => {
         // Safely extract messageText
@@ -87,7 +87,7 @@ async function parsePanelChatAsync(
             .filter((ctx: Context | undefined) => ctx !== undefined) as Context[];
         }
 
-        console.log(`Parsed message: ${messageText} -> ${responseText}`);
+        //console.log(`Parsed message: ${messageText} -> ${responseText}`);
         return {
           id: uuidv4(), // Assign new UUID to MessageEntry
           messageText,
@@ -100,7 +100,7 @@ async function parsePanelChatAsync(
         entry.messageText.trim() !== '' && entry.responseText.trim() !== ''
       );
 
-      console.log(`Parsed panel chat with ${messages.length} messages.`);
+      //console.log(`Parsed panel chat with ${messages.length} messages.`);
       return {
         ai_editor,
         id,
@@ -221,7 +221,7 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
       console.log(`stashedPanelChats.json was missing some properties. Updated with default values.`);
     }
 
-    console.log(`Read stashedState from stashedPanelChats.json:`, parsed);
+    //console.log(`Read stashedState from stashedPanelChats.json:`, parsed);
     return parsed;
   } catch (error) {
     console.error(`Error reading stashedPanelChats.json:`, error);
@@ -299,11 +299,11 @@ export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
 
           // Determine new messages to append
           const newMessages = panelChat.messages.slice(lastAppendedIndex);
-          console.log(`monitorPanelChatAsync: New messages for panelChat ${panelChatId}: ${newMessages.length}`);
+          //console.log(`monitorPanelChatAsync: New messages for panelChat ${panelChatId}: ${newMessages.length}`);
 
           if (newMessages.length > 0) {
             existingStashedState.panelChats[existingPanelChatIndex].messages.push(...newMessages);
-            console.log(`monitorPanelChatAsync: Appended ${newMessages.length} messages to existing PanelChat ${panelChatId}.`);
+            //console.log(`monitorPanelChatAsync: Appended ${newMessages.length} messages to existing PanelChat ${panelChatId}.`);
 
             // Update the last appended index for this panelChat
             lastAppended.lastAppendedMap[panelChatId] = (lastAppended.lastAppendedMap[panelChatId] || 0) + newMessages.length;
