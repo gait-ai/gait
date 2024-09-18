@@ -11,7 +11,7 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     const commitMessage = commitInfo?.commitMessage;
     const commitHash = commitInfo?.commitHash ?? "uncommitted chat";
 
-    markdown.supportHtml = true; // Allows HTML in the Markdown
+    //markdown.supportHtml = true; // Allows HTML in the Markdown
     markdown.isTrusted = true; // Allows advanced Markdown features
 
     // Display the prompt with a smaller, circular user icon

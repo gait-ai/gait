@@ -2,13 +2,13 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const LAST_APPENDED_FILE = 'lastAppended.json'; // Changed to JSON format
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
 
 import { v4 as uuidv4 } from 'uuid';
 import { readVSCodeState } from './extension';
 import { StashedState, PanelChat, MessageEntry, Context, LastAppended, isStashedState } from './types';
+
 /**
  * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
  */
@@ -21,7 +21,7 @@ async function parsePanelChatAsync(
 
     if (!Array.isArray(interactiveSessions)) {
       vscode.window.showErrorMessage('Interactive sessions data is not an array.');
-      return { panelChats: [], schemaVersion: SCHEMA_VERSION };
+      return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
     }
 
     const panelChats: PanelChat[] = interactiveSessions.map((panel: any, index: number) => {
@@ -110,69 +110,128 @@ async function parsePanelChatAsync(
       } as PanelChat;
     });
 
-    return { panelChats, schemaVersion: SCHEMA_VERSION };
+    return { panelChats, schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to parse panel chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    return { panelChats: [], schemaVersion: SCHEMA_VERSION };
+    return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
   }
 }
 
 /**
- * Reads the last appended indices and order from .gait/lastAppended.json.
- */
-async function readLastAppended(gaitDir: string): Promise<LastAppended> {
-  const lastAppendedPath = path.join(gaitDir, LAST_APPENDED_FILE);
-  try {
-    if (!fs.existsSync(lastAppendedPath)) {
-      // Initialize the file with empty order and map if it doesn't exist
-      const initial: LastAppended = { order: [], lastAppendedMap: {} };
-      fs.writeFileSync(lastAppendedPath, JSON.stringify(initial, null, 2), 'utf-8');
-      console.log(`${LAST_APPENDED_FILE} not found. Initialized with empty order and map.`);
-      return initial;
-    }
-    const content = fs.readFileSync(lastAppendedPath, 'utf-8');
-    const parsed: LastAppended = JSON.parse(content);
-    console.log(`Read LastAppended from ${LAST_APPENDED_FILE}:`, parsed);
-    return parsed;
-  } catch (error) {
-    console.error(`Error reading ${LAST_APPENDED_FILE}:`, error);
-    return { order: [], lastAppendedMap: {} };
-  }
-}
-
-async function writeLastAppended(gaitDir: string, lastAppended: LastAppended): Promise<void> {
-  const lastAppendedPath = path.join(gaitDir, LAST_APPENDED_FILE);
-  try {
-    fs.writeFileSync(lastAppendedPath, JSON.stringify(lastAppended, null, 2), 'utf-8');
-    console.log(`Updated ${LAST_APPENDED_FILE} with:`, lastAppended);
-  } catch (error) {
-    console.error(`Error writing to ${LAST_APPENDED_FILE}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Reads the stashed panel chats from .gait/stashedPanelChats.json.
+ * Reads the stashed panel chats and last appended data from .gait/stashedPanelChats.json.
+ * Accounts for cases where the file is empty or contains malformed JSON.
  */
 async function readStashedPanelChats(gaitDir: string): Promise<StashedState> {
   const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
   try {
     if (!fs.existsSync(stashedPath)) {
-      // Initialize with empty stashedState
-      const initialState: StashedState = { panelChats: [], schemaVersion: SCHEMA_VERSION };
+      // Initialize with empty stashedState and lastAppended
+      const initialState: StashedState = { 
+        panelChats: [], 
+        schemaVersion: SCHEMA_VERSION,
+        lastAppended: { order: [], lastAppendedMap: {} }
+      };
       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
-      console.log(`stashedPanelChats.json not found. Initialized with empty stashedState.`);
+      console.log(`stashedPanelChats.json not found. Initialized with empty stashedState and lastAppended.`);
       return initialState;
     }
-    const content = fs.readFileSync(stashedPath, 'utf-8');
-    const parsed: StashedState = JSON.parse(content);
+
+    const stats = fs.statSync(stashedPath);
+    if (stats.size === 0) {
+      // File is empty, initialize it
+      const initialState: StashedState = { 
+        panelChats: [], 
+        schemaVersion: SCHEMA_VERSION,
+        lastAppended: { order: [], lastAppendedMap: {} }
+      };
+      fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
+      console.log(`stashedPanelChats.json is empty. Initialized with empty stashedState and lastAppended.`);
+      return initialState;
+    }
+
+    const content = fs.readFileSync(stashedPath, 'utf-8').trim();
+
+    if (content === '') {
+      // Content is empty string after trimming, initialize it
+      const initialState: StashedState = { 
+        panelChats: [], 
+        schemaVersion: SCHEMA_VERSION,
+        lastAppended: { order: [], lastAppendedMap: {} }
+      };
+      fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
+      console.log(`stashedPanelChats.json contains only whitespace. Initialized with empty stashedState and lastAppended.`);
+      return initialState;
+    }
+
+    let parsed: StashedState;
+
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseError) {
+      console.error(`Error parsing stashedPanelChats.json:`, parseError);
+      vscode.window.showErrorMessage(`stashedPanelChats.json is malformed. Reinitializing the file.`);
+      
+      // Reinitialize the file with default state
+      const initialState: StashedState = { 
+        panelChats: [], 
+        schemaVersion: SCHEMA_VERSION,
+        lastAppended: { order: [], lastAppendedMap: {} }
+      };
+      fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
+      return initialState;
+    }
+
+    // Ensure that all required properties are present
+    let isModified = false;
+
+    if (!Array.isArray(parsed.panelChats)) {
+      parsed.panelChats = [];
+      isModified = true;
+      console.warn(`panelChats property missing or not an array. Initialized as empty array.`);
+    }
+
+    if (typeof parsed.schemaVersion !== 'string') {
+      parsed.schemaVersion = SCHEMA_VERSION;
+      isModified = true;
+      console.warn(`schemaVersion property missing or not a string. Initialized to default schema version.`);
+    }
+
+    if (!parsed.lastAppended || typeof parsed.lastAppended !== 'object') {
+      parsed.lastAppended = { order: [], lastAppendedMap: {} };
+      isModified = true;
+      console.warn(`lastAppended property missing or invalid. Initialized to default.`);
+    } else {
+      // Further ensure that lastAppended has 'order' and 'lastAppendedMap'
+      if (!Array.isArray(parsed.lastAppended.order)) {
+        parsed.lastAppended.order = [];
+        isModified = true;
+        console.warn(`lastAppended.order missing or not an array. Initialized as empty array.`);
+      }
+
+      if (typeof parsed.lastAppended.lastAppendedMap !== 'object') {
+        parsed.lastAppended.lastAppendedMap = {};
+        isModified = true;
+        console.warn(`lastAppended.lastAppendedMap missing or not an object. Initialized as empty object.`);
+      }
+    }
+
+    if (isModified) {
+      // Write the corrected state back to the file
+      fs.writeFileSync(stashedPath, JSON.stringify(parsed, null, 2), 'utf-8');
+      console.log(`stashedPanelChats.json was missing some properties. Updated with default values.`);
+    }
+
     console.log(`Read stashedState from stashedPanelChats.json:`, parsed);
     return parsed;
   } catch (error) {
     console.error(`Error reading stashedPanelChats.json:`, error);
     vscode.window.showErrorMessage(`Error reading stashedPanelChats.json: ${error instanceof Error ? error.message : 'Unknown error'}`);
     // Return an empty state to prevent application crash
-    return { panelChats: [], schemaVersion: SCHEMA_VERSION };
+    return { 
+      panelChats: [], 
+      schemaVersion: SCHEMA_VERSION,
+      lastAppended: { order: [], lastAppendedMap: {} }
+    };
   }
 }
 
@@ -212,28 +271,23 @@ export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
         console.log(`Created directory: ${gaitDir}`);
       }
 
-      // Read the last appended data
-      const lastAppended = await readLastAppended(gaitDir);
+      // Read the existing stashedPanelChats.json as existingStashedState
+      let existingStashedState = await readStashedPanelChats(gaitDir);
+      const lastAppended = existingStashedState.lastAppended; // Access lastAppended
       const existingIds = lastAppended.order;
 
       // Parse the current panelChats with existing UUIDs
-      const stashedState = await parsePanelChatAsync(context, existingIds);
-      const panelChats = stashedState.panelChats;
-
-      // Read the existing stashedPanelChats.json as existingStashedState
-      let existingStashedState = await readStashedPanelChats(gaitDir);
-
-      // Initialize a new order array
-      const newOrder: string[] = [];
+      const parsedStashedState = await parsePanelChatAsync(context, existingIds);
+      const panelChats = parsedStashedState.panelChats;
 
       // Iterate through each panelChat in order
+      const newOrder: string[] = [];
+
       for (const panelChat of panelChats) {
         const panelChatId = panelChat.id;
         newOrder.push(panelChatId);
 
         // Find if this panelChat already exists in existingStashedState
-        console.log("test1: ", existingStashedState)
-        console.log("test: ", existingStashedState.panelChats)
         const existingPanelChatIndex = existingStashedState.panelChats.findIndex(pc => pc.id === panelChatId);
 
         if (existingPanelChatIndex !== -1) {
@@ -267,9 +321,6 @@ export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
 
       // Write back to stashedPanelChats.json
       await writeStashedPanelChats(gaitDir, existingStashedState);
-
-      // Write the updated last appended data
-      await writeLastAppended(gaitDir, lastAppended);
     } catch (error) {
       console.error(`Error monitoring and saving state:`, error);
       vscode.window.showErrorMessage(`Error monitoring and saving state: ${error instanceof Error ? error.message : 'Unknown error'}`);

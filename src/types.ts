@@ -53,6 +53,7 @@ export function isPanelChat(obj: any): obj is PanelChat {
 export interface StashedState {
   panelChats: PanelChat[];
   schemaVersion: string;
+  lastAppended: LastAppended;
 }
 
 export function isStashedState(obj: any): obj is StashedState {

@@ -14,7 +14,6 @@ import { parse } from 'csv-parse/sync';
 const execAsync = promisify(exec);
 
 // Constants for global state keys and file paths
-const LAST_APPENDED_FILE = 'lastAppended.txt';
 const GAIT_FOLDER_NAME = '.gait';
 
 /**
@@ -190,16 +189,6 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
         vscode.window.showInformationMessage(`${GAIT_FOLDER_NAME} folder created successfully`);
     }
 
-    const lastAppendedPath = path.join(gaitFolderPath, LAST_APPENDED_FILE);
-    if (!fs.existsSync(lastAppendedPath)) {
-        fs.writeFileSync(lastAppendedPath, '0', 'utf-8');
-        vscode.window.showInformationMessage(`${LAST_APPENDED_FILE} created successfully`);
-    }
-
-    if (!fs.existsSync(path.join(gaitFolderPath, 'panelChatsCommited.json'))) {
-        fs.writeFileSync(path.join(gaitFolderPath, 'panelChatsCommited.json'), '[]');
-        vscode.window.showInformationMessage('panelChatsCommited.json created successfully');
-    }
 
     const gitAttributesPath = path.join(workspaceFolder.uri.fsPath, '.gitattributes');
     const gitAttributesContent = fs.existsSync(gitAttributesPath)
