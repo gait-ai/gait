@@ -1,3 +1,5 @@
+import * as vscode from 'vscode';
+
 export interface Context {
 	context_type: string
 	key: string
@@ -74,4 +76,12 @@ export function isLastAppended(obj: any): obj is LastAppended {
     typeof obj.lastAppendedMap === 'object' && obj.lastAppendedMap !== null &&
     Object.values(obj.lastAppendedMap).every((value: any) => typeof value === 'number')
   );
+}
+
+export interface PanelMatchedRange {
+  range: vscode.Range;
+  matchedLines: string[];
+  panelChat: PanelChat;
+  message_id: string;
+  similarity: number;
 }
