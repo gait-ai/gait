@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { PanelMatchedRange } from './types';
-import { getIdToCommitInfo, InlineCommitData } from './inlinegit';
+import { getIdToCommitInfo } from './panelview';
 
 /**
  * Creates hover content for a matched panel chat range.
@@ -16,7 +16,9 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
         console.warn('No workspace folder found.');
     } else {
         try {
-            idToCommitInfo = await getIdToCommitInfo(workspaceFolder.uri.fsPath, vscode.workspace.asRelativePath(document.uri));
+            const repoPath = workspaceFolder.uri.fsPath;
+            const filePath = '.gait/stashedPanelChats.json'; // Replace with your actual file path relative to repo
+            idToCommitInfo = await getIdToCommitInfo(repoPath, filePath);
         } catch (error) {
             console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
         }
@@ -28,12 +30,12 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
     if (!message) {
         return undefined;
     }
+    console.log("test123123",idToCommitInfo);   
 
-    const commitInfo = idToCommitInfo?.get(panelChat.id);
-    const author = commitInfo?.author ?? "Unknown";
-    const commitMessage = commitInfo?.commitMessage ?? "No commit message";
+    const commitInfo = idToCommitInfo?.get(message.id);
+    const author = commitInfo?.author ?? "You";
+    const commitMessage = commitInfo?.commitMessage ?? "Uncommited changes";
 
-    markdown.supportHtml = true;
     markdown.isTrusted = true;
 
     // Display the commit information
