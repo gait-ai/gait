@@ -11,6 +11,7 @@ type CommitData = {
   commitHash: string;
   date: Date;
   commitMessage: string;
+  author: string;
   messages: MessageEntry[];
 };
 
