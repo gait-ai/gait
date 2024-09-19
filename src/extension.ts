@@ -9,6 +9,7 @@ import { promisify } from 'util';
 import { PanelViewProvider } from './panelview';
 import { monitorPanelChatAsync } from './panelChats';
 import { parse } from 'csv-parse/sync';
+import { activateGaitParticipant } from './gaitChatParticipant';
 
 
 const execAsync = promisify(exec);
@@ -409,7 +410,15 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // Register commands to activate and deactivate decorations
+    // Register command to activate gait chat participant
+    const registerGaitChatParticipantCommand = vscode.commands.registerCommand('gait-copilot.registerGaitChatParticipant', (contextString: string) => {
+        try {
+            activateGaitParticipant(context, contextString);
+            vscode.window.showInformationMessage('Gait chat participant registered successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to register gait chat participant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    });
     const activateDecorationsCommand = vscode.commands.registerCommand('gait-copilot.activateDecorations', () => {
         decorationsActive = true;
         redecorate(context);
@@ -437,7 +446,8 @@ export function activate(context: vscode.ExtensionContext) {
         openFileWithContentCommand,
         activateDecorationsCommand,
         deactivateDecorationsCommand,
-        deletePanelChatCommand // Add the new command here
+        deletePanelChatCommand,
+        registerGaitChatParticipantCommand // Add the new command here
     );
 
     redecorate(context);
