@@ -30,7 +30,6 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
     if (!message) {
         return undefined;
     }
-    console.log("test123123",idToCommitInfo);   
 
     const commitInfo = idToCommitInfo?.get(message.id);
     const author = commitInfo?.author ?? "You";
@@ -44,7 +43,9 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
 
     // Display the message text and response
     markdown.appendMarkdown(`**Message**: ${message.messageText}\n\n`);
-    markdown.appendMarkdown(`**Response**: ${message.responseText}\n\n`);
+    // Escape backticks and newlines in the response text
+    const escapedResponseText = message.responseText.replace(/`/g, '\\`').replace(/\n/g, '\\n');
+    markdown.appendMarkdown(`**Response**: ${escapedResponseText}\n\n`);
 
     // Add action buttons at the end of the hover content
     markdown.appendMarkdown(`\n\n`);
@@ -53,6 +54,12 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
         message_id: message.id
     }))}`);
     markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);
+
+    // Add action button to continue the conversation
+    const continueCommand = vscode.Uri.parse(`command:gait-copilot.registerGaitChatParticipant?${encodeURIComponent(JSON.stringify({
+        contextString: JSON.stringify(panelChat.messages)
+    }))}`);
+    markdown.appendMarkdown(`\n\n[Continue This Conversation](${continueCommand})`);
 
     return new vscode.Hover(markdown);
 }
