@@ -1,6 +1,7 @@
 import { renderPrompt } from '@vscode/prompt-tsx';
 import * as vscode from 'vscode';
 import { PlayPrompt } from './play';
+import { activateGaitParticipant } from './gaitChatParticipant';
 
 const CAT_NAMES_COMMAND_ID = 'cat.namesInEditor';
 const CAT_PARTICIPANT_ID = 'chat-sample.cat';
@@ -135,7 +136,19 @@ export function activate(context: vscode.ExtensionContext) {
         });
     }));
 
+    const GAIT_COMMAND_ID = 'gait.registerAndStartChat';
+
     context.subscriptions.push(
+        vscode.commands.registerCommand(GAIT_COMMAND_ID, async () => {
+            const additionalContext = await vscode.window.showInputBox({
+                prompt: 'Enter additional context for the Gait chat participant'
+            });
+
+            if (additionalContext) {
+                const gaitParticipant = activateGaitParticipant(context, additionalContext);
+                vscode.chat.startChat(gaitParticipant.id);
+            }
+        }),
         cat,
         // Register the command handler for the /meow followup
         vscode.commands.registerTextEditorCommand(CAT_NAMES_COMMAND_ID, async (textEditor: vscode.TextEditor) => {
