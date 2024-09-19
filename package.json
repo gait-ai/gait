@@ -16,16 +16,12 @@
   "contributes": {
     "chatParticipants": [
         {
-            "id": "gait-sample.gait",
+            "id": "gait-participant.gait",
             "fullName": "Gait Chat Participant",
             "name": "gait",
             "description": "Provides insights and makes edits to code based on context.",
-            "isSticky": true,
+            "isSticky": false,
             "commands": [
-                {
-                    "name": "gait-copilot.registerGaitChatParticipant",
-                    "description": "Register the gait chat participant with context"
-                }
             ]
         }
     ],
@@ -82,8 +78,12 @@
       },
       {
         "command": "gait-copilot.deletePanelChat",
-        "title": "Gait Copilot: Delete Panel Chat",
+        "title": "Delete Panel Chat",
         "category": "Gait Copilot"
+      }, 
+      {
+        "command": "gait-copilot.registerGaitChatParticipant",
+        "title": "Load context into gait chat participant"
       }
     ],
     "keybindings": [

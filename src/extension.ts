@@ -411,14 +411,18 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Register command to activate gait chat participant
-    const registerGaitChatParticipantCommand = vscode.commands.registerCommand('gait-copilot.registerGaitChatParticipant', (contextString: string) => {
+    const registerGaitChatParticipantCommand = vscode.commands.registerCommand('gait-copilot.registerGaitChatParticipant', (args) => {
+        console.log("Registering gait chat participant", args);
         try {
-            activateGaitParticipant(context, contextString);
-            vscode.window.showInformationMessage('Gait chat participant registered successfully.');
+            activateGaitParticipant(context, args.contextString);
+            vscode.window.showInformationMessage('Gait chat participant loaded with edit history!');
+            vscode.commands.executeCommand('workbench.action.chat.openInSidebar');
         } catch (error) {
+            console.log("Error registering gait chat participant", error);
             vscode.window.showErrorMessage(`Failed to register gait chat participant: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     });
+
     const activateDecorationsCommand = vscode.commands.registerCommand('gait-copilot.activateDecorations', () => {
         decorationsActive = true;
         redecorate(context);

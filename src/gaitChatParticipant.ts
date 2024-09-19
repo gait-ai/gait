@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-const GAIT_PARTICIPANT_ID = 'gait-sample.gait';
+const GAIT_PARTICIPANT_ID = 'gait-participant.gait';
 
 interface IGaitChatResult extends vscode.ChatResult {
     metadata: {
@@ -8,13 +8,13 @@ interface IGaitChatResult extends vscode.ChatResult {
     }
 }
 
-export function activateGaitParticipant(context: vscode.ExtensionContext) {
+export function activateGaitParticipant(context: vscode.ExtensionContext, additional_context: string) {
     const handler: vscode.ChatRequestHandler = async (request: vscode.ChatRequest, context: vscode.ChatContext, stream: vscode.ChatResponseStream, token: vscode.CancellationToken): Promise<IGaitChatResult> => {
         try {
             const [model] = await vscode.lm.selectChatModels({ vendor: 'copilot', family: 'gpt-4o' });
             if (model) {
                 const messages = [
-                    vscode.LanguageModelChatMessage.User('You are a gait assistant! Your job is to provide insights and context specific to the Gait extension.'),
+                    vscode.LanguageModelChatMessage.User("You are an LLM tasked with providing insights and making edits to code - here are past conversations for context, and the pieces in the code base that they correspond to: " + additional_context),
                     vscode.LanguageModelChatMessage.User(request.prompt)
                 ];
 
@@ -34,6 +34,7 @@ export function activateGaitParticipant(context: vscode.ExtensionContext) {
     gait.iconPath = vscode.Uri.joinPath(context.extensionUri, 'gait-icon.png');
 
     context.subscriptions.push(gait);
+    return gait;
 }
 
 function handleError(err: any, stream: vscode.ChatResponseStream): void {
