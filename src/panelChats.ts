@@ -26,6 +26,7 @@ async function parsePanelChatAsync(
 
     const panelChats: PanelChat[] = interactiveSessions.map((panel: any, index: number) => {
       const ai_editor: string = "copilot";
+      const customTitle: string = typeof panel.customTitle === 'string' ? panel.customTitle : '';
 
       // Determine if this PanelChat has an existing UUID
       let id: string;
@@ -103,6 +104,7 @@ async function parsePanelChatAsync(
       //console.log(`Parsed panel chat with ${messages.length} messages.`);
       return {
         ai_editor,
+        customTitle,
         id,
         parent_id,
         created_on,

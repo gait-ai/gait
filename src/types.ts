@@ -37,6 +37,7 @@ export function isMessageEntry(obj: any): obj is MessageEntry {
 export interface PanelChat {
   ai_editor: string;
   id: string;
+  customTitle: string;
   parent_id: string | null;
   created_on: string;
   messages: MessageEntry[];
