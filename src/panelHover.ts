@@ -54,5 +54,11 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
     }))}`);
     markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);
 
+    // Add action button to continue the conversation
+    const continueCommand = vscode.Uri.parse(`command:gait-copilot.registerGaitChatParticipant?${encodeURIComponent(JSON.stringify({
+        contextString: JSON.stringify(panelChat.messages)
+    }))}`);
+    markdown.appendMarkdown(`\n\n[Continue This Conversation](${continueCommand})`);
+
     return new vscode.Hover(markdown);
 }
