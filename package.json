@@ -15,24 +15,20 @@
   "main": "./dist/extension.js",
   "contributes": {
     "chatParticipants": [
-			{
-				"id": "chat-sample.cat",
-				"fullName": "Cat",
-				"name": "cat",
-				"description": "Meow! What can I teach you?",
-				"isSticky": true,
-				"commands": [
-					{
-						"name": "randomTeach",
-						"description": "Pick at random a computer science concept then explain it in purfect way of a cat"
-					},
-					{
-						"name": "play",
-						"description": "Do whatever you want, you are a cat after all",
-					}
-				]
-			}
-		],
+        {
+            "id": "gait-sample.gait",
+            "fullName": "Gait Chat Participant",
+            "name": "gait",
+            "description": "Provides insights and makes edits to code based on context.",
+            "isSticky": true,
+            "commands": [
+                {
+                    "name": "gait-copilot.registerGaitChatParticipant",
+                    "description": "Register the gait chat participant with context"
+                }
+            ]
+        }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
