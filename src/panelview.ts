@@ -18,12 +18,12 @@ type UncommittedData = {
   messages: MessageEntry[];
 };
 
-type GitHistoryData = {
+export type GitHistoryData = {
   commits: CommitData[];
   uncommitted: UncommittedData | null;
 };
 
-async function getGitHistory(repoPath: string, filePath: string): Promise<GitHistoryData> {
+export async function getGitHistory(repoPath: string, filePath: string): Promise<GitHistoryData> {
   const git: SimpleGit = simpleGit(repoPath);
 
   console.log("Starting getGitHistory");
