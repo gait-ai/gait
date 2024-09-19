@@ -213,6 +213,11 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No workspace folder found. Extension activation failed.');
         return;
     }
+    if ('vscode' in process.env.__CFBundleIdentifier) {
+        console.log('Running in VSCode');
+      } else if (process.env.__CFBundleIdentifier === 'com.todesktop.230313mzl4w4u92') {
+        console.log('Running in Cursor');
+      }
 
     createGaitFolderIfNotExists(workspaceFolder);
 
