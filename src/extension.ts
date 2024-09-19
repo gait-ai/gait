@@ -13,6 +13,7 @@ import { activateGaitParticipant } from './gaitChatParticipant';
 import { checkTool } from './ide';
 
 
+
 const execAsync = promisify(exec);
 
 // Constants for global state keys and file paths
@@ -207,19 +208,13 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
-    const tool = checkTool();
-    vscode.window.showInformationMessage(`Gait Copilot extension activated in ${tool}`);
+    vscode.window.showInformationMessage('Gait Copilot extension activated for ' + checkTool());
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('No workspace folder found. Extension activation failed.');
         return;
     }
-    if ('vscode' in process.env.__CFBundleIdentifier) {
-        console.log('Running in VSCode');
-      } else if (process.env.__CFBundleIdentifier === 'com.todesktop.230313mzl4w4u92') {
-        console.log('Running in Cursor');
-      }
 
     createGaitFolderIfNotExists(workspaceFolder);
 

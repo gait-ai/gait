@@ -4,7 +4,7 @@
   "description": "Store and share your copilot conversations",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.91.0"
   },
   "categories": [
     "Other"
@@ -15,15 +15,14 @@
   "main": "./dist/extension.js",
   "contributes": {
     "chatParticipants": [
-        {
-            "id": "gait-participant.gait",
-            "fullName": "Gait Chat Participant",
-            "name": "gait",
-            "description": "Provides insights and makes edits to code based on context.",
-            "isSticky": false,
-            "commands": [
-            ]
-        }
+      {
+        "id": "gait-participant.gait",
+        "fullName": "Gait Chat Participant",
+        "name": "gait",
+        "description": "Provides insights and makes edits to code based on context.",
+        "isSticky": false,
+        "commands": []
+      }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -46,44 +45,53 @@
     "commands": [
       {
         "command": "gait-copilot.helloWorld",
-        "title": "Hello World"
+        "title": "Hello World",
+        "category": "Gait"
       },
       {
         "command": "gait-copilot.startInlineChat",
-        "title": "Start Inline Chat"
+        "title": "Start Inline Chat",
+        "category": "Gait"
       },
       {
         "command": "gait-copilot.updateSidebar",
-        "title": "Update Sidebar"
+        "title": "Update Sidebar",
+        "category": "Gait"
       },
       {
         "command": "gait-copilot.acceptInlineChat",
-        "title": "Accept Inline Chat"
+        "title": "Accept Inline Chat",
+        "category": "Gait"
       },
       {
         "command": "gait-copilot.removeInlineChat",
-        "title": "Remove Inline Chat"
+        "title": "Remove Inline Chat",
+        "category": "Gait"
       },
       {
         "command": "gait-copilot.continueInlineChat",
-        "title": "Continue Inline Chat"
+        "title": "Continue Inline Chat",
+        "category": "Gait"
       },
       {
         "command": "gait-copilot.activateDecorations",
-        "title": "Activate Decorations"
+        "title": "Activate Decorations",
+        "category": "Gait"
       },
       {
         "command": "gait-copilot.deactivateDecorations",
-        "title": "Deactivate Decorations"
+        "title": "Deactivate Decorations",
+        "category": "Gait"  
       },
       {
         "command": "gait-copilot.deletePanelChat",
         "title": "Delete Panel Chat",
-        "category": "Gait Copilot"
-      }, 
+        "category": "Gait"
+      },
       {
         "command": "gait-copilot.registerGaitChatParticipant",
-        "title": "Load context into gait chat participant"
+        "title": "Load context into gait chat participant",
+        "category": "Gait"
       }
     ],
     "keybindings": [
@@ -117,7 +125,7 @@
     "@types/mocha": "^10.0.7",
     "@types/node": "20.x",
     "@types/uuid": "^10.0.0",
-    "@types/vscode": "^1.93.0",
+    "@types/vscode": "^1.91.0",
     "@typescript-eslint/eslint-plugin": "^8.3.0",
     "@typescript-eslint/parser": "^8.3.0",
     "@vscode/test-cli": "^0.0.10",

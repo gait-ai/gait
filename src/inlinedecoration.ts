@@ -152,7 +152,6 @@ export function matchDiffToCurrentFile(
                 similarity: bestMatch.similarity
                 } );
             ;
-            console.log("Found match remaining lines", addedLines);
         } else {
             // No more matches found that meet the threshold
             break;
