@@ -12,11 +12,11 @@ type CommitData = {
   date: Date;
   commitMessage: string;
   author: string;
-  messages: MessageEntry[];
+  panelChats: PanelChat[]; // Updated from messages to panelChats
 };
 
 type UncommittedData = {
-  messages: MessageEntry[];
+  panelChats: PanelChat[]; // Updated from messages to panelChats
 };
 
 export type GitHistoryData = {
@@ -24,6 +24,12 @@ export type GitHistoryData = {
   uncommitted: UncommittedData | null;
 };
 
+/**
+ * Retrieves the Git history for a specific file, capturing PanelChats instead of flat messages.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the target file within the repository.
+ * @returns A Promise resolving to GitHistoryData containing commit history and uncommitted changes.
+ */
 export async function getGitHistory(repoPath: string, filePath: string): Promise<GitHistoryData> {
   const git: SimpleGit = simpleGit(repoPath);
 
@@ -132,7 +138,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
               date: new Date(dateStr),
               commitMessage,
               author: authorName,
-              messages: [],
+              panelChats: [], // Initialize panelChats
           };
           allCommitsMap.set(commitHash, commitData);
       }
@@ -141,6 +147,20 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
       for (const panelChat of parsedContent.panelChats) {
           const panelChatId = panelChat.id;
 
+          // Create or retrieve existing PanelChat in commitData
+          let existingPanelChat = commitData.panelChats.find(pc => pc.id === panelChatId);
+          if (!existingPanelChat) {
+              existingPanelChat = {
+                  ai_editor: panelChat.ai_editor,
+                  id: panelChat.id,
+                  customTitle: panelChat.customTitle,
+                  parent_id: panelChat.parent_id,
+                  created_on: panelChat.created_on,
+                  messages: []
+              };
+              commitData.panelChats.push(existingPanelChat);
+          }
+
           for (const messageEntry of panelChat.messages) {
               const messageId = messageEntry.id;
 
@@ -148,7 +168,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
               if (currentMessageIds.has(messageId)) {
                   if (!seenMessageIds.has(messageId)) {
                       // New message found
-                      commitData.messages.push(messageEntry);
+                      existingPanelChat.messages.push(messageEntry);
                       console.log(`Added message ID ${messageId} from PanelChat ${panelChatId} in commit ${commitHash}.`);
                       seenMessageIds.add(messageId);
                   } else {
@@ -164,8 +184,8 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
   // Convert the map to an array
   let allCommits: CommitData[] = Array.from(allCommitsMap.values());
 
-  // **New Addition:** Filter out commits with empty messages
-  allCommits = allCommits.filter(commit => commit.messages.length > 0);
+  // **New Addition:** Filter out commits with empty panelChats
+  allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
   console.log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`);
 
   // Step 3: Check for uncommitted changes
@@ -213,21 +233,31 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
           }; // Default to empty StashedState
       }
 
-      // Aggregate all messages from panelChats
-      const allCurrentMessages: MessageEntry[] = parsedUncommitted.panelChats.flatMap(pc => pc.messages);
-      console.log("All current uncommitted messages:");
-      console.log(allCurrentMessages);
+      // Aggregate all panelChats from uncommitted changes
+      const allCurrentPanelChats: PanelChat[] = parsedUncommitted.panelChats;
+      console.log("All current uncommitted panelChats:");
+      console.log(allCurrentPanelChats);
 
-      // Determine new uncommitted messages based on currentMessageIds
-      const newUncommittedMessages: MessageEntry[] = allCurrentMessages.filter(msg => currentMessageIds.has(msg.id) && !seenMessageIds.has(msg.id));
-
-      if (newUncommittedMessages.length > 0) {
-          uncommitted = {
-              messages: newUncommittedMessages,
+      // Determine new uncommitted panelChats based on currentMessageIds
+      const newUncommittedPanelChats: PanelChat[] = allCurrentPanelChats.map(pc => {
+          const filteredMessages = pc.messages.filter(msg => currentMessageIds.has(msg.id) && !seenMessageIds.has(msg.id));
+          return {
+              ai_editor: pc.ai_editor,
+              id: pc.id,
+              customTitle: pc.customTitle,
+              parent_id: pc.parent_id,
+              created_on: pc.created_on,
+              messages: filteredMessages
           };
-          console.log(`Found ${newUncommittedMessages.length} uncommitted new messages.`);
+      }).filter(pc => pc.messages.length > 0);
+
+      if (newUncommittedPanelChats.length > 0) {
+          uncommitted = {
+              panelChats: newUncommittedPanelChats,
+          };
+          console.log(`Found ${newUncommittedPanelChats.length} uncommitted new panelChats.`);
       } else {
-          console.log("No uncommitted new messages found.");
+          console.log("No uncommitted new panelChats found.");
       }
   }
 
@@ -240,13 +270,20 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
   };
 }
 
-
+/**
+ * Maps each message ID to its corresponding CommitData.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the target file within the repository.
+ * @returns A Promise resolving to a Map where each key is a message ID and the value is its CommitData.
+ */
 export async function getIdToCommitInfo(repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
   const gitHistory  = await getGitHistory(repoPath, filePath);
   const idToCommitInfo = new Map<string, CommitData>();
   for (const commit of gitHistory.commits) {
-    for (const message of commit.messages) {
-      idToCommitInfo.set(message.id, commit);
+    for (const panelChat of commit.panelChats) { // Updated to iterate through panelChats
+      for (const message of panelChat.messages) { // Iterate through messages within each panelChat
+        idToCommitInfo.set(message.id, commit);
+      }
     }
   }
   return idToCommitInfo;
@@ -280,7 +317,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             commitMessage: commit.commitMessage,
             author: commit.author,
             date: new Date(commit.date),
-            messages: commit.messages
+            panelChats: commit.panelChats // Updated to use panelChats
         })).sort((a, b) => b.date.getTime() - a.date.getTime());
 
         // Handle uncommitted changes by appending them to the commits array
@@ -290,7 +327,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 author: 'You',
                 commitMessage: 'Uncommitted Changes',
                 date: new Date(), // Current date and time
-                messages: gitHistory.uncommitted.messages
+                panelChats: gitHistory.uncommitted.panelChats // Updated to use panelChats
             };
             this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
         }
@@ -298,8 +335,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         vscode.window.showErrorMessage(`Error loading git history: ${error.message}`);
         this._commits = [];
     }
-}
-
+  }
 
   /**
    * Updates the webview content by loading commits and integrating uncommitted changes.
@@ -432,6 +468,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
       }
   }
 
+  /**
+   * Generates the HTML content for the webview.
+   * @param webview - The Webview instance.
+   * @returns A string containing the HTML.
+   */
   private getHtmlForWebview(webview: vscode.Webview): string {
       const nonce = getNonce();
 
@@ -493,6 +534,22 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
   .commit-details {
     display: none;
     margin-top: 10px;
+  }
+  .panel-chat {
+    margin-bottom: 15px;
+    padding: 10px;
+    border: 1px solid var(--vscode-editorWidget-border);
+    border-radius: 5px;
+    background-color: var(--vscode-editor-background);
+  }
+  .panel-chat-header {
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  .panel-chat-info {
+    font-size: 0.9em;
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 10px;
   }
   .message-container {
     margin-bottom: 15px;
@@ -614,6 +671,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
 
+  /**
+   * Escapes HTML characters to prevent XSS attacks.
+   * @param {string} text - The text to escape.
+   * @returns {string} - The escaped text.
+   */
   function escapeHtml(text) {
     const map = {
       '&': '&amp;',
@@ -625,6 +687,113 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     return text.replace(/[&<>"']/g, function(m) { return map[m]; });
   }
 
+  /**
+   * Formats the response text, converting code blocks into styled divs.
+   * @param {string} responseText - The response text to format.
+   * @returns {string} - The formatted HTML string.
+   */
+  function formatResponse(responseText) {
+    if (typeof responseText !== 'string') {
+      console.warn('formatResponse received non-string responseText:', responseText);
+      return '<em>Invalid response text.</em>';
+    }
+
+    const codeBlockRegex = /\`\`\`([^\`]+)\`\`\`/g;
+    let formattedText = '';
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(responseText)) !== null) {
+      const index = match.index;
+      formattedText += escapeHtml(responseText.slice(lastIndex, index));
+      formattedText += \`<div class="code-block">\${escapeHtml(match[1].trim())}</div>\`;
+      lastIndex = index + match[0].length;
+    }
+
+    formattedText += escapeHtml(responseText.slice(lastIndex));
+    return formattedText;
+  }
+
+  /**
+   * Attaches click listeners to commit headers to toggle visibility of commit details.
+   */
+  function attachCommitToggleListeners() {
+    const commitHeaders = document.querySelectorAll('.commit-header');
+    commitHeaders.forEach(header => {
+      header.addEventListener('click', () => {
+        const details = header.nextElementSibling;
+        if (details) {
+          if (details.style.display === 'block') {
+            details.style.display = 'none';
+          } else {
+            details.style.display = 'block';
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Attaches click listeners to delete buttons to initiate message deletion.
+   */
+  function attachDeleteButtonListeners() {
+    const deleteButtons = document.querySelectorAll('.delete-button');
+    deleteButtons.forEach(button => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation(); // Prevent triggering the commit toggle
+        const messageId = button.getAttribute('data-id');
+        if (messageId) {
+          showConfirmationModal(messageId);
+        } else {
+          console.warn('Delete button clicked without a valid message ID.');
+        }
+      });
+    });
+  }
+
+  /**
+   * Displays a custom confirmation modal before deleting a message.
+   * @param {string} messageId - The ID of the message to delete.
+   */
+  function showConfirmationModal(messageId) {
+    const modal = document.getElementById('confirmModal');
+    modal.style.display = 'flex';
+
+    // Handle "Yes" button click
+    document.getElementById('confirmYes').onclick = function() {
+      console.log('Sending deleteMessage command for ID: ' + messageId);
+      vscode.postMessage({ command: 'deleteMessage', id: messageId });
+      modal.style.display = 'none';
+    };
+
+    // Handle "No" button click
+    document.getElementById('confirmNo').onclick = function() {
+      console.log('Deletion cancelled by user.');
+      modal.style.display = 'none';
+    };
+  }
+
+  /**
+   * Closes the modal when clicking outside of the modal content.
+   * @param {MouseEvent} event - The mouse event.
+   */
+  window.onclick = function(event) {
+    const modal = document.getElementById('confirmModal');
+    if (event.target == modal) {
+      modal.style.display = 'none';
+    }
+  };
+
+  /**
+   * Attaches an event listener to the refresh button to update commit history.
+   */
+  document.getElementById('refreshButton').addEventListener('click', () => {
+    vscode.postMessage({ command: 'refresh' });
+  });
+
+  /**
+   * Handles incoming messages from the extension backend.
+   */
   window.addEventListener('message', event => {
     const message = event.data;
     if (message.type === 'update') {
@@ -650,39 +819,86 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
           const commitDetails = document.createElement('div');
           commitDetails.className = 'commit-details';
 
-          // Populate messages
-          if (commit.messages && commit.messages.length > 0) {
-            commit.messages.forEach(messageEntry => {
-              const messageContainer = document.createElement('div');
-              messageContainer.className = 'message-container';
+          // Populate panelChats
+          if (commit.panelChats && commit.panelChats.length > 0) {
+            commit.panelChats.forEach(panelChat => {
+              // Create panelChat container
+              const panelChatDiv = document.createElement('div');
+              panelChatDiv.className = 'panel-chat';
 
-              // Delete button
-              const deleteBtn = document.createElement('button');
-              deleteBtn.className = 'delete-button';
-              deleteBtn.setAttribute('data-id', messageEntry.id);
-              deleteBtn.title = 'Delete Message';
-              deleteBtn.textContent = '×';
-              messageContainer.appendChild(deleteBtn);
+              // PanelChat header
+              const panelChatHeader = document.createElement('div');
+              panelChatHeader.className = 'panel-chat-header';
+              panelChatHeader.textContent = \`PanelChat ID: \${escapeHtml(panelChat.id)}\`;
+              panelChatDiv.appendChild(panelChatHeader);
 
-              // Message Text
-              const messageDiv = document.createElement('div');
-              messageDiv.className = 'message';
-              messageDiv.innerHTML = escapeHtml(messageEntry.messageText);
-              messageContainer.appendChild(messageDiv);
+              // PanelChat info (customTitle, ai_editor, etc.)
+              const panelChatInfo = document.createElement('div');
+              panelChatInfo.className = 'panel-chat-info';
+              panelChatInfo.innerHTML = \`
+                <strong>Title:</strong> \${escapeHtml(panelChat.customTitle)}<br>
+                <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
+                <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
+                <strong>Parent ID:</strong> \${panelChat.parent_id ? escapeHtml(panelChat.parent_id) : 'N/A'}
+              \`;
+              panelChatDiv.appendChild(panelChatInfo);
 
-              // Response Text
-              const responseDiv = document.createElement('div');
-              responseDiv.className = 'response';
-              responseDiv.innerHTML = formatResponse(messageEntry.responseText);
-              messageContainer.appendChild(responseDiv);
+              // Messages in panelChat
+              panelChat.messages.forEach(messageEntry => {
+                const messageContainer = document.createElement('div');
+                messageContainer.className = 'message-container';
 
-              commitDetails.appendChild(messageContainer);
+                // Delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-button';
+                deleteBtn.setAttribute('data-id', messageEntry.id);
+                deleteBtn.title = 'Delete Message';
+                deleteBtn.textContent = '×';
+                messageContainer.appendChild(deleteBtn);
+
+                // Message Text
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                messageDiv.innerHTML = escapeHtml(messageEntry.messageText);
+                messageContainer.appendChild(messageDiv);
+
+                // Response Text
+                const responseDiv = document.createElement('div');
+                responseDiv.className = 'response';
+                responseDiv.innerHTML = formatResponse(messageEntry.responseText);
+                messageContainer.appendChild(responseDiv);
+
+                // Additional Message Details
+                const messageDetails = document.createElement('div');
+                messageDetails.className = 'message-details';
+                messageDetails.style.fontSize = '0.8em';
+                messageDetails.style.color = 'var(--vscode-descriptionForeground)';
+                messageDetails.innerHTML = \`
+                  <strong>Model:</strong> \${escapeHtml(messageEntry.model)}<br>
+                  <strong>Timestamp:</strong> \${new Date(messageEntry.timestamp).toLocaleString()}
+                \`;
+                messageContainer.appendChild(messageDetails);
+
+                // Optionally, display context if needed
+                if (messageEntry.context && messageEntry.context.length > 0) {
+                  const contextDiv = document.createElement('div');
+                  contextDiv.className = 'context';
+                  contextDiv.style.fontSize = '0.8em';
+                  contextDiv.style.color = 'var(--vscode-descriptionForeground)';
+                  contextDiv.innerHTML = \`<strong>Context:</strong> \${escapeHtml(JSON.stringify(messageEntry.context))}\`;
+                  messageContainer.appendChild(contextDiv);
+                }
+
+                panelChatDiv.appendChild(messageContainer);
+              });
+
+              commitDetails.appendChild(panelChatDiv);
             });
           } else {
-            const noMessages = document.createElement('div');
-            noMessages.className = 'no-messages';
-            noMessages.textContent = 'No messages in this commit.';
-            commitDetails.appendChild(noMessages);
+            const noPanelChats = document.createElement('div');
+            noPanelChats.className = 'no-messages';
+            noPanelChats.textContent = 'No panelChats in this commit.';
+            commitDetails.appendChild(noPanelChats);
           }
 
           commitDiv.appendChild(commitDetails);
@@ -703,100 +919,24 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     }
   });
 
-  function formatResponse(responseText) {
-    if (typeof responseText !== 'string') {
-      console.warn('formatResponse received non-string responseText:', responseText);
-      return '<em>Invalid response text.</em>';
-    }
-
-    const codeBlockRegex = /\`\`\`([^\`]+)\`\`\`/g;
-    let formattedText = '';
-    let lastIndex = 0;
-    let match;
-
-    while ((match = codeBlockRegex.exec(responseText)) !== null) {
-      const index = match.index;
-      formattedText += escapeHtml(responseText.slice(lastIndex, index));
-      formattedText += \`<div class="code-block">\${escapeHtml(match[1].trim())}</div>\`;
-      lastIndex = index + match[0].length;
-    }
-
-    formattedText += escapeHtml(responseText.slice(lastIndex));
-    return formattedText;
-  }
-
-  function attachCommitToggleListeners() {
-    const commitHeaders = document.querySelectorAll('.commit-header');
-    commitHeaders.forEach(header => {
-      header.addEventListener('click', () => {
-        const details = header.nextElementSibling;
-        if (details) {
-          if (details.style.display === 'block') {
-            details.style.display = 'none';
-          } else {
-            details.style.display = 'block';
-          }
-        }
-      });
-    });
-  }
-
-  function attachDeleteButtonListeners() {
-    const deleteButtons = document.querySelectorAll('.delete-button');
-    deleteButtons.forEach(button => {
-      button.addEventListener('click', (event) => {
-        event.stopPropagation(); // Prevent triggering the commit toggle
-        const messageId = button.getAttribute('data-id');
-        if (messageId) {
-          showConfirmationModal(messageId);
-        } else {
-          console.warn('Delete button clicked without a valid message ID.');
-        }
-      });
-    });
-  }
-
-  // Function to show the custom confirmation modal
-  function showConfirmationModal(messageId) {
-    const modal = document.getElementById('confirmModal');
-    modal.style.display = 'flex';
-
-    // Handle "Yes" button click
-    document.getElementById('confirmYes').onclick = function() {
-      console.log('Sending deleteMessage command for ID: ' + messageId);
-      vscode.postMessage({ command: 'deleteMessage', id: messageId });
-      modal.style.display = 'none';
-    };
-
-    // Handle "No" button click
-    document.getElementById('confirmNo').onclick = function() {
-      console.log('Deletion cancelled by user.');
-      modal.style.display = 'none';
-    };
-  }
-
-  // Optional: Close the modal when clicking outside of the modal content
-  window.onclick = function(event) {
-    const modal = document.getElementById('confirmModal');
-    if (event.target == modal) {
-      modal.style.display = 'none';
-    }
-  };
-
-  // Attach event listener to the refresh button
-  document.getElementById('refreshButton').addEventListener('click', () => {
-    vscode.postMessage({ command: 'refresh' });
-  });
-
+  /**
+   * Notifies the extension that the Webview is ready.
+   */
   // Notify the extension that the Webview is ready
   vscode.postMessage({ command: 'webviewReady' });
   console.log('Webview is ready.');
 </script>
 </body>
 </html>
-  `;
-}}
+      `;
+  }
 
+}
+
+/**
+ * Generates a random nonce for Content Security Policy.
+ * @returns {string} - A random 32-character string.
+ */
 function getNonce() {
   let text = '';
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
