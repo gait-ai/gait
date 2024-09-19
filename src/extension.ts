@@ -10,6 +10,7 @@ import { PanelViewProvider } from './panelview';
 import { monitorPanelChatAsync } from './panelChats';
 import { parse } from 'csv-parse/sync';
 import { activateGaitParticipant } from './gaitChatParticipant';
+import { checkTool } from './ide';
 
 
 const execAsync = promisify(exec);
@@ -206,7 +207,8 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
-    vscode.window.showInformationMessage('Gait Copilot extension activated');
+    const tool = checkTool();
+    vscode.window.showInformationMessage(`Gait Copilot extension activated in ${tool}`);
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
