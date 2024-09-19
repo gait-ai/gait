@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { PanelMatchedRange } from './types';
+import { getIdToCommitInfo } from './panelview';
 
 /**
  * Creates hover content for a matched panel chat range.
@@ -8,7 +9,20 @@ import { PanelMatchedRange } from './types';
  * @returns A promise that resolves to a VSCode Hover object.
  */
 export async function createPanelHover(matchedRange: PanelMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
-    const markdown = new vscode.MarkdownString();
+    let markdown = new vscode.MarkdownString();
+    let idToCommitInfo = undefined;
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        console.warn('No workspace folder found.');
+    } else {
+        try {
+            const repoPath = workspaceFolder.uri.fsPath;
+            const filePath = '.gait/stashedPanelChats.json'; // Replace with your actual file path relative to repo
+            idToCommitInfo = await getIdToCommitInfo(repoPath, filePath);
+        } catch (error) {
+            console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
+        }
+    }
     const { panelChat, message_id } = matchedRange;
 
     // Find the message that resulted in the matched range
@@ -16,8 +30,16 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
     if (!message) {
         return undefined;
     }
+    console.log("test123123",idToCommitInfo);   
 
-    markdown.supportHtml = true;
+    const commitInfo = idToCommitInfo?.get(message.id);
+    const author = commitInfo?.author ?? "You";
+    const commitMessage = commitInfo?.commitMessage ?? "Uncommited changes";
+
+    markdown.isTrusted = true;
+
+    // Display the commit information
+    markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
     markdown.isTrusted = true;
 
     // Display the message text and response

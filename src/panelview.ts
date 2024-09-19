@@ -11,6 +11,7 @@ type CommitData = {
   commitHash: string;
   date: Date;
   commitMessage: string;
+  author: string;
   messages: MessageEntry[];
 };
 
@@ -18,12 +19,12 @@ type UncommittedData = {
   messages: MessageEntry[];
 };
 
-type GitHistoryData = {
+export type GitHistoryData = {
   commits: CommitData[];
   uncommitted: UncommittedData | null;
 };
 
-async function getGitHistory(repoPath: string, filePath: string): Promise<GitHistoryData> {
+export async function getGitHistory(repoPath: string, filePath: string): Promise<GitHistoryData> {
   const git: SimpleGit = simpleGit(repoPath);
 
   console.log("Starting getGitHistory");
@@ -130,6 +131,7 @@ async function getGitHistory(repoPath: string, filePath: string): Promise<GitHis
               commitHash,
               date: new Date(dateStr),
               commitMessage,
+              author: authorName,
               messages: [],
           };
           allCommitsMap.set(commitHash, commitData);
@@ -239,6 +241,17 @@ async function getGitHistory(repoPath: string, filePath: string): Promise<GitHis
 }
 
 
+export async function getIdToCommitInfo(repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
+  const gitHistory  = await getGitHistory(repoPath, filePath);
+  const idToCommitInfo = new Map<string, CommitData>();
+  for (const commit of gitHistory.commits) {
+    for (const message of commit.messages) {
+      idToCommitInfo.set(message.id, commit);
+    }
+  }
+  return idToCommitInfo;
+}
+
 export class PanelViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'gait-copilot.panelView';
 
@@ -265,6 +278,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         this._commits = gitHistory.commits.map(commit => ({
             commitHash: commit.commitHash,
             commitMessage: commit.commitMessage,
+            author: commit.author,
             date: new Date(commit.date),
             messages: commit.messages
         })).sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -273,6 +287,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         if (gitHistory.uncommitted) {
             const uncommittedCommit: CommitData = {
                 commitHash: 'uncommitted',
+                author: 'You',
                 commitMessage: 'Uncommitted Changes',
                 date: new Date(), // Current date and time
                 messages: gitHistory.uncommitted.messages
