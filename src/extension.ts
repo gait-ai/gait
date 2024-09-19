@@ -4,11 +4,9 @@ import * as fs from 'fs';
 import * as Diff from 'diff';
 import * as Inline from './inline';
 import * as InlineDecoration from './inlinedecoration';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { PanelViewProvider } from './panelview';
 import { monitorPanelChatAsync } from './panelChats';
-import { parse } from 'csv-parse/sync';
+import { parseVSCodeState } from './dbReader';
 import { activateGaitParticipant } from './gaitChatParticipant';
 import { checkTool } from './ide';
 
@@ -16,15 +14,6 @@ import { checkTool } from './ide';
 
 const execAsync = promisify(exec);
 
-// Constants for global state keys and file paths
-const GAIT_FOLDER_NAME = '.gait';
-
-/**
- * Interface representing the VSCode state.
- */
-interface VSCodeState {
-    [key: string]: any;
-}
 
 let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider: vscode.Disposable } | undefined;
 let decorationsActive = true;
