@@ -2,8 +2,9 @@ import * as vscode from 'vscode';
 import * as Diff from 'diff';
 import * as Inline from '../inline';
 import { readVSCodeState } from '../tools/dbReader';
-import { Context, MessageEntry, PanelChat, StashedState } from '../types';
+import { Context, MessageEntry, PanelChat, StashedState, StateReader } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
 const SCHEMA_VERSION = '1.0';
 
 
@@ -58,40 +59,53 @@ function getSingleNewEditorText(oldSessions: InteractiveSession, newSessions: In
     return newEditorTexts[0];
 }
 
+function getDBPath(context: vscode.ExtensionContext): string {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder || !context.storageUri) {
+        throw new Error('No workspace folder or storage URI found');
+    }
+    const dbPath = path.join(path.dirname(context.storageUri.fsPath), 'state.vscdb');
+    return dbPath;
+}
 
-export class VSCodeReader {
+
+export class VSCodeReader implements StateReader {
     private context: vscode.ExtensionContext;
+    private interactiveSessions: InteractiveSession | null = null;
+    private inlineStartInfo: Inline.InlineStartInfo | null = null;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
     }
 
+
     /**
      * Initializes the extension by reading interactive sessions.
      */
-    public async startInline() {
-        const interactiveSessions = await readVSCodeState(this.context, 'memento/interactive-session');
-        this.context.workspaceState.update('memento/interactive-session', interactiveSessions);
+    public async startInline(inlineStartInfo: Inline.InlineStartInfo) {
+        const interactiveSessions = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
+        this.interactiveSessions= interactiveSessions;
+        this.inlineStartInfo = inlineStartInfo;
     }
 
     /**
      * Processes the editor content during inline chat acceptance.
      */
     public async acceptInline(editor: vscode.TextEditor) {
-        const oldInteractiveSessions: any = this.context.workspaceState.get('memento/interactive-session');
+        const oldInteractiveSessions: any = this.interactiveSessions;
         if (!isValidInteractiveSession(oldInteractiveSessions)) {
             throw new Error('Old interactive sessions are invalid or not found.');
         }
 
         const newContent = editor.document.getText();
-        const lastInline = this.context.workspaceState.get("last_inline_start");
-
+        const lastInline = this.inlineStartInfo;
+        this.inlineStartInfo = null;
         if (Inline.isInlineStartInfo(lastInline)) {
             const diff = Diff.diffLines(lastInline.content, newContent);
             await vscode.commands.executeCommand('inlineChat.acceptChanges');
 
             await new Promise(resolve => setTimeout(resolve, 2000));
-            const newInteractiveSessions: any = await readVSCodeState(this.context, 'memento/interactive-session');
+            const newInteractiveSessions: any = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
             
             if (!isValidInteractiveSession(newInteractiveSessions)) {
                 throw new Error('New interactive sessions are invalid or not found.');
@@ -100,6 +114,7 @@ export class VSCodeReader {
             const inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, diff, newChat);
 
             Inline.writeInlineChat(inlineChatInfoObj);
+            this.interactiveSessions = null;
         } else {
             throw new Error('No valid content stored in last_inline_start');
         }
@@ -110,7 +125,7 @@ export class VSCodeReader {
      */
     public async parsePanelChatAsync(existingIds: string[]): Promise<StashedState> {
         try {
-            const interactiveSessions = await readVSCodeState(this.context, 'interactive.sessions');
+            const interactiveSessions = await readVSCodeState(getDBPath(this.context), 'interactive.sessions');
     
             if (!Array.isArray(interactiveSessions)) {
                 vscode.window.showErrorMessage('Interactive sessions data is not an array.');

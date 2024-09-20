@@ -54,7 +54,6 @@ async function getGitHistory(repoPath: string, filePath: string): Promise<GitHis
   let previousChats = new Set<string>(); // To track the chats seen in previous commits
 
   for (const line of logLines) {
-    console.log("Processing Line: ", line);
     const [commitHash, author, dateStr, ...commitMsgParts] = line.split('\t');
     const commitMessage = commitMsgParts.join('\t');
 
@@ -156,9 +155,6 @@ async function getGitHistory(repoPath: string, filePath: string): Promise<GitHis
       };
     }
   }
-  console.log("Returning commits and uncommitted");
-  console.log(allCommits);
-  console.log(uncommitted);
   return {
     commits: allCommits,
     uncommitted,

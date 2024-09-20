@@ -1,11 +1,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as VSCodeReader from './vscode/vscodeReader';
 
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
-import { StashedState, PanelChat, MessageEntry, Context, LastAppended, isStashedState } from './types';
+import { StashedState, StateReader } from './types';
 
 /**
  * Reads the stashed panel chats and last appended data from .gait/stashedPanelChats.json.
@@ -141,7 +140,7 @@ async function writeStashedPanelChats(gaitDir: string, stashedState: StashedStat
  */
 let isAppending = false;
 
-export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
+export async function monitorPanelChatAsync(stateReader: StateReader) {
   setInterval(async () => {
     if (isAppending) {
       // Skip if a previous append operation is still in progress
@@ -167,7 +166,7 @@ export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
       const existingIds = lastAppended.order;
 
       // Parse the current panelChats with existing UUIDs
-      const parsedStashedState = await VSCodeReader.parsePanelChatAsync(context, existingIds);
+      const parsedStashedState = await stateReader.parsePanelChatAsync(existingIds);
       const panelChats = parsedStashedState.panelChats;
 
       // Read the existing stashedPanelChats.json as existingStashedState

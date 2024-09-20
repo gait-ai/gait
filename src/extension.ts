@@ -1,15 +1,15 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as Diff from 'diff';
 import * as Inline from './inline';
 import * as InlineDecoration from './inlinedecoration';
 import { PanelViewProvider } from './panelview';
 import { monitorPanelChatAsync } from './panelChats';
-import { readVSCodeState } from './tools/dbReader';
 import * as VSCodeReader from './vscode/vscodeReader';
+import * as CursorReader from './cursor/cursorReader';
 import { activateGaitParticipant } from './vscode/gaitChatParticipant';
-import { checkTool } from './ide';
+import { checkTool, TOOL } from './ide';
+import { StateReader } from './types';
 
 const GAIT_FOLDER_NAME = '.gait';
 
@@ -56,7 +56,7 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
-    vscode.window.showInformationMessage('Gait Copilot extension activated for ' + checkTool());
+    const tool: TOOL = checkTool();
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
@@ -66,8 +66,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     createGaitFolderIfNotExists(workspaceFolder);
 
+    const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
+
     setTimeout(() => {
-        monitorPanelChatAsync(context);
+        monitorPanelChatAsync(stateReader);
     }, 3000); // Delay to ensure initial setup
 
     const provider = new PanelViewProvider(context);
@@ -77,9 +79,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     console.log('WebviewViewProvider registered for', PanelViewProvider.viewType);
 
-    const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-    const panelChatPath = path.join(gaitDir, 'stashedPanelChats.json');
-
     const updateSidebarCommand = vscode.commands.registerCommand('gait-copilot.updateSidebar', async () => {
         vscode.window.showInformationMessage('Updating sidebar content');
         try {
@@ -87,16 +86,6 @@ export function activate(context: vscode.ExtensionContext) {
         } catch (error) {
             vscode.window.showErrorMessage(`Error updating sidebar: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-    });
-
-    const helloWorldCommand = vscode.commands.registerCommand('gait-copilot.helloWorld', async () => {
-        try {
-            const interactiveSessions = context.workspaceState.get('interactive.sessions', []);
-            vscode.window.showInformationMessage(`${JSON.stringify(interactiveSessions, null, 2)}`);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to save file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-        vscode.commands.executeCommand('inlineChat.start');
     });
 
     const inlineChatStartOverride = vscode.commands.registerCommand('gait-copilot.startInlineChat', () => {
@@ -114,10 +103,9 @@ export function activate(context: vscode.ExtensionContext) {
                 selectionContent: document.getText(selection),
                 parent_inline_chat_id: null,
             };
-            VSCodeReader.initializeAsync(context).catch((error) => {
+            stateReader.startInline(inlineStartInfo).catch((error) => {
                 vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
             });
-            context.workspaceState.update("last_inline_start", inlineStartInfo);
         }
         vscode.commands.executeCommand('inlineChat.start');
     });
@@ -151,12 +139,9 @@ export function activate(context: vscode.ExtensionContext) {
                     selectionContent: document.getText(selection),
                     parent_inline_chat_id: args.parent_inline_chat_id,
                 };
-
-                VSCodeReader.initializeAsync(context).catch((error) => {
+                stateReader.startInline(inlineStartInfo).catch((error) => {
                     vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 });
-                context.workspaceState.update("last_inline_start", inlineStartInfo);
-
                 vscode.commands.executeCommand('inlineChat.start');
             }
         } catch (error) {
@@ -167,7 +152,7 @@ export function activate(context: vscode.ExtensionContext) {
     const inlineChatAcceptOverride = vscode.commands.registerCommand('gait-copilot.acceptInlineChat', () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
-            VSCodeReader.processEditorContent(context, editor).catch(error => {
+            stateReader.acceptInline(editor).catch(error => {
                 vscode.window.showErrorMessage(`Failed to process editor content: ${error instanceof Error ? error.message : 'Unknown error'}`);
             });
 
@@ -292,7 +277,6 @@ export function activate(context: vscode.ExtensionContext) {
     // Register all commands
     context.subscriptions.push(
         updateSidebarCommand, 
-        helloWorldCommand, 
         inlineChatStartOverride, 
         inlineChatContinue, 
         inlineChatAcceptOverride, 

@@ -1,24 +1,10 @@
 import * as vscode from 'vscode';
+import { InlineStartInfo } from './inline';
 
 export interface Context {
 	context_type: string
 	key: string
 	value: string
-  
-  /**
-   * Initializes the extension by reading interactive sessions.
-   */
-  startInline(inlineStartInfo: Inline.InlineStartInfo): Promise<void>;
-
-  /**
-   * Processes the editor content during inline chat acceptance.
-   */
-  acceptInline(editor: vscode.TextEditor): Promise<void>;
-
-  /**
-   * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
-   */
-  parsePanelChatAsync(existingIds: string[]): Promise<StashedState>;
 }
 
 function isContext(obj: any): obj is Context {
@@ -102,16 +88,20 @@ export interface PanelMatchedRange {
   similarity: number;
 }
 
-export interface StateReader {
+export interface StateReader {   
   /**
-   * Reads and parses the state into PanelChats.
-   * @returns A promise that resolves to an array of PanelChats.
-   */
-  readPanelChats(): Promise<PanelChat[]>;
+  * Initializes the extension by reading interactive sessions.
+  */
+  startInline(inlineStartInfo: InlineStartInfo): Promise<void>;
 
   /**
-   * Retrieves the prompt for inline chats.
-   * @returns A promise that resolves to a string containing the inline chat prompt.
-   */
-  getInlineChatPrompt(): Promise<string>;
+  * Processes the editor content during inline chat acceptance.
+  */
+  acceptInline(editor: vscode.TextEditor): Promise<void>;
+
+  /**
+  * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
+  */
+  parsePanelChatAsync(existingIds: string[]): Promise<StashedState>;
 }
+

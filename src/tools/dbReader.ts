@@ -40,20 +40,13 @@ async function parseVSCodeState(dbPath: string): Promise<VSCodeState> {
 /**
  * Reads a specific key from the VSCode state.
  */
-export async function readVSCodeState(context: vscode.ExtensionContext, key: string): Promise<any> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder || !context.storageUri) {
-        throw new Error('No workspace folder or storage URI found');
-    }
-
-    const dbPath = path.join(path.dirname(context.storageUri.fsPath), 'state.vscdb');
+export async function readVSCodeState(dbPath: string, key: string): Promise<any> {
     const state = await parseVSCodeState(dbPath);
 
     if (key in state) {
         return state[key];
     } else {
-        vscode.window.showInformationMessage(`No data found for key: ${key}`);
-        return [];
+        return null;
     }
 }
 
