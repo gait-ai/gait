@@ -107,7 +107,21 @@ async function generateKeybindings(extensionPath: string) {
         },
     ];
 
+    const newKeybindings: Keybinding[] = [
+        {
+            command: "gait-copilot.startInlineChat",
+            key: "cmd+i",
+            when: "editorFocus && inlineChatHasProvider && !editorReadonly"
+        },
+        {
+            command: "gait-copilot.acceptInlineChat",
+            key: "cmd+enter",
+            when: "inlineChatHasProvider && inlineChatVisible && !inlineChatDocumentChanged || inlineChatHasProvider && inlineChatVisible && config.inlineChat.mode != 'preview'"
+        }
+    ];
+
     const resultShortcuts = [
+        ...newKeybindings,
         ...removedCmdRShortcuts,
         ...cmdKKeybindings,
         ...removedCmdKKeybindings,
