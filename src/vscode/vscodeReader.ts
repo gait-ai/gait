@@ -60,9 +60,17 @@ function getSingleNewEditorText(oldSessions: InteractiveSession, newSessions: In
 
 
 /**
+ * Initializes the extension by reading interactive sessions.
+ */
+export async function startInline(context: vscode.ExtensionContext) {
+    const interactiveSessions = await readVSCodeState(context, 'memento/interactive-session');
+    await context.workspaceState.update('memento/interactive-session', interactiveSessions);
+}
+
+/**
  * Processes the editor content during inline chat acceptance.
  */
-export async function processEditorContent(context: vscode.ExtensionContext, editor: vscode.TextEditor) {
+export async function acceptInline(context: vscode.ExtensionContext, editor: vscode.TextEditor) {
     const oldInteractiveSessions: any = context.workspaceState.get('memento/interactive-session');
     if (!isValidInteractiveSession(oldInteractiveSessions)) {
         throw new Error('Old interactive sessions are invalid or not found.');
@@ -200,11 +208,3 @@ export async function parsePanelChatAsync(
       return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
     }
   }
-  
-  /**
- * Initializes the extension by reading interactive sessions.
- */
-export async function initializeAsync(context: vscode.ExtensionContext) {
-    const interactiveSessions = await readVSCodeState(context, 'memento/interactive-session');
-    await context.workspaceState.update('memento/interactive-session', interactiveSessions);
-}
