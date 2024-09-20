@@ -1,143 +1,180 @@
 {
-  "name": "gait-copilot",
-  "displayName": "gait copilot",
-  "description": "Store and share your copilot conversations",
-  "version": "0.0.1",
-  "engines": {
-    "vscode": "^1.93.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onStartupFinished"
-  ],
-  "main": "./dist/extension.js",
-  "contributes": {
-    "chatParticipants": [
-        {
-            "id": "gait-participant.gait",
-            "fullName": "Gait Chat Participant",
-            "name": "gait",
-            "description": "Provides insights and makes edits to code based on context.",
-            "isSticky": false,
-            "commands": [
+    "name": "gait-copilot",
+    "displayName": "gait copilot",
+    "description": "Store and share your copilot conversations",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.91.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "chatParticipants": [
+            {
+                "id": "gait-participant.gait",
+                "fullName": "Gait Chat Participant",
+                "name": "gait",
+                "description": "Provides insights and makes edits to code based on context.",
+                "isSticky": false,
+                "commands": []
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "gait-copilot",
+                    "title": "Gait Copilot",
+                    "icon": "resources/sidebar-icon.svg"
+                }
             ]
-        }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "gait-copilot",
-          "title": "Gait Copilot",
-          "icon": "resources/sidebar-icon.svg"
-        }
-      ]
+        },
+        "views": {
+            "gait-copilot": [
+                {
+                    "type": "webview",
+                    "id": "gait-copilot.panelView",
+                    "name": "Panel View"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "gait-copilot.helloWorld",
+                "title": "Hello World",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.startInlineChat",
+                "title": "Start Inline Chat",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.updateSidebar",
+                "title": "Update Sidebar",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.acceptInlineChat",
+                "title": "Accept Inline Chat",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.removeInlineChat",
+                "title": "Remove Inline Chat",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.continueInlineChat",
+                "title": "Continue Inline Chat",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.activateDecorations",
+                "title": "Activate Decorations",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.deactivateDecorations",
+                "title": "Deactivate Decorations",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.deletePanelChat",
+                "title": "Delete Panel Chat",
+                "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.registerGaitChatParticipant",
+                "title": "Load context into gait chat participant",
+                "category": "Gait"
+            }
+        ],
+        "keybindings": [
+            {
+                "key": "cmd+e",
+                "command": "aipopup.action.modal.generate",
+                "when": "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
+            },
+            {
+                "key": "cmd+k",
+                "command": "-aipopup.action.modal.generate",
+                "when": "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
+            },
+            {
+                "key": "cmd+e",
+                "command": "composer.startComposerPrompt",
+                "when": "composerIsEnabled"
+            },
+            {
+                "key": "cmd+k",
+                "command": "-composer.startComposerPrompt",
+                "when": "composerIsEnabled"
+            },
+            {
+                "command": "gait-copilot.startInlineChat",
+                "key": "cmd+k",
+                "when": "editorFocus"
+            },
+            {
+                "command": "gait-copilot.acceptInlineChat",
+                "key": "cmd+shift+space"
+            },
+            {
+                "key": "cmd+a cmd+s",
+                "command": "editor.action.inlineDiffs.acceptAll",
+                "when": "editorTextFocus && (arbitrary function)"
+            },
+            {
+                "key": "cmd+enter",
+                "command": "-editor.action.inlineDiffs.acceptAll",
+                "when": "editorTextFocus && (arbitrary function)"
+            }
+        ]
     },
-    "views": {
-      "gait-copilot": [
-        {
-          "type": "webview",
-          "id": "gait-copilot.panelView",
-          "name": "Panel View"
-        }
-      ]
+    "scripts": {
+        "vscode:prepublish": "npm run package",
+        "compile": "webpack",
+        "watch": "webpack --watch",
+        "package": "webpack --mode production --devtool hidden-source-map",
+        "compile-tests": "tsc -p . --outDir out",
+        "watch-tests": "tsc -p . -w --outDir out",
+        "pretest": "npm run compile-tests && npm run compile && npm run lint",
+        "lint": "eslint src",
+        "test": "vscode-test"
     },
-    "commands": [
-      {
-        "command": "gait-copilot.helloWorld",
-        "title": "Hello World"
-      },
-      {
-        "command": "gait-copilot.startInlineChat",
-        "title": "Start Inline Chat"
-      },
-      {
-        "command": "gait-copilot.updateSidebar",
-        "title": "Update Sidebar"
-      },
-      {
-        "command": "gait-copilot.acceptInlineChat",
-        "title": "Accept Inline Chat"
-      },
-      {
-        "command": "gait-copilot.removeInlineChat",
-        "title": "Remove Inline Chat"
-      },
-      {
-        "command": "gait-copilot.continueInlineChat",
-        "title": "Continue Inline Chat"
-      },
-      {
-        "command": "gait-copilot.activateDecorations",
-        "title": "Activate Decorations"
-      },
-      {
-        "command": "gait-copilot.deactivateDecorations",
-        "title": "Deactivate Decorations"
-      },
-      {
-        "command": "gait-copilot.deletePanelChat",
-        "title": "Delete Panel Chat",
-        "category": "Gait Copilot"
-      }, 
-      {
-        "command": "gait-copilot.registerGaitChatParticipant",
-        "title": "Load context into gait chat participant"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "gait-copilot.startInlineChat",
-        "key": "cmd+i",
-        "when": "editorFocus && inlineChatHasProvider && !editorReadonly"
-      },
-      {
-        "command": "gait-copilot.acceptInlineChat",
-        "key": "cmd+enter",
-        "when": "inlineChatHasProvider && inlineChatVisible && !inlineChatDocumentChanged || inlineChatHasProvider && inlineChatVisible && config.inlineChat.mode != 'preview'"
-      }
-    ]
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run package",
-    "compile": "webpack",
-    "watch": "webpack --watch",
-    "package": "webpack --mode production --devtool hidden-source-map",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
-    "@types/diff": "^5.2.2",
-    "@types/fast-levenshtein": "^0.0.4",
-    "@types/mocha": "^10.0.7",
-    "@types/node": "20.x",
-    "@types/uuid": "^10.0.0",
-    "@types/vscode": "^1.93.0",
-    "@typescript-eslint/eslint-plugin": "^8.3.0",
-    "@typescript-eslint/parser": "^8.3.0",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.9.1",
-    "ts-loader": "^9.5.1",
-    "typescript": "^5.5.4",
-    "webpack": "^5.94.0",
-    "webpack-cli": "^5.1.4"
-  },
-  "dependencies": {
-    "@sqlite.org/sqlite-wasm": "^3.46.1-build3",
-    "better-sqlite3": "^11.3.0",
-    "csv-parse": "^5.5.6",
-    "diff": "^7.0.0",
-    "fast-levenshtein": "^3.0.0",
-    "file-uri-to-path": "^2.0.0",
-    "simple-git": "^3.26.0",
-    "sqlite3": "^5.1.7",
-    "uuid": "^10.0.0",
-    "zod": "^3.23.8"
-  }
+    "devDependencies": {
+        "@types/better-sqlite3": "^7.6.11",
+        "@types/diff": "^5.2.2",
+        "@types/fast-levenshtein": "^0.0.4",
+        "@types/mocha": "^10.0.7",
+        "@types/node": "20.x",
+        "@types/uuid": "^10.0.0",
+        "@types/vscode": "^1.91.0",
+        "@typescript-eslint/eslint-plugin": "^8.3.0",
+        "@typescript-eslint/parser": "^8.3.0",
+        "@vscode/test-cli": "^0.0.10",
+        "@vscode/test-electron": "^2.4.1",
+        "eslint": "^9.9.1",
+        "ts-loader": "^9.5.1",
+        "typescript": "^5.5.4",
+        "webpack": "^5.94.0",
+        "webpack-cli": "^5.1.4"
+    },
+    "dependencies": {
+        "@sqlite.org/sqlite-wasm": "^3.46.1-build3",
+        "better-sqlite3": "^11.3.0",
+        "csv-parse": "^5.5.6",
+        "diff": "^7.0.0",
+        "fast-levenshtein": "^3.0.0",
+        "file-uri-to-path": "^2.0.0",
+        "simple-git": "^3.26.0",
+        "sqlite3": "^5.1.7",
+        "uuid": "^10.0.0",
+        "zod": "^3.23.8"
+    }
 }

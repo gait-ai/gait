@@ -4,120 +4,7 @@ import * as path from 'path';
 
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
-
-import { v4 as uuidv4 } from 'uuid';
-import { readVSCodeState } from './extension';
-import { StashedState, PanelChat, MessageEntry, Context, LastAppended, isStashedState } from './types';
-
-/**
- * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
- */
-async function parsePanelChatAsync(
-  context: vscode.ExtensionContext,
-  existingIds: string[]
-): Promise<StashedState> {
-  try {
-    const interactiveSessions = await readVSCodeState(context, 'interactive.sessions');
-
-    if (!Array.isArray(interactiveSessions)) {
-      vscode.window.showErrorMessage('Interactive sessions data is not an array.');
-      return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
-    }
-
-    const panelChats: PanelChat[] = interactiveSessions.map((panel: any, index: number) => {
-      const ai_editor: string = "copilot";
-      const customTitle: string = typeof panel.customTitle === 'string' ? panel.customTitle : '';
-
-      // Determine if this PanelChat has an existing UUID
-      let id: string;
-      const existingIndex = index - (interactiveSessions.length - existingIds.length);
-      if (existingIndex >= 0 && existingIndex < existingIds.length) {
-        // Assign existing UUID
-        id = existingIds[existingIndex];
-      } else {
-        // Assign new UUID
-        id = uuidv4();
-      }
-  
-      const parent_id: string | null = null;
-      const created_on: string = typeof panel.creationDate === 'string' ? panel.creationDate : new Date().toISOString();
-
-      // Extract messages
-      //console.log(`Parsing panel chat with ${panel.requests.length} sessions.`);
-      //console.log(panel);
-
-      const messages: MessageEntry[] = panel.requests.map((request: any) => {
-        // Safely extract messageText
-        const messageText: string = typeof request.message?.text === 'string' ? request.message.text : '';
-
-        // Safely extract responseText
-        let responseText: string = '';
-
-        if (Array.isArray(request.response)) {
-          // Concatenate all response values into a single string, separated by newlines
-          const validResponses = request.response
-            .map((response: any) => response.value)
-            .filter((value: any) => typeof value === 'string' && value.trim() !== '');
-
-          responseText = validResponses.join('\n');
-        } else if (typeof request.response?.value === 'string') {
-          responseText = request.response.value;
-        }
-
-        // Extract model and timestamp if available
-        const model: string = typeof request.model === 'string' ? request.model : 'Unknown';
-        const timestamp: string = typeof request.timestamp === 'string' ? request.timestamp : new Date().toISOString();
-
-        // Extract context if available
-        let contextData: Context[]  = [];
-        if (Array.isArray(request.context)) {
-          contextData = request.context
-            .map((ctx: any) => {
-              if (typeof ctx.type === 'string' && typeof ctx.value === 'string') {
-                switch (ctx.type) {
-                  case 'RelativePath':
-                  case 'SymbolFromReferences':
-                  case 'SymbolInFile':
-                    return { context_type: ctx.type, key: ctx.key, value: ctx.value } as Context;
-                  default:
-                    return undefined;
-                }
-              }
-              return undefined;
-            })
-            .filter((ctx: Context | undefined) => ctx !== undefined) as Context[];
-        }
-
-        //console.log(`Parsed message: ${messageText} -> ${responseText}`);
-        return {
-          id: uuidv4(), // Assign new UUID to MessageEntry
-          messageText,
-          responseText,
-          model,
-          timestamp,
-          context: contextData,
-        };
-      }).filter((entry: MessageEntry) =>
-        entry.messageText.trim() !== '' && entry.responseText.trim() !== ''
-      );
-
-      //console.log(`Parsed panel chat with ${messages.length} messages.`);
-      return {
-        ai_editor,
-        customTitle,
-        id,
-        parent_id,
-        created_on,
-        messages,
-      } as PanelChat;
-    });
-
-    return { panelChats, schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
-  } catch (error) {
-    vscode.window.showErrorMessage(`Failed to parse panel chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
-  }
-}
+import { StashedState, StateReader } from './types';
 
 /**
  * Reads the stashed panel chats and last appended data from .gait/stashedPanelChats.json.
@@ -253,7 +140,7 @@ async function writeStashedPanelChats(gaitDir: string, stashedState: StashedStat
  */
 let isAppending = false;
 
-export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
+export async function monitorPanelChatAsync(stateReader: StateReader) {
   setInterval(async () => {
     if (isAppending) {
       // Skip if a previous append operation is still in progress
@@ -279,7 +166,7 @@ export async function monitorPanelChatAsync(context: vscode.ExtensionContext) {
       const existingIds = lastAppended.order;
 
       // Parse the current panelChats with existing UUIDs
-      const parsedStashedState = await parsePanelChatAsync(context, existingIds);
+      const parsedStashedState = await stateReader.parsePanelChatAsync(existingIds);
       const panelChats = parsedStashedState.panelChats;
 
       // Read the existing stashedPanelChats.json as existingStashedState

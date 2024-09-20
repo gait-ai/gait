@@ -80,8 +80,6 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
       }
   }
 
-  console.log(`Current Message IDs: ${Array.from(currentMessageIds).join(', ')}`);
-
   // Step 2: Get the commit history for the file with --follow to track renames
   // '--reverse' ensures commits are ordered from oldest to newest
   const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
@@ -98,7 +96,6 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
   const seenMessageIds: Set<string> = new Set();
 
   for (const line of logLines) {
-      console.log("Processing Line: ", line);
       const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
       const commitMessage = commitMsgParts.join('\t');
 
