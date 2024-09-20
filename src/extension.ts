@@ -158,6 +158,8 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const inlineChatAcceptOverride = vscode.commands.registerCommand('gait-copilot.acceptInlineChat', () => {
+        
+        vscode.window.showInformationMessage('accepting inline chat...');
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             stateReader.acceptInline(editor).catch(error => {

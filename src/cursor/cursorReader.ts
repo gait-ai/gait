@@ -57,7 +57,7 @@ export class CursorReader implements StateReader {
      */
     public async startInline(inlineStartInfo: Inline.InlineStartInfo) {
         const inlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
-        this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 2);
+        this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 1);
         this.inlineStartInfo = inlineStartInfo;
     }
 
@@ -72,12 +72,30 @@ export class CursorReader implements StateReader {
         this.inlineStartInfo = null;
         if (Inline.isInlineStartInfo(lastInline)) {
             const diff = Diff.diffLines(lastInline.content, newContent);
-            await vscode.commands.executeCommand('inlineChat.acceptChanges');
+            await vscode.commands.executeCommand('editor.action.inlineDiffs.acceptAll');
+            let newInlineChats: any;
+            let newChat: string | undefined;
+            const maxAttempts = 12; // 60 seconds total (12 * 5 seconds)
+            let attempts = 0;
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 5 seconds
 
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            const newInlineChats: any = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
-            
-            const newChat = getSingleNewEditorText(oldInlineChats, newInlineChats);
+            while (attempts < maxAttempts) {
+                newInlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
+                try {
+                    newChat = getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1));
+                } catch (error) {
+                    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait for 5 seconds
+                    attempts++;
+                    continue;
+                }
+                if (newChat) {
+                    break; // Exit the loop if we found a new chat
+                }
+            }
+
+            if (!newChat) {
+                throw new Error('No new chat found after 60 seconds');
+            }
             const inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, diff, newChat);
 
             Inline.writeInlineChat(inlineChatInfoObj);

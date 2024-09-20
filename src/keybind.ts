@@ -13,24 +13,24 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
     let newKeybindings: Keybinding[] = [];
     if (tool === "Cursor") {
         newKeybindings = [{
-                "key": "cmd+e",
-                "command": "aipopup.action.modal.generate",
-                "when": "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
+                key: "cmd+e",
+                command: "aipopup.action.modal.generate",
+                when: "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
             },
             {
-                "key": "cmd+k",
-                "command": "-aipopup.action.modal.generate",
-                "when": "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
+                key: "cmd+k",
+                command: "-aipopup.action.modal.generate",
+                when: "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
             },
             {
-                "key": "cmd+e",
-                "command": "composer.startComposerPrompt",
-                "when": "composerIsEnabled"
+                key: "cmd+e",
+                command: "composer.startComposerPrompt",
+                when: "composerIsEnabled"
             },
             {
-                "key": "cmd+k",
-                "command": "-composer.startComposerPrompt",
-                "when": "composerIsEnabled"
+                key: "cmd+k",
+                command: "-composer.startComposerPrompt",
+                when: "composerIsEnabled"
             },
             {
                 command: "gait-copilot.startInlineChat",
@@ -39,8 +39,17 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
             },
             {
                 command: "gait-copilot.acceptInlineChat",
+                key: "cmd+shift+space",
+            },
+            {
+                key: "cmd+a cmd+s",
+                command: "editor.action.inlineDiffs.acceptAll",
+                when: "editorTextFocus && (arbitrary function)"
+            },
+            {
                 key: "cmd+enter",
-                when: "editorTextFocus"
+                command: "-editor.action.inlineDiffs.acceptAll",
+                when: "editorTextFocus && (arbitrary function)"
             }
         ];
     }
@@ -63,10 +72,18 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
     console.log("extensionPackageJsonPath", extensionPackageJsonPath);
     const extensionPackageJson = fs.readFileSync(extensionPackageJsonPath, 'utf8');
     const extensionPackageJsonObj = JSON.parse(extensionPackageJson);
-    extensionPackageJsonObj.contributes.keybindings = newKeybindings;
-    fs.writeFileSync(
-        extensionPackageJsonPath,
-        JSON.stringify(extensionPackageJsonObj, null, 4),
-        'utf8',
-    );
+    if (!areKeybindingsEqual(extensionPackageJsonObj.contributes.keybindings, newKeybindings)) {
+        extensionPackageJsonObj.contributes.keybindings = newKeybindings;
+        fs.writeFileSync(
+            extensionPackageJsonPath,
+            JSON.stringify(extensionPackageJsonObj, null, 4),
+            'utf8',
+        );
+        vscode.window.showInformationMessage("Keybindings updated... Reloading");
+        vscode.commands.executeCommand("workbench.action.reloadWindow");
+    }
 }
+function areKeybindingsEqual(keybindings: any, newKeybindings: Keybinding[]) {
+    return keybindings.length === newKeybindings.length && keybindings.every((kb: Keybinding) => newKeybindings.some((newKb: Keybinding) => newKb.command === kb.command && newKb.key === kb.key));
+}
+
