@@ -1,12 +1,10 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as vscode from 'vscode';
 import { parse } from 'csv-parse/sync';
+import * as path from 'path';
 
 const execAsync = promisify(exec);
-
-/**
- * Interface representing the VSCode state.
- */
 interface VSCodeState {
     [key: string]: any;
 }
@@ -14,7 +12,7 @@ interface VSCodeState {
 /**
  * Parses the VSCode state from the SQLite database.
  */
-export async function parseVSCodeState(dbPath: string): Promise<VSCodeState> {
+async function parseVSCodeState(dbPath: string): Promise<VSCodeState> {
     try {
         const escapedDbPath = `"${dbPath}"`;
         const itemTableOutput = await execAsync(`sqlite3 ${escapedDbPath} -readonly -csv "SELECT key, value FROM ItemTable;"`);
@@ -38,3 +36,24 @@ export async function parseVSCodeState(dbPath: string): Promise<VSCodeState> {
         throw error;
     }
 }
+
+/**
+ * Reads a specific key from the VSCode state.
+ */
+export async function readVSCodeState(context: vscode.ExtensionContext, key: string): Promise<any> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder || !context.storageUri) {
+        throw new Error('No workspace folder or storage URI found');
+    }
+
+    const dbPath = path.join(path.dirname(context.storageUri.fsPath), 'state.vscdb');
+    const state = await parseVSCodeState(dbPath);
+
+    if (key in state) {
+        return state[key];
+    } else {
+        vscode.window.showInformationMessage(`No data found for key: ${key}`);
+        return [];
+    }
+}
+

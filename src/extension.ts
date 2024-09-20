@@ -6,14 +6,12 @@ import * as Inline from './inline';
 import * as InlineDecoration from './inlinedecoration';
 import { PanelViewProvider } from './panelview';
 import { monitorPanelChatAsync } from './panelChats';
-import { parseVSCodeState } from './dbReader';
-import { activateGaitParticipant } from './gaitChatParticipant';
+import { readVSCodeState } from './tools/dbReader';
+import * as VSCodeReader from './vscode/vscodeReader';
+import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool } from './ide';
 
-
-
-const execAsync = promisify(exec);
-
+const GAIT_FOLDER_NAME = '.gait';
 
 let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider: vscode.Disposable } | undefined;
 let decorationsActive = true;
@@ -29,145 +27,6 @@ function redecorate(context: vscode.ExtensionContext) {
 
     if (decorationsActive) {
         disposibleDecorations = InlineDecoration.decorateActive(context);
-    }
-}
-
-/**
- * Interface representing an interactive session.
- */
-interface InteractiveSession {
-    history: {
-        editor: {
-            text: string;
-            state: {
-                chatContextAttachments: any[];
-                chatDynamicVariableModel: any[];
-            }
-        }[];
-        copilot: any[];
-    }
-}
-
-/**
- * Parses the VSCode state from the SQLite database.
- */
-async function parseVSCodeState(dbPath: string): Promise<VSCodeState> {
-    try {
-        const escapedDbPath = `"${dbPath}"`;
-        const itemTableOutput = await execAsync(`sqlite3 ${escapedDbPath} -readonly -csv "SELECT key, value FROM ItemTable;"`);
-
-        const records = parse(itemTableOutput.stdout, {
-            columns: ['key', 'value'],
-            skip_empty_lines: true,
-        });
-
-        return records.reduce((state: VSCodeState, record: { key: string; value: string }) => {
-            const { key, value } = record;
-            try {
-                state[key] = JSON.parse(value);
-            } catch {
-                state[key] = value;
-            }
-            return state;
-        }, {});
-    } catch (error) {
-        console.error(`Error querying SQLite DB: ${error}`);
-        throw error;
-    }
-}
-
-/**
- * Reads a specific key from the VSCode state.
- */
-export async function readVSCodeState(context: vscode.ExtensionContext, key: string): Promise<any> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder || !context.storageUri) {
-        throw new Error('No workspace folder or storage URI found');
-    }
-
-    const dbPath = path.join(path.dirname(context.storageUri.fsPath), 'state.vscdb');
-    const state = await parseVSCodeState(dbPath);
-
-    if (key in state) {
-        return state[key];
-    } else {
-        vscode.window.showInformationMessage(`No data found for key: ${key}`);
-        return [];
-    }
-}
-
-
-
-/**
- * Validates if the object is a valid InteractiveSession.
- */
-function isValidInteractiveSession(obj: any): obj is InteractiveSession {
-    return (
-        obj &&
-        typeof obj === 'object' &&
-        obj.history &&
-        Array.isArray(obj.history.editor) &&
-        obj.history.editor.every((entry: any) =>
-            typeof entry.text === 'string' &&
-            entry.state &&
-            Array.isArray(entry.state.chatContextAttachments) &&
-            Array.isArray(entry.state.chatDynamicVariableModel)
-        )
-    );
-}
-
-/**
- * Retrieves a single new editor text from the sessions.
- */
-function getSingleNewEditorText(oldSessions: InteractiveSession, newSessions: InteractiveSession): string {
-    const oldEditorTexts = new Set(oldSessions.history.editor.map(entry => entry.text));
-    const newEditorTexts = newSessions.history.editor
-        .filter(entry => entry.text && !oldEditorTexts.has(entry.text))
-        .map(entry => entry.text);
-
-    if (newEditorTexts.length !== 1) {
-        throw new Error(newEditorTexts.length === 0 ? "No new editor text found." : "Multiple new editor texts found.");
-    }
-
-    return newEditorTexts[0];
-}
-
-/**
- * Initializes the extension by reading interactive sessions.
- */
-async function initializeAsync(context: vscode.ExtensionContext) {
-    const interactiveSessions = await readVSCodeState(context, 'memento/interactive-session');
-    await context.workspaceState.update('memento/interactive-session', interactiveSessions);
-}
-
-/**
- * Processes the editor content during inline chat acceptance.
- */
-async function processEditorContent(context: vscode.ExtensionContext, editor: vscode.TextEditor) {
-    const oldInteractiveSessions: any = context.workspaceState.get('memento/interactive-session');
-    if (!isValidInteractiveSession(oldInteractiveSessions)) {
-        throw new Error('Old interactive sessions are invalid or not found.');
-    }
-
-    const newContent = editor.document.getText();
-    const lastInline = context.workspaceState.get("last_inline_start");
-
-    if (Inline.isInlineStartInfo(lastInline)) {
-        const diff = Diff.diffLines(lastInline.content, newContent);
-        await vscode.commands.executeCommand('inlineChat.acceptChanges');
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const newInteractiveSessions: any = await readVSCodeState(context, 'memento/interactive-session');
-        
-        if (!isValidInteractiveSession(newInteractiveSessions)) {
-            throw new Error('New interactive sessions are invalid or not found.');
-        }
-        const newChat = getSingleNewEditorText(oldInteractiveSessions, newInteractiveSessions);
-        const inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, diff, newChat);
-
-        Inline.writeInlineChat(inlineChatInfoObj);
-    } else {
-        throw new Error('No valid content stored in last_inline_start');
     }
 }
 
@@ -232,7 +91,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const helloWorldCommand = vscode.commands.registerCommand('gait-copilot.helloWorld', async () => {
         try {
-            const interactiveSessions = context.workspaceState.get<InteractiveSession[]>('interactive.sessions', []);
+            const interactiveSessions = context.workspaceState.get('interactive.sessions', []);
             vscode.window.showInformationMessage(`${JSON.stringify(interactiveSessions, null, 2)}`);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to save file: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -255,7 +114,7 @@ export function activate(context: vscode.ExtensionContext) {
                 selectionContent: document.getText(selection),
                 parent_inline_chat_id: null,
             };
-            initializeAsync(context).catch((error) => {
+            VSCodeReader.initializeAsync(context).catch((error) => {
                 vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
             });
             context.workspaceState.update("last_inline_start", inlineStartInfo);
@@ -293,7 +152,7 @@ export function activate(context: vscode.ExtensionContext) {
                     parent_inline_chat_id: args.parent_inline_chat_id,
                 };
 
-                initializeAsync(context).catch((error) => {
+                VSCodeReader.initializeAsync(context).catch((error) => {
                     vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 });
                 context.workspaceState.update("last_inline_start", inlineStartInfo);
@@ -308,7 +167,7 @@ export function activate(context: vscode.ExtensionContext) {
     const inlineChatAcceptOverride = vscode.commands.registerCommand('gait-copilot.acceptInlineChat', () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
-            processEditorContent(context, editor).catch(error => {
+            VSCodeReader.processEditorContent(context, editor).catch(error => {
                 vscode.window.showErrorMessage(`Failed to process editor content: ${error instanceof Error ? error.message : 'Unknown error'}`);
             });
 
