@@ -65,133 +65,41 @@ export function matchDiffToCurrentFile(
         .flatMap(change => change.value.split('\n').map(line => line.trim()))
     addedLines = addedLines.filter(line => line.length > 0); // Remove empty lines
 
-    const minBlockSize = 1;
-
-    while (addedLines.length >= minBlockSize) {
-        let bestMatch = {
-            similarity: 0,
-            docStart: -1,
-            docEnd: 0,
-            addedStart: -1,
-            addedBlockSize: 0,
-        };
-
-        // Iterate through possible block sizes starting from the maximum possible
-        for (let blockSize = addedLines.length; blockSize >= minBlockSize; blockSize--) {
-            
-            for (let addedStart = 0; addedStart <= addedLines.length - blockSize; addedStart++) {
-                const currentAddedBlock = addedLines.slice(addedStart, addedStart + blockSize);
-
-                // Slide through the document to find the best matching block
-                let docStart = 0;
-                let docEnd = 0;
-                while (docEnd < documentLines.length) {
-                    // Count non-blank lines
-                    let nonBlankCount = 0;
-                    while (docEnd < documentLines.length && nonBlankCount < blockSize) {
-                        if (documentLines[docEnd].trim().length > 0) {
-                            nonBlankCount++;
-                        }
-                        docEnd++;
-                    }
-
-                    // If we don't have enough non-blank lines, break
-                    if (nonBlankCount < blockSize) break;
-
-                    const currentDocBlock = documentLines.slice(docStart, docEnd)
-                        .filter(line => line.trim().length > 0)
-                        .map(line => line.trim());
-                    
-                    const similarity = computeBlockSimilarity(currentDocBlock, currentAddedBlock);
-
-                    if (similarity > bestMatch.similarity) {
-                        bestMatch = {
-                            similarity,
-                            docStart,
-                            docEnd,
-                            addedStart,
-                            addedBlockSize: blockSize
-                        };
-                    }
-
-                    // Early exit if perfect match is found
-                    if (similarity === 1) {
-                        break;
-                    }
-
-                    // Move docStart to the next non-blank line
-                    while (docStart < docEnd && documentLines[docStart].trim().length === 0) {
-                        docStart++;
-                    }
-                    docStart++;
-                    docEnd = docStart;
-                }
-
-                // Early exit if perfect match is found
-                if (bestMatch.similarity === 1) {
-                    break;
-                }
-            }
-
-            // Early exit if perfect match is found
-            if (bestMatch.similarity === 1) {
-                break;
-            }
+    // Iterate over every document line and added line for comparison
+    for (let i = 0; i < documentLines.length; i++) {
+        const docLine = documentLines[i].trim();
+        if (docLine.length === 0) {
+            continue;
         }
+        for (let j = 0; j < addedLines.length; j++) {
+            const addedLine = addedLines[j].trim();
+            // Compute similarity between the lines
+            let distance;
 
-        // Check if the best match meets the similarity threshold
-        if (bestMatch.similarity >= similarityThreshold && bestMatch.docStart !== -1) {
-            const { docStart, docEnd, addedStart, addedBlockSize } = bestMatch;
-
-            // Create a range covering the matched block in the document
-            const startPos = new vscode.Position(docStart, 0);
-            const endPos = new vscode.Position(docEnd-1, documentLines[docEnd-1].length);
-            matchedRanges.push(
-                {ranges: new vscode.Range(startPos, endPos),
-                originalLines: addedLines.splice(addedStart, addedStart + addedBlockSize),
-                similarity: bestMatch.similarity
-                } );
-            ;
-        } else {
-            // No more matches found that meet the threshold
-            break;
+            // Skip trivial lines
+            if (!/[a-zA-Z0-9]/.test(docLine) || !/[a-zA-Z0-9]/.test(addedLine)) {
+                continue;
+            }
+            if (Math.abs(docLine.length - addedLine.length) / Math.max(docLine.length, addedLine.length) <= 0.2) {
+                distance = levenshtein.get(docLine, addedLine);
+            } else {
+                continue; // Skip if length difference is too large
+            }
+            const maxLength = Math.max(docLine.length, addedLine.length);
+            const similarity = maxLength === 0 ? 1 : 1 - distance / maxLength;
+            
+            // If similarity is above the threshold, add to matchedRanges
+            if (similarity >= similarityThreshold) {
+                matchedRanges.push({
+                    ranges: new vscode.Range(i, 0, i, documentLines[i].length),
+                    originalLines: [docLine],
+                    similarity: similarity
+                });
+            }
         }
     }
 
     return matchedRanges;
-}
-
-/**
- * Computes the average similarity between two blocks of lines.
- * @param docBlock The block of lines from the document.
- * @param addedBlock The block of lines from the diff.
- * @returns The average similarity score between 0 and 1.
- */
-function computeBlockSimilarity(docBlock: string[], addedBlock: string[]): number {
-    if (docBlock.length !== addedBlock.length) {
-        return 0;
-    }
-
-    let totalSimilarity = 0;
-    let validLines = 0;
-
-    for (let i = 0; i < docBlock.length; i++) {
-        const docLine = docBlock[i].trim();
-        const addedLine = addedBlock[i].trim();
-
-        // Skip trivial lines for small blocks
-        if (docBlock.length <= 2 && !/[a-zA-Z0-9]/.test(docLine) && !/[a-zA-Z0-9]/.test(addedLine)) {
-            continue;
-        }
-
-        const distance = levenshtein.get(docLine, addedLine);
-        const maxLength = Math.max(docLine.length, addedLine.length);
-        const similarity = maxLength === 0 ? 1 : 1 - distance / maxLength;
-        totalSimilarity += similarity;
-        validLines++;
-    }
-
-    return validLines === 0 ? 0 : totalSimilarity / validLines;
 }
 
 export function decorateActive(context: vscode.ExtensionContext) {
@@ -235,9 +143,9 @@ export function decorateActive(context: vscode.ExtensionContext) {
         for (const message of panelChat.messages) {
             const codeBlocks = extractCodeBlocks(message.responseText);
             for (const code of codeBlocks) {
-                const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[], 0.8);
+                const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[], 0.9);
                 if (currentRanges.length > 0) {
-                    const color = generateColors(decorationIndex, 'orange');
+                    const color = generateColors(decorationIndex, 'green');
                     decorationIndex += 1;
 
                     // Create a new decoration type with the unique color
