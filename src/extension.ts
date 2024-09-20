@@ -10,6 +10,7 @@ import * as CursorReader from './cursor/cursorReader';
 import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool, TOOL } from './ide';
 import { StateReader } from './types';
+import { generateKeybindings } from './keybind';
 
 const GAIT_FOLDER_NAME = '.gait';
 
@@ -58,6 +59,11 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
 export function activate(context: vscode.ExtensionContext) {
     const tool: TOOL = checkTool();
 
+    generateKeybindings(context, tool);
+
+    const startInlineCommand = tool === "Cursor" ? "aipopup.action.modal.generate" : "inlineChat.start";
+    const startPanelCommand = tool === "Cursor" ? "aichat.newchataction" : "workbench.action.chat.openInSidebar";
+
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('No workspace folder found. Extension activation failed.');
@@ -89,6 +95,8 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const inlineChatStartOverride = vscode.commands.registerCommand('gait-copilot.startInlineChat', () => {
+        // Display an information message
+        vscode.window.showInformationMessage('Starting inline chat...');
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             const document = editor.document;
@@ -107,7 +115,7 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
             });
         }
-        vscode.commands.executeCommand('inlineChat.start');
+        vscode.commands.executeCommand(startInlineCommand);
     });
 
 
@@ -142,7 +150,7 @@ export function activate(context: vscode.ExtensionContext) {
                 stateReader.startInline(inlineStartInfo).catch((error) => {
                     vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 });
-                vscode.commands.executeCommand('inlineChat.start');
+                vscode.commands.executeCommand(startInlineCommand);
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to continue inline chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -251,7 +259,7 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             activateGaitParticipant(context, args.contextString);
             vscode.window.showInformationMessage('Gait chat participant loaded with edit history!');
-            vscode.commands.executeCommand('workbench.action.chat.openInSidebar');
+            vscode.commands.executeCommand(startPanelCommand);
         } catch (error) {
             console.log("Error registering gait chat participant", error);
             vscode.window.showErrorMessage(`Failed to register gait chat participant: ${error instanceof Error ? error.message : 'Unknown error'}`);
