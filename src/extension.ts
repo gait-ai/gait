@@ -6,6 +6,8 @@ import * as InlineDecoration from './inlinedecoration';
 import { PanelViewProvider } from './panelview';
 import { monitorPanelChatAsync } from './panelChats';
 import * as VSCodeReader from './vscode/vscodeReader';
+import { panelChatsToMarkdown } from './panelChatsToMarkdown';
+import { PanelChat } from './types';
 import * as CursorReader from './cursor/cursorReader';
 import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool, TOOL } from './ide';
@@ -255,7 +257,20 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // Register command to activate gait chat participant
+    // Register command to convert PanelChats to markdown and open in a new file
+    const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (panelChats: PanelChat[], gitHistory: any) => {
+        try {
+            const markdownContent = panelChatsToMarkdown(panelChats, gitHistory);
+            const document = await vscode.workspace.openTextDocument({
+                content: markdownContent,
+                language: 'markdown'
+            });
+            await vscode.window.showTextDocument(document, { preview: false });
+            vscode.window.showInformationMessage('Panel chats exported to markdown successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    });
     const registerGaitChatParticipantCommand = vscode.commands.registerCommand('gait-copilot.registerGaitChatParticipant', (args) => {
         console.log("Registering gait chat participant", args);
         try {
@@ -295,7 +310,8 @@ export function activate(context: vscode.ExtensionContext) {
         activateDecorationsCommand,
         deactivateDecorationsCommand,
         deletePanelChatCommand,
-        registerGaitChatParticipantCommand // Add the new command here
+        registerGaitChatParticipantCommand, // Add the new command here
+        exportPanelChatsToMarkdownCommand
     );
 
     redecorate(context);
