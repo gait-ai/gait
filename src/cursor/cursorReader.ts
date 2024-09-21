@@ -112,7 +112,11 @@ export class CursorReader implements StateReader {
         try {
             const raw_data = await readVSCodeState(getDBPath(this.context), 'workbench.panel.aichat.view.aichat.chatdata');
 
-            if (!raw_data || !Array.isArray(raw_data.tabs)) {
+            if (!raw_data) {
+                return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
+            }
+
+            if (!Array.isArray(raw_data.tabs)) {
                 vscode.window.showErrorMessage('Invalid chat data structure.');
                 return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
             }

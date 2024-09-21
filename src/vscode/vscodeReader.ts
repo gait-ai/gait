@@ -123,13 +123,17 @@ export class VSCodeReader implements StateReader {
     /**
      * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
      */
-    public async parsePanelChatAsync(existingIds: string[]): Promise<StashedState> {
+    public async parsePanelChatAsync(): Promise<StashedState> {
         try {
             const interactiveSessions = await readVSCodeState(getDBPath(this.context), 'interactive.sessions');
     
             if (!Array.isArray(interactiveSessions)) {
                 vscode.window.showErrorMessage('Interactive sessions data is not an array.');
-                return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
+                return { 
+                    panelChats: [], 
+                    schemaVersion: SCHEMA_VERSION, 
+                    deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] } 
+                };
             }
     
             const panelChats: PanelChat[] = interactiveSessions.map((panel: any, index: number) => {
@@ -137,15 +141,7 @@ export class VSCodeReader implements StateReader {
                 const customTitle: string = typeof panel.customTitle === 'string' ? panel.customTitle : '';
     
                 // Determine if this PanelChat has an existing UUID
-                let id: string;
-                const existingIndex = index - (interactiveSessions.length - existingIds.length);
-                if (existingIndex >= 0 && existingIndex < existingIds.length) {
-                    // Assign existing UUID
-                    id = existingIds[existingIndex];
-                } else {
-                    // Assign new UUID
-                    id = uuidv4();
-                }
+                let id: string = typeof panel.sessionId === 'string' ? panel.sessionId : '';
         
                 const parent_id: string | null = null;
                 const created_on: string = typeof panel.creationDate === 'string' ? panel.creationDate : new Date().toISOString();
@@ -154,7 +150,7 @@ export class VSCodeReader implements StateReader {
                 const messages: MessageEntry[] = panel.requests.map((request: any) => {
                     // Safely extract messageText
                     const messageText: string = typeof request.message?.text === 'string' ? request.message.text : '';
-    
+                    const id: string = typeof request.result.metadata?.modelMessageId === 'string' ? request.result.metadata?.modelMessageId: '';
                     // Safely extract responseText
                     let responseText: string = '';
     
@@ -194,7 +190,7 @@ export class VSCodeReader implements StateReader {
                     }
     
                     return {
-                        id: uuidv4(), // Assign new UUID to MessageEntry
+                        id, // Assign new UUID to MessageEntry
                         messageText,
                         responseText,
                         model,
@@ -215,10 +211,18 @@ export class VSCodeReader implements StateReader {
                 } as PanelChat;
             });
     
-            return { panelChats, schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
+            return { 
+                panelChats, 
+                schemaVersion: SCHEMA_VERSION, 
+                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] } 
+            };
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to parse panel chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
+            return { 
+                panelChats: [], 
+                schemaVersion: SCHEMA_VERSION, 
+                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] } 
+            };
         }
     }
 }

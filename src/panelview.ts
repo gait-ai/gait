@@ -2,10 +2,11 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import {CommitData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile} from './panelgit';
+import simpleGit, { SimpleGit } from 'simple-git';
 import { MessageEntry, StashedState, PanelChat, isStashedState } from './types';
+import {CommitData, UncommittedData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile} from './panelgit';
 
-
+const SCHEMA_VERSION = '1.0';
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'gait-copilot.panelView';
@@ -210,17 +211,22 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
           }
 
           let messageFound = false;
-          // Iterate through panelChats to find and remove the message
+          // Iterate through panelChats to find the message
           for (const panelChat of stashedState.panelChats) {
               const messageIndex = panelChat.messages.findIndex(msg => msg.id === messageId);
               if (messageIndex !== -1) {
-                  panelChat.messages.splice(messageIndex, 1);
                   messageFound = true;
-                  console.log(`Deleted message with ID: ${messageId} from PanelChat ${panelChat.id}`);
+                  console.log(`Marking message with ID: ${messageId} as deleted in PanelChat ${panelChat.id}`);
 
-                  // Optional: Update lastAppended if necessary
-                  // For simplicity, assuming deletion does not affect lastAppended
-                  break; // Exit the loop once the message is found and deleted
+                  // Add the message ID to deletedChats.deletedMessageIDs if not already present
+                  if (!stashedState.deletedChats.deletedMessageIDs.includes(messageId)) {
+                      stashedState.deletedChats.deletedMessageIDs.push(messageId);
+                      console.log(`Added message ID ${messageId} to deletedMessageIDs.`);
+                  } else {
+                      console.log(`Message ID ${messageId} is already marked as deleted.`);
+                  }
+
+                  break; // Exit the loop once the message is found
               }
           }
 
@@ -231,9 +237,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
           // Write the updated stashedState back to the file
           fs.writeFileSync(filePath, JSON.stringify(stashedState, null, 2), 'utf-8');
-          console.log(`Updated ${filePath} after deletion.`);
+          console.log(`Updated ${filePath} after marking message as deleted.`);
 
-          // Commit the change to Git
+          // Commit the change to Git (Optional)
           // const git: SimpleGit = simpleGit(repoPath);
           // await git.add(filePath);
           // await git.commit(`Delete message with ID ${messageId}`);
