@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { PanelMatchedRange } from './types';
-import { getIdToCommitInfo } from './panelview';
+import { getIdToCommitInfo } from './panelgit';
 
 /**
  * Creates hover content for a matched panel chat range.
@@ -47,9 +47,11 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
     const escapedResponseText = message.responseText.replace(/`/g, '\\`').replace(/\n/g, '\\n');
     markdown.appendMarkdown(`**Response**: ${escapedResponseText}\n\n`);
 
+    const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]}
+
     // Add action buttons at the end of the hover content
-    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(JSON.stringify([panelChat, idToCommitInfo]))}`);
-    markdown.appendMarkdown(`\n\n[Export to Markdown](${exportCommand})`);
+    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(JSON.stringify(markdownData))}`);
+    markdown.appendMarkdown(`\n\n[View in Markdown](${exportCommand})`);
     markdown.appendMarkdown(`\n\n`);
     const deleteCommand = vscode.Uri.parse(`command:gait-copilot.removePanelChat?${encodeURIComponent(JSON.stringify({
         panel_chat_id: panelChat.id,
