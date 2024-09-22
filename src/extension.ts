@@ -13,6 +13,7 @@ import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool, TOOL } from './ide';
 import { StateReader } from './types';
 import { generateKeybindings } from './keybind';
+import { handleMerge } from './automerge';
 
 const GAIT_FOLDER_NAME = '.gait';
 
@@ -315,6 +316,10 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Decorations deactivated.');
     });
 
+    const handleMergeCommand = vscode.commands.registerCommand('gait-copilot.handleMerge', () => {
+        handleMerge(context);
+    });
+
     // Register all commands
     context.subscriptions.push(
         updateSidebarCommand, 
@@ -327,7 +332,8 @@ export function activate(context: vscode.ExtensionContext) {
         deactivateDecorationsCommand,
         deletePanelChatCommand,
         registerGaitChatParticipantCommand, // Add the new command here
-        exportPanelChatsToMarkdownCommand
+        exportPanelChatsToMarkdownCommand,
+        handleMergeCommand
     );
 
     debouncedRedecorate(context);
