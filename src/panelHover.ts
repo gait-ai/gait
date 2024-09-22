@@ -42,7 +42,8 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
     markdown.isTrusted = true;
 
     // Display the message text and response
-    markdown.appendMarkdown(`### ${message.messageText}\n\n`);
+    const messageAuthor = commitInfo?.author ?? "You";
+    markdown.appendMarkdown(`### ${messageAuthor}: ${message.messageText}\n\n`);
     // Escape backticks and newlines in the response text
     const escapedResponseText = message.responseText.replace(/`/g, '\\`').replace(/\n/g, '\\n');
     markdown.appendMarkdown(`**Response**: ${escapedResponseText}\n\n`);
