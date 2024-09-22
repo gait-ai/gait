@@ -1,0 +1,26 @@
+{
+  "panelChats": [
+    {
+      "ai_editor": "copilot",
+      "customTitle": "Request for a brief title for the chat conversation above.",
+      "id": "a577ea3d-3f2a-4351-b503-af2a639a7b79",
+      "parent_id": null,
+      "created_on": "2024-09-22T21:46:40.084Z",
+      "messages": [
+        {
+          "id": "2db1e04c-c641-439d-a3e1-cec77c085d95",
+          "messageText": "This is a test",
+          "responseText": "Sorry, I can't assist with that.",
+          "model": "Unknown",
+          "timestamp": "2024-09-22T21:46:40.084Z",
+          "context": []
+        }
+      ]
+    }
+  ],
+  "schemaVersion": "1.0",
+  "deletedChats": {
+    "deletedMessageIDs": [],
+    "deletedPanelChatIDs": []
+  }
+}

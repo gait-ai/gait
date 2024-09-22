@@ -125,8 +125,14 @@ export class VSCodeReader implements StateReader {
      */
     public async parsePanelChatAsync(): Promise<PanelChat[]> {
         try {
+
             const interactiveSessions = await readVSCodeState(getDBPath(this.context), 'interactive.sessions');
-    
+
+            if (!interactiveSessions) {
+                vscode.window.showErrorMessage('Interactive sessions data is not available.');
+                return [];
+            }
+            
             if (!Array.isArray(interactiveSessions)) {
                 vscode.window.showErrorMessage('Interactive sessions data is not an array.');
                 return [];
@@ -141,12 +147,14 @@ export class VSCodeReader implements StateReader {
         
                 const parent_id: string | null = null;
                 const created_on: string = typeof panel.creationDate === 'string' ? panel.creationDate : new Date().toISOString();
-    
+
                 // Extract messages
                 const messages: MessageEntry[] = panel.requests.map((request: any) => {
-                    // Safely extract messageText
                     const messageText: string = typeof request.message?.text === 'string' ? request.message.text : '';
-                    const id: string = typeof request.result.metadata?.modelMessageId === 'string' ? request.result.metadata?.modelMessageId: '';
+                    let id: string = '';
+                    if (request.result && request.result.metadata && typeof request.result.metadata.modelMessageId === 'string') {
+                        id = request.result.metadata.modelMessageId;
+                    }
                     // Safely extract responseText
                     let responseText: string = '';
     

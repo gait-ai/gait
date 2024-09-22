@@ -33,6 +33,7 @@ async function parseVSCodeState(dbPath: string): Promise<VSCodeState> {
         }, {});
     } catch (error) {
         console.error(`Error querying SQLite DB: ${error}`);
+        vscode.window.showErrorMessage(`Error querying SQLite DB: ${error}`);
         throw error;
     }
 }
@@ -43,9 +44,12 @@ async function parseVSCodeState(dbPath: string): Promise<VSCodeState> {
 export async function readVSCodeState(dbPath: string, key: string): Promise<any> {
     const state = await parseVSCodeState(dbPath);
 
+    //vscode.window.showInformationMessage(`Read key ${key} from state: ${state[key]}`);
     if (key in state) {
+        //vscode.window.showInformationMessage(`Read key ${key} from state: ${state[key]}`);
         return state[key];
     } else {
+        //vscode.window.showErrorMessage(`Key ${key} not found in state.`);
         return null;
     }
 }
