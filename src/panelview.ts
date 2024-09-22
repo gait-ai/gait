@@ -103,6 +103,72 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
       });
   }
 
+  private async handleDeletePanelChat(panelChatId: string) {
+    console.log(`Received request to delete panel chat with ID: ${panelChatId}`);
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder found.');
+        return;
+    }
+
+    const repoPath = workspaceFolder.uri.fsPath;
+    const filePath = path.join(repoPath, '.gait', 'stashedPanelChats.json');
+
+    try {
+        // Read the current file content as StashedState
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        let stashedState: StashedState;
+
+        try {
+            stashedState = JSON.parse(fileContent);
+            if (!isStashedState(stashedState)) {
+                throw new Error('Parsed content does not match StashedState structure.');
+            }
+        } catch (parseError) {
+            vscode.window.showErrorMessage(`Failed to parse stashedPanelChats.json: ${(parseError as Error).message}`);
+            console.error(`Error parsing stashedPanelChats.json:`, parseError);
+            return;
+        }
+
+        // Find the panel chat to delete
+        const panelChatIndex = stashedState.panelChats.findIndex(pc => pc.id === panelChatId);
+        if (panelChatIndex === -1) {
+            vscode.window.showErrorMessage(`PanelChat with ID ${panelChatId} not found.`);
+            return;
+        }
+
+        // Remove the panel chat from panelChats
+        stashedState.panelChats.splice(panelChatIndex, 1);
+        console.log(`Removed PanelChat with ID: ${panelChatId} from panelChats.`);
+
+        // Add the panel chat ID to deletedChats.deletedPanelChatIDs if not already present
+        if (!stashedState.deletedChats.deletedPanelChatIDs.includes(panelChatId)) {
+            stashedState.deletedChats.deletedPanelChatIDs.push(panelChatId);
+            console.log(`Added PanelChat ID ${panelChatId} to deletedPanelChatIDs.`);
+        } else {
+            console.log(`PanelChat ID ${panelChatId} is already marked as deleted.`);
+        }
+
+        // Write the updated stashedState back to the file
+        fs.writeFileSync(filePath, JSON.stringify(stashedState, null, 2), 'utf-8');
+        console.log(`Updated ${filePath} after deleting PanelChat.`);
+
+        // Optionally, commit the change to Git
+        // const git: SimpleGit = simpleGit(repoPath);
+        // await git.add(filePath);
+        // await git.commit(`Delete PanelChat with ID ${panelChatId}`);
+        // console.log(`Committed deletion of PanelChat ID ${panelChatId} to Git.`);
+
+        vscode.window.showInformationMessage(`PanelChat with ID ${panelChatId} has been deleted.`);
+
+        // Refresh the webview content
+        this.updateContent();
+    } catch (error: any) {
+        vscode.window.showErrorMessage(`Failed to delete PanelChat: ${error.message}`);
+        console.error(`Error deleting PanelChat: ${error.stack}`);
+    }
+}
+
   public resolveWebviewView(
       webviewView: vscode.WebviewView,
       context: vscode.WebviewViewResolveContext,
@@ -125,6 +191,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
               case 'deleteMessage':
                   console.log('Delete message command received.');
                   this.handleDeleteMessage(message.id);
+                  break;
+              case 'deletePanelChat': // New case for deleting panel chats
+                  console.log('Delete panel chat command received.');
+                  this.handleDeletePanelChat(message.id);
                   break;
               case 'refresh':
                   console.log('Refresh command received.');
@@ -332,6 +402,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         .panel-chat-header {
             font-weight: bold;
             margin-bottom: 5px;
+            display: flex;
+            align-items: center;
         }
         .panel-chat-info {
             font-size: 0.9em;
@@ -356,6 +428,18 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             font-weight: bold;
             cursor: pointer;
             font-size: 16px;
+        }
+        .delete-panelchat-button {
+            background: transparent;
+            border: none;
+            color: red;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 16px;
+        }
+        .delete-panelchat-button:hover {
+            color: darkred;
         }
         .message, .response {
             padding: 10px;
@@ -478,7 +562,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     <!-- Confirmation Modal -->
     <div id="confirmModal" class="modal" style="display: none;">
         <div class="modal-content">
-            <p>Are you sure you want to delete this message?</p>
+            <p>Are you sure you want to delete this item?</p>
             <div class="modal-buttons">
                 <button id="confirmYes">Yes</button>
                 <button id="confirmNo">No</button>
@@ -552,35 +636,61 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         }
 
         /**
-         * Attaches click listeners to delete buttons to initiate message deletion.
+         * Attaches click listeners to delete buttons to initiate message or panel chat deletion.
          */
         function attachDeleteButtonListeners() {
-            const deleteButtons = document.querySelectorAll('.delete-button');
-            deleteButtons.forEach(button => {
+            // Delete Message Buttons
+            const deleteMessageButtons = document.querySelectorAll('.delete-button');
+            deleteMessageButtons.forEach(button => {
                 button.addEventListener('click', (event) => {
                     event.stopPropagation(); // Prevent triggering the commit toggle
                     const messageId = button.getAttribute('data-id');
                     if (messageId) {
-                        showConfirmationModal(messageId);
+                        showConfirmationModal('message', messageId);
                     } else {
                         console.warn('Delete button clicked without a valid message ID.');
+                    }
+                });
+            });
+
+            // Delete PanelChat Buttons
+            const deletePanelChatButtons = document.querySelectorAll('.delete-panelchat-button');
+            deletePanelChatButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Prevent triggering the commit toggle
+                    const panelChatId = button.getAttribute('data-id');
+                    if (panelChatId) {
+                        showConfirmationModal('panelChat', panelChatId);
+                    } else {
+                        console.warn('Delete PanelChat button clicked without a valid PanelChat ID.');
                     }
                 });
             });
         }
 
         /**
-         * Displays a custom confirmation modal before deleting a message.
-         * @param {string} messageId - The ID of the message to delete.
+         * Displays a custom confirmation modal before deleting a message or panel chat.
+         * @param {string} type - The type of deletion ('message' or 'panelChat').
+         * @param {string} id - The ID of the item to delete.
          */
-        function showConfirmationModal(messageId) {
+        function showConfirmationModal(type, id) {
             const modal = document.getElementById('confirmModal');
+            const modalMessage = modal.querySelector('p');
+            modalMessage.textContent = type === 'message' 
+                ? 'Are you sure you want to delete this message?' 
+                : 'Are you sure you want to delete this PanelChat?';
+
             modal.style.display = 'flex';
 
             // Handle "Yes" button click
             document.getElementById('confirmYes').onclick = function() {
-                console.log('Sending deleteMessage command for ID: ' + messageId);
-                vscode.postMessage({ command: 'deleteMessage', id: messageId });
+                if (type === 'message') {
+                    console.log('Sending deleteMessage command for ID: ' + id);
+                    vscode.postMessage({ command: 'deleteMessage', id: id });
+                } else if (type === 'panelChat') {
+                    console.log('Sending deletePanelChat command for ID: ' + id);
+                    vscode.postMessage({ command: 'deletePanelChat', id: id });
+                }
                 modal.style.display = 'none';
             };
 
@@ -639,6 +749,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         commitHeader.innerHTML = \`
                             <h3>\${escapeHtml(commit.commitMessage)}</h3>
                             <span style="color: var(--vscode-descriptionForeground); font-size: 0.9em;">\${new Date(commit.date).toLocaleString()}</span>
+                            <!-- Optional: Add a delete commit button if needed -->
                         \`;
                         commitDiv.appendChild(commitHeader);
 
@@ -653,10 +764,13 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                 const panelChatDiv = document.createElement('div');
                                 panelChatDiv.className = 'panel-chat';
 
-                                // PanelChat header
+                                // PanelChat header with delete button
                                 const panelChatHeader = document.createElement('div');
                                 panelChatHeader.className = 'panel-chat-header';
-                                panelChatHeader.textContent = \`PanelChat ID: \${escapeHtml(panelChat.id)}\`;
+                                panelChatHeader.innerHTML = \`
+                                    PanelChat ID: \${escapeHtml(panelChat.id)}
+                                    <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete PanelChat">🗑️</button>
+                                \`;
                                 panelChatDiv.appendChild(panelChatHeader);
 
                                 // PanelChat info (customTitle, ai_editor, etc.)
@@ -757,6 +871,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 </html>
     `;
 }
+
 
 
 }
