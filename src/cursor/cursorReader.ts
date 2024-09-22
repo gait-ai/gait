@@ -108,38 +108,28 @@ export class CursorReader implements StateReader {
     /**
      * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
      */
-    public async parsePanelChatAsync(existingIds: string[]): Promise<StashedState> {
+    public async parsePanelChatAsync(): Promise<PanelChat[]> {
         try {
             const raw_data = await readVSCodeState(getDBPath(this.context), 'workbench.panel.aichat.view.aichat.chatdata');
 
             if (!raw_data) {
-                return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
+                return [];
             }
 
             if (!Array.isArray(raw_data.tabs)) {
-                vscode.window.showErrorMessage('Invalid chat data structure.');
-                return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
+                vscode.window.showErrorMessage('Invalid internal chat data structure.');
+                return [];
             }
 
-            const panelChats = raw_data.tabs.map((tab: any, index: number) => {
-
-                // Determine if this PanelChat has an existing UUID
-                let id: string;
-                const existingIndex = index - (raw_data.length - existingIds.length);
-                if (existingIndex >= 0 && existingIndex < existingIds.length) {
-                    // Assign existing UUID
-                    id = existingIds[existingIndex];
-                } else {
-                    // Assign new UUID
-                    id = uuidv4();
-                }
+            const panelChats = raw_data.tabs.map((tab: any) => {
                 const panelChat: PanelChat = {
                     ai_editor: "cursor",
                     customTitle: tab.chatTitle || '',
-                    id: id,
+                    id: tab.tabId,
                     parent_id: null,
                     created_on: new Date(tab.lastSendTime).toISOString(),
-                    messages: []
+                    messages: [],
+                    kv_store: {}
                 };
                 // Filter out bubbles with empty text
                 const filteredBubbles = tab.bubbles.filter((bubble: any) => bubble.text && bubble.text.trim() !== '');
@@ -152,23 +142,25 @@ export class CursorReader implements StateReader {
 
                     if (userBubble && userBubble.type === 'user' && aiBubble && aiBubble.type === 'ai') {
                         const messageEntry: MessageEntry = {
-                            id: uuidv4(),
+                            id: userBubble.id,
                             messageText: userBubble.text || '',
                             responseText: aiBubble.text || '',
                             model: aiBubble.modelType || 'Unknown',
                             timestamp: new Date(tab.lastSendTime).toISOString(),
-                            context: [], // Extract context if needed
+                            context: [], // Extract context if needed,
+                            kv_store: {}
                         };
                         panelChat.messages.push(messageEntry);
                     }
                 }
                 return panelChat;
             });
-            return { panelChats, schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
-            
+            // Filter out empty panelChats
+            const nonEmptyPanelChats = panelChats.filter((chat: PanelChat) => chat.messages.length > 0);
+            return nonEmptyPanelChats;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to parse panel chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            return { panelChats: [], schemaVersion: SCHEMA_VERSION, lastAppended: { order: [], lastAppendedMap: {} } };
+            return [];
         }
     }
 }

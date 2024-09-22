@@ -123,17 +123,13 @@ export class VSCodeReader implements StateReader {
     /**
      * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
      */
-    public async parsePanelChatAsync(): Promise<StashedState> {
+    public async parsePanelChatAsync(): Promise<PanelChat[]> {
         try {
             const interactiveSessions = await readVSCodeState(getDBPath(this.context), 'interactive.sessions');
     
             if (!Array.isArray(interactiveSessions)) {
                 vscode.window.showErrorMessage('Interactive sessions data is not an array.');
-                return { 
-                    panelChats: [], 
-                    schemaVersion: SCHEMA_VERSION, 
-                    deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] } 
-                };
+                return [];
             }
     
             const panelChats: PanelChat[] = interactiveSessions.map((panel: any, index: number) => {
@@ -211,18 +207,10 @@ export class VSCodeReader implements StateReader {
                 } as PanelChat;
             });
     
-            return { 
-                panelChats, 
-                schemaVersion: SCHEMA_VERSION, 
-                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] } 
-            };
+            return panelChats;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to parse panel chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            return { 
-                panelChats: [], 
-                schemaVersion: SCHEMA_VERSION, 
-                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] } 
-            };
+            return [];
         }
     }
 }

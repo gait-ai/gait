@@ -13,14 +13,15 @@ import { StashedState, StateReader } from './types';
  */
 export function readStashedPanelChats(gaitDir: string): StashedState {
   const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
+  const initialState: StashedState = { 
+    panelChats: [], 
+    schemaVersion: SCHEMA_VERSION,
+    deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+    kv_store: {}
+  };
   try {
     if (!fs.existsSync(stashedPath)) {
       // Initialize with empty stashedState and deletedChats
-      const initialState: StashedState = { 
-        panelChats: [], 
-        schemaVersion: SCHEMA_VERSION,
-        deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
-      };
       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
       console.log(`stashedPanelChats.json not found. Initialized with empty stashedState and deletedChats.`);
       return initialState;
@@ -28,12 +29,6 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
 
     const stats = fs.statSync(stashedPath);
     if (stats.size === 0) {
-      // File is empty, initialize it
-      const initialState: StashedState = { 
-        panelChats: [], 
-        schemaVersion: SCHEMA_VERSION,
-        deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
-      };
       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
       console.log(`stashedPanelChats.json is empty. Initialized with empty stashedState and deletedChats.`);
       return initialState;
@@ -42,12 +37,6 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
     const content = fs.readFileSync(stashedPath, 'utf-8').trim();
 
     if (content === '') {
-      // Content is empty string after trimming, initialize it
-      const initialState: StashedState = { 
-        panelChats: [], 
-        schemaVersion: SCHEMA_VERSION,
-        deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
-      };
       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
       console.log(`stashedPanelChats.json contains only whitespace. Initialized with empty stashedState and deletedChats.`);
       return initialState;
@@ -65,7 +54,8 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
       const initialState: StashedState = { 
         panelChats: [], 
         schemaVersion: SCHEMA_VERSION,
-        deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
+        deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+        kv_store: {}
       };
       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
       return initialState;
@@ -120,7 +110,8 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
     return { 
       panelChats: [], 
       schemaVersion: SCHEMA_VERSION,
-      deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
+      deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+      kv_store: {}
     };
   }
 }
@@ -167,8 +158,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader) {
       let existingStashedState = readStashedPanelChats(gaitDir);
 
       // Parse the current panelChats
-      const parsedStashedState = await stateReader.parsePanelChatAsync(existingStashedState.panelChats.map(pc => pc.id));
-      const incomingPanelChats = parsedStashedState.panelChats;
+      const incomingPanelChats = await stateReader.parsePanelChatAsync();
 
       for (const incomingPanelChat of incomingPanelChats) {
         const panelChatId = incomingPanelChat.id;

@@ -114,7 +114,8 @@ function processCommit(
                 customTitle: panelChat.customTitle,
                 parent_id: panelChat.parent_id,
                 created_on: panelChat.created_on,
-                messages: []
+                messages: [],
+                kv_store: {}
             };
             commitData.panelChats.push(existingPanelChat);
             log(`Initialized PanelChat ID ${panelChatId} in commit ${commitHash}.`, LogLevel.INFO);
@@ -188,7 +189,8 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
         parsedCurrent = {
             panelChats: [],
             schemaVersion: SCHEMA_VERSION,
-            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
+            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+            kv_store: {}
         };
         log(`Initialized default stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
     }
@@ -350,7 +352,8 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
             parsedUncommitted = {
                 panelChats: [],
                 schemaVersion: SCHEMA_VERSION,
-                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
+                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+                kv_store: {}
             }; // Default to empty StashedState
             log(`Initialized default uncommitted stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
         }
@@ -461,7 +464,8 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         parsedCurrent = {
             panelChats: [],
             schemaVersion: SCHEMA_VERSION,
-            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
+            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+            kv_store: {}
         };
         console.log(`Initialized default stashedPanelChats.json structure due to parsing failure.`);
     }
@@ -644,7 +648,8 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             parsedUncommitted = {
                 panelChats: [],
                 schemaVersion: SCHEMA_VERSION,
-                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
+                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+                kv_store: {}
             }; // Default to empty StashedState
             console.log(`Initialized default uncommitted stashedPanelChats.json structure due to parsing failure.`);
         }
@@ -706,4 +711,17 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         commits: allCommits,
         uncommitted,
     };
+}
+
+export async function getIdToCommitInfo(repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
+    const gitHistory  = await getGitHistory(repoPath, filePath);
+    const idToCommitInfo = new Map<string, CommitData>();
+    for (const commit of gitHistory.commits) {
+      for (const panelChat of commit.panelChats) { // Updated to iterate through panelChats
+        for (const message of panelChat.messages) { // Iterate through messages within each panelChat
+          idToCommitInfo.set(message.id, commit);
+        }
+      }
+    }
+    return idToCommitInfo;
 }

@@ -22,6 +22,7 @@ export interface MessageEntry {
   model: string;
   timestamp: string;
   context: Context[];
+  kv_store: { [key: string]: any };
 }
 
 export function isMessageEntry(obj: any): obj is MessageEntry {
@@ -42,6 +43,7 @@ export interface PanelChat {
   parent_id: string | null;
   created_on: string;
   messages: MessageEntry[];
+  kv_store: { [key: string]: any };
 }
 
 export function isPanelChat(obj: any): obj is PanelChat {
@@ -58,6 +60,7 @@ export interface StashedState {
   panelChats: PanelChat[];
   schemaVersion: string;
   deletedChats: DeletedChats;
+  kv_store: { [key: string]: any };
 }
 
 export function isStashedState(obj: any): obj is StashedState {
@@ -107,6 +110,6 @@ export interface StateReader {
   /**
   * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
   */
-  parsePanelChatAsync(existingIds: string[]): Promise<StashedState>;
+  parsePanelChatAsync(): Promise<PanelChat[]>;
 }
 
