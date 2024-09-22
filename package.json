@@ -92,18 +92,52 @@
                 "command": "gait-copilot.registerGaitChatParticipant",
                 "title": "Load context into gait chat participant",
                 "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.handleMerge",
+                "title": "Handle Merge",
+                "category": "Gait"
             }
         ],
         "keybindings": [
             {
+                "key": "cmd+e",
+                "command": "aipopup.action.modal.generate",
+                "when": "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
+            },
+            {
+                "key": "cmd+k",
+                "command": "-aipopup.action.modal.generate",
+                "when": "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
+            },
+            {
+                "key": "cmd+e",
+                "command": "composer.startComposerPrompt",
+                "when": "composerIsEnabled"
+            },
+            {
+                "key": "cmd+k",
+                "command": "-composer.startComposerPrompt",
+                "when": "composerIsEnabled"
+            },
+            {
                 "command": "gait-copilot.startInlineChat",
-                "key": "cmd+i",
-                "when": "editorFocus && inlineChatHasProvider && !editorReadonly"
+                "key": "cmd+k",
+                "when": "editorFocus"
             },
             {
                 "command": "gait-copilot.acceptInlineChat",
+                "key": "cmd+shift+space"
+            },
+            {
+                "key": "cmd+a cmd+s",
+                "command": "editor.action.inlineDiffs.acceptAll",
+                "when": "editorTextFocus && (arbitrary function)"
+            },
+            {
                 "key": "cmd+enter",
-                "when": "inlineChatHasProvider && inlineChatVisible && !inlineChatDocumentChanged || inlineChatHasProvider && inlineChatVisible && config.inlineChat.mode != 'preview'"
+                "command": "-editor.action.inlineDiffs.acceptAll",
+                "when": "editorTextFocus && (arbitrary function)"
             }
         ]
     },

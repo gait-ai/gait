@@ -13,16 +13,32 @@ import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool, TOOL } from './ide';
 import { StateReader } from './types';
 import { generateKeybindings } from './keybind';
+import { handleMerge } from './automerge';
 
 const GAIT_FOLDER_NAME = '.gait';
 
 let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider: vscode.Disposable } | undefined;
 let decorationsActive = true;
 
+let isRedecorating = false;
+
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    return (...args: Parameters<F>): void => {
+        if (timeout !== null) {
+            clearTimeout(timeout);
+        }
+        timeout = setTimeout(() => func(...args), waitFor);
+    };
+}
 /**
- * Function to redecorate the editor.
+ * Function to redecorate the editor with debounce.
  */
-function redecorate(context: vscode.ExtensionContext) {
+const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
+    if (isRedecorating) return;
+    isRedecorating = true;
+
     if (disposibleDecorations) {
         disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
         disposibleDecorations.hoverProvider.dispose();
@@ -31,7 +47,9 @@ function redecorate(context: vscode.ExtensionContext) {
     if (decorationsActive) {
         disposibleDecorations = InlineDecoration.decorateActive(context);
     }
-}
+
+    isRedecorating = false;
+}, 300); // 300ms debounce time
 
 /**
  * Creates the .gait folder and necessary files if they don't exist.
@@ -168,7 +186,7 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage(`Failed to process editor content: ${error instanceof Error ? error.message : 'Unknown error'}`);
             });
 
-            redecorate(context);
+            debouncedRedecorate(context);
         }
     });
 
@@ -193,7 +211,7 @@ export function activate(context: vscode.ExtensionContext) {
     const deleteInlineChatCommand = vscode.commands.registerCommand('gait-copilot.removeInlineChat', (args) => {
         console.log("Removing inline chat", args);
         Inline.removeInlineChat(args.filePath, args.inline_chat_id);
-        redecorate(context);
+        debouncedRedecorate(context);
     });
 
     // Register the deletePanelChat command
@@ -284,7 +302,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const activateDecorationsCommand = vscode.commands.registerCommand('gait-copilot.activateDecorations', () => {
         decorationsActive = true;
-        redecorate(context);
+        debouncedRedecorate(context);
         vscode.window.showInformationMessage('Decorations activated.');
     });
 
@@ -296,6 +314,10 @@ export function activate(context: vscode.ExtensionContext) {
             disposibleDecorations = undefined;
         }
         vscode.window.showInformationMessage('Decorations deactivated.');
+    });
+
+    const handleMergeCommand = vscode.commands.registerCommand('gait-copilot.handleMerge', () => {
+        handleMerge(context);
     });
 
     // Register all commands
@@ -310,15 +332,22 @@ export function activate(context: vscode.ExtensionContext) {
         deactivateDecorationsCommand,
         deletePanelChatCommand,
         registerGaitChatParticipantCommand, // Add the new command here
-        exportPanelChatsToMarkdownCommand
+        exportPanelChatsToMarkdownCommand,
+        handleMergeCommand
     );
 
-    redecorate(context);
+    debouncedRedecorate(context);
     vscode.window.onDidChangeActiveTextEditor(() => {
-        redecorate(context);
+        debouncedRedecorate(context);
     });
+    
     vscode.workspace.onDidSaveTextDocument(() => {
-        redecorate(context);
+        debouncedRedecorate(context);
+    });
+
+    // Add a new event listener for text changes
+    vscode.workspace.onDidChangeTextDocument(() => {
+        debouncedRedecorate(context);
     });
 }
 
