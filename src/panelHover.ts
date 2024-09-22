@@ -37,17 +37,14 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
 
     markdown.isTrusted = true;
 
-    // Display the commit information
-    markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
-    markdown.isTrusted = true;
-
     // Display the message text and response
     const messageAuthor = commitInfo?.author ?? "You";
     markdown.appendMarkdown(`### ${messageAuthor}: ${message.messageText}\n\n`);
     // Escape backticks and newlines in the response text
     const escapedResponseText = message.responseText.replace(/`/g, '\\`').replace(/\n/g, '\\n');
-    markdown.appendMarkdown(`**Response**: ${escapedResponseText}\n\n`);
+    markdown.appendMarkdown(`**Response**: ${message.responseText}\n\n`);
 
+    markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
     const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]}
 
     // Add action buttons at the end of the hover content
