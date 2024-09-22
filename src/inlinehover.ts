@@ -20,7 +20,7 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     const hoursSinceEdit = Math.floor(timeDiffMs / (1000 * 3600));
     const daysSinceEdit = Math.floor(timeDiffMs / (1000 * 3600 * 24));
     const timeAgo = daysSinceEdit === 0 ? `${hoursSinceEdit} hours ago` : daysSinceEdit === 1 ? 'yesterday' : `${daysSinceEdit} days ago`;
-    markdown.appendMarkdown(`## ${author ?? "You"}: ${prompt} (${new Date(endTimestamp).toISOString().split('T')[0]}) (${timeAgo}) \n\n---\n`);
+    markdown.appendMarkdown(`### ${author ?? "You"}: ${prompt} (${new Date(endTimestamp).toISOString().split('T')[0]}) (${timeAgo}) \n\n---\n`);
     markdown.appendMarkdown(`**Commit**: ${commitMessage} (${commitHash}) \n\n---\n`);
     // Flatten the diffs into individual lines
     let lineBasedDiffs: Diff.Change[] = [];
