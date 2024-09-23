@@ -43,6 +43,15 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
     // Escape backticks and newlines in the response text
     markdown.appendMarkdown(`**Response**: ${message.responseText}\n\n`);
 
+    // Display the context information in small text
+    if (message.context && message.context.length > 0) {
+        markdown.appendMarkdown(`**Context**: ${message.context[0].value.human_readable}`);
+        if (message.context.length > 1) {
+            markdown.appendMarkdown(` (and ${message.context.length - 1} more)`);
+        }
+        markdown.appendMarkdown(`\n\n`);
+    }
+
     markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
     const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]};
 
