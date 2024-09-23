@@ -97,6 +97,11 @@
                 "command": "gait-copilot.handleMerge",
                 "title": "Handle Merge",
                 "category": "Gait"
+            },
+            {
+                "command": "gait-copilot.setPanelChatMode",
+                "title": "Set Panel Chat Mode",
+                "category": "Gait"
             }
         ],
         "keybindings": [

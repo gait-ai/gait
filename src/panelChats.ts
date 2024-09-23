@@ -5,7 +5,7 @@ import * as path from 'path';
 
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
-import { PanelChat, StashedState, StateReader } from './types';
+import { PanelChat, PanelChatMode, StashedState, StateReader } from './types';
 
 /**
  * Reads the stashed panel chats and deleted chats from .gait/stashedPanelChats.json.
@@ -160,12 +160,13 @@ function sanitizePanelChats(panelChats: PanelChat[]): PanelChat[] {
  */
 let isAppending = false;
 
-export async function monitorPanelChatAsync(stateReader: StateReader) {
+export async function monitorPanelChatAsync(stateReader: StateReader, context: vscode.ExtensionContext) {
   setInterval(async () => {
     if (isAppending) {
       // Skip if a previous append operation is still in progress
       return;
     }
+    const panelChatMode = context.workspaceState.get('panelChatMode');
     isAppending = true;
     try {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -182,6 +183,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader) {
 
       // Read the existing stashedPanelChats.json as existingStashedState
       let existingStashedState = readStashedPanelChats(gaitDir);
+      let currentPanelChats = [];
 
       // Parse the current panelChats
       const incomingPanelChats = sanitizePanelChats(await stateReader.parsePanelChatAsync());
@@ -203,10 +205,14 @@ export async function monitorPanelChatAsync(stateReader: StateReader) {
           }
         } else {
           // PanelChat does not exist, add it to panelChats
-          existingStashedState.panelChats.push(incomingPanelChat);
-          console.log(`monitorPanelChatAsync: Added new PanelChat ${panelChatId} with ${incomingPanelChat.messages.length} messages.`);
+          if (panelChatMode === 'AddAllChats') {
+            existingStashedState.panelChats.push(incomingPanelChat);
+            console.log(`monitorPanelChatAsync: Added new PanelChat ${panelChatId} with ${incomingPanelChat.messages.length} messages.`);
+          } 
+          currentPanelChats.push(incomingPanelChat);
         }
       }
+      context.workspaceState.update('currentPanelChats', currentPanelChats);
 
       // Write back to stashedPanelChats.json
       await writeStashedPanelChats(gaitDir, existingStashedState);
@@ -225,7 +231,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader) {
  * @param messageId The ID of the message to associate with the file.
  * @param filePath The path of the file to associate.
  */
-export async function associateFileWithMessage(messageId: string, filePath: string): Promise<void> {
+export async function associateFileWithMessage(messageId: string, filePath: string, newPanelChat: PanelChat): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         throw new Error('No workspace folder found');
@@ -252,10 +258,13 @@ export async function associateFileWithMessage(messageId: string, filePath: stri
     }
 
     if (!messageFound) {
-        console.error(`Message with ID ${messageId} not found in any panel chat.`);
+        vscode.window.showInformationMessage(`Adding associated panel chat to stashed state`);
+        stashedState.panelChats.push(newPanelChat);
+        await writeStashedPanelChats(gaitDir, stashedState);
         return;
     }
     vscode.window.showInformationMessage(`Associated file with message: ${messageId}`);
 
     await writeStashedPanelChats(gaitDir, stashedState);
 }
+

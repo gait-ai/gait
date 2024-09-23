@@ -25,6 +25,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         vscode.window.showErrorMessage('No workspace folder found.');
         return;
     }
+    let context = this._context
 
     const repoPath = workspaceFolder.uri.fsPath;
     const filePath = '.gait/stashedPanelChats.json'; // Replace with your actual file path relative to repo
@@ -70,11 +71,31 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 const uncommittedCommit: CommitData = {
                     commitHash: 'uncommitted',
                     author: 'You',
-                    commitMessage: 'Uncommitted Changes',
+                    commitMessage: 'Added Chats',
                     date: new Date(), // Current date and time
                     panelChats: gitHistory.uncommitted.panelChats // Updated to use panelChats
                 };
                 this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
+            }
+            const currentPanelChats = context.workspaceState.get('currentPanelChats');
+            if (currentPanelChats && Array.isArray(currentPanelChats)) {
+                let filteredCurrentPanelChats = currentPanelChats;
+                if (gitHistory.uncommitted) {
+                    // Filter out panelChats from currentPanelChats that are already in uncommitted
+                    const uncommittedPanelChatIds = new Set(gitHistory.uncommitted.panelChats.map(pc => pc.id));
+                    filteredCurrentPanelChats = currentPanelChats.filter((pc: { id: string }) => !uncommittedPanelChatIds.has(pc.id));
+                }
+                // If there are any remaining filtered panelChats, add them to the uncommitted commit
+                if (filteredCurrentPanelChats.length > 0) {
+                    const unaddedCommit: CommitData = {
+                        commitHash: 'unadded',
+                        author: 'You',
+                        commitMessage: 'Unadded Chats',
+                        date: new Date(), // Current date and time
+                        panelChats:filteredCurrentPanelChats // Updated to use panelChats
+                    };
+                    this._commits.unshift(unaddedCommit); // Add to the beginning for visibility
+                }
             }
         }
     } catch (error: any) {

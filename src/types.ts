@@ -113,3 +113,4 @@ export interface StateReader {
   parsePanelChatAsync(): Promise<PanelChat[]>;
 }
 
+export type PanelChatMode = 'AddAllChats' | 'OnlyMatchedChats';

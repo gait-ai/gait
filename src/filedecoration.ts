@@ -5,7 +5,7 @@ import * as levenshtein from 'fast-levenshtein';
 import * as path from 'path';
 import * as InlineHover from './inlinehover';
 import { associateFileWithMessage, readStashedPanelChats } from './panelChats';
-import { PanelMatchedRange, StashedState } from './types';
+import { PanelChat, PanelMatchedRange, StashedState } from './types';
 import * as PanelHover from './panelHover';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
@@ -212,6 +212,11 @@ export function decorateActive(context: vscode.ExtensionContext) {
     const stashedState: StashedState = readStashedPanelChats(gaitDir);
     const fileChats = Inline.loadFileChats(baseName);
 
+    const currentPanelChats = [
+        ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []),
+        ...stashedState.panelChats
+    ];
+
     const rangesToPanel: PanelMatchedRange[] = [];
 
     const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
@@ -231,7 +236,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
     }
 
     let decorationIndex = 0;
-    for (const panelChat of stashedState.panelChats) {
+    for (const panelChat of currentPanelChats) {
         for (const message of panelChat.messages) {
             if (message.kv_store && 'file_paths' in message.kv_store && !message.kv_store.file_paths.includes(baseName)) {
                 continue;
@@ -244,7 +249,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
                     // If more than half of the code lines match, associate the file with the message
                     const filePath = editor.document.uri.fsPath;
                     const relativeFilePath = vscode.workspace.asRelativePath(filePath);
-                    associateFileWithMessage(message.id, relativeFilePath).catch(error => {
+                    associateFileWithMessage(message.id, relativeFilePath, panelChat).catch(error => {
                         console.error(`Failed to associate file with message: ${error}`);
                     });
                 }
