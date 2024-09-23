@@ -211,7 +211,7 @@ export class VSCodeReader implements StateReader {
                     id,
                     parent_id,
                     created_on,
-                    messages,
+                    messages
                 } as PanelChat;
             });
     

@@ -2,16 +2,15 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as Inline from './inline';
-import * as InlineDecoration from './inlinedecoration';
+import * as InlineDecoration from './filedecoration';
 import { PanelViewProvider } from './panelview';
 import { monitorPanelChatAsync } from './panelChats';
 import * as VSCodeReader from './vscode/vscodeReader';
 import { panelChatsToMarkdown } from './markdown';
-import { PanelChat } from './types';
 import * as CursorReader from './cursor/cursorReader';
 import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool, TOOL } from './ide';
-import { StateReader } from './types';
+import { PanelChatMode, StateReader } from './types';
 import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 
@@ -36,7 +35,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
  * Function to redecorate the editor with debounce.
  */
 const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
-    if (isRedecorating) return;
+    if (isRedecorating) {return;}
     isRedecorating = true;
 
     if (disposibleDecorations) {
@@ -78,6 +77,10 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
  */
 export function activate(context: vscode.ExtensionContext) {
     const tool: TOOL = checkTool();
+    const panelChatMode: PanelChatMode = 'AddAllChats';
+    // Set panelChatMode in extension workspaceStorage
+    context.workspaceState.update('panelChatMode', panelChatMode);
+    console.log(`PanelChatMode set to: ${panelChatMode}`);
 
     generateKeybindings(context, tool);
 
@@ -95,7 +98,7 @@ export function activate(context: vscode.ExtensionContext) {
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
     setTimeout(() => {
-        monitorPanelChatAsync(stateReader);
+        monitorPanelChatAsync(stateReader, context);
     }, 3000); // Delay to ensure initial setup
 
     const provider = new PanelViewProvider(context);
@@ -136,6 +139,23 @@ export function activate(context: vscode.ExtensionContext) {
             });
         }
         vscode.commands.executeCommand(startInlineCommand);
+    });
+
+    const setPanelChatModeCommand = vscode.commands.registerCommand('gait-copilot.setPanelChatMode', async () => {
+        const options: vscode.QuickPickItem[] = [
+            { label: 'Add All Chats', description: 'Save all panel chats' },
+            { label: 'Add Selected Chats', description: 'Only save panel chats that match code ' }
+        ];
+
+        const selectedOption = await vscode.window.showQuickPick(options, {
+            placeHolder: 'Select Panel Chat Mode'
+        });
+
+        if (selectedOption) {
+            const mode: PanelChatMode = selectedOption.label === 'Add All Chats' ? 'AddAllChats' : 'OnlyMatchedChats';
+            context.workspaceState.update('panelChatMode', mode);
+            vscode.window.showInformationMessage(`Panel Chat Mode set to: ${selectedOption.label}`);
+        }
     });
 
 
@@ -333,7 +353,8 @@ export function activate(context: vscode.ExtensionContext) {
         deletePanelChatCommand,
         registerGaitChatParticipantCommand, // Add the new command here
         exportPanelChatsToMarkdownCommand,
-        handleMergeCommand
+        handleMergeCommand,
+        setPanelChatModeCommand
     );
 
     debouncedRedecorate(context);

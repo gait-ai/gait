@@ -41,11 +41,10 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
     const messageAuthor = commitInfo?.author ?? "You";
     markdown.appendMarkdown(`### ${messageAuthor}: ${message.messageText}\n\n`);
     // Escape backticks and newlines in the response text
-    const escapedResponseText = message.responseText.replace(/`/g, '\\`').replace(/\n/g, '\\n');
     markdown.appendMarkdown(`**Response**: ${message.responseText}\n\n`);
 
     markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
-    const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]}
+    const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]};
 
     // Add action buttons at the end of the hover content
     const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(JSON.stringify(markdownData))}`);
