@@ -5,7 +5,7 @@ import * as path from 'path';
 
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
-import { StashedState, StateReader } from './types';
+import { PanelChat, StashedState, StateReader } from './types';
 
 /**
  * Reads the stashed panel chats and deleted chats from .gait/stashedPanelChats.json.
@@ -127,6 +127,32 @@ async function writeStashedPanelChats(gaitDir: string, stashedState: StashedStat
   }
 }
 
+function sanitizePanelChats(panelChats: PanelChat[]): PanelChat[] {
+  // Regular expression to match the unwanted command strings
+  const commandRegex = /\(command:_github\.copilot\.[^)]*\)/g;
+
+  // Deep clone the stashedState to avoid mutating the original object
+  const panelChats2: PanelChat[] = JSON.parse(JSON.stringify(panelChats));
+
+  // Iterate through each PanelChat
+  panelChats2.forEach((panelChat) => {
+    // Iterate through each MessageEntry within the PanelChat
+    panelChat.messages.forEach((message) => {
+      // Remove the unwanted command strings from messageText
+      if (typeof message.messageText === 'string') {
+        message.messageText = message.messageText.replace(commandRegex, '').trim();
+      }
+
+      // Remove the unwanted command strings from responseText
+      if (typeof message.responseText === 'string') {
+        message.responseText = message.responseText.replace(commandRegex, '').trim();
+      }
+    });
+  });
+
+  return panelChats2;
+}
+
 /**
  * Monitors the panel chat and appends new chats to stashedPanelChats.json.
  * Note: Since 'lastAppended' has been removed from StashedState, this function has been simplified.
@@ -158,7 +184,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader) {
       let existingStashedState = readStashedPanelChats(gaitDir);
 
       // Parse the current panelChats
-      const incomingPanelChats = await stateReader.parsePanelChatAsync();
+      const incomingPanelChats = sanitizePanelChats(await stateReader.parsePanelChatAsync());
 
       for (const incomingPanelChat of incomingPanelChats) {
         const panelChatId = incomingPanelChat.id;
