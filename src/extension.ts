@@ -2,12 +2,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as Inline from './inline';
-import * as InlineDecoration from './inlinedecoration';
+import * as InlineDecoration from './filedecoration';
 import { PanelViewProvider } from './panelview';
 import { monitorPanelChatAsync } from './panelChats';
 import * as VSCodeReader from './vscode/vscodeReader';
 import { panelChatsToMarkdown } from './markdown';
-import { PanelChat } from './types';
 import * as CursorReader from './cursor/cursorReader';
 import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool, TOOL } from './ide';
@@ -36,7 +35,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
  * Function to redecorate the editor with debounce.
  */
 const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
-    if (isRedecorating) return;
+    if (isRedecorating) {return;}
     isRedecorating = true;
 
     if (disposibleDecorations) {

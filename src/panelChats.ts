@@ -218,3 +218,44 @@ export async function monitorPanelChatAsync(stateReader: StateReader) {
     }
   }, 1000); // Runs every second
 }
+
+
+/**
+ * Associates a file with a message in the stashed panel chats.
+ * @param messageId The ID of the message to associate with the file.
+ * @param filePath The path of the file to associate.
+ */
+export async function associateFileWithMessage(messageId: string, filePath: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        throw new Error('No workspace folder found');
+    }
+
+    const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
+    let stashedState = readStashedPanelChats(gaitDir);
+
+    let messageFound = false;
+    for (const panelChat of stashedState.panelChats) {
+        for (const message of panelChat.messages) {
+            if (message.id === messageId) {
+                message.kv_store = { 
+                    ...message.kv_store, 
+                    file_paths: [...(message.kv_store?.file_paths || []), filePath]
+                };
+                messageFound = true;
+                break;
+            }
+        }
+        if (messageFound) {
+            break;
+        }
+    }
+
+    if (!messageFound) {
+        console.error(`Message with ID ${messageId} not found in any panel chat.`);
+        return;
+    }
+    vscode.window.showInformationMessage(`Associated file with message: ${messageId}`);
+
+    await writeStashedPanelChats(gaitDir, stashedState);
+}
