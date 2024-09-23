@@ -25,6 +25,7 @@ export function panelChatsToMarkdown(panelChats: ({commit: CommitData, panelChat
             markdown += `  - **Message ID**: ${message.id}\n`;
             markdown += `    - **Text**: ${message.messageText}\n`;
             markdown += `    - **Response**: ${message.responseText}\n`;
+            markdown += `    - **Context**: ${JSON.stringify(message.context)}\n`;
         });
         markdown += `\n`;
     });

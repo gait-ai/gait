@@ -4,14 +4,13 @@ import { InlineStartInfo } from './inline';
 export interface Context {
 	context_type: string
 	key: string
-	value: string
+	value: any
 }
 
 function isContext(obj: any): obj is Context {
   return (
     typeof obj.context_type === 'string' &&
-    typeof obj.key === 'string' &&
-    typeof obj.value === 'string'
+    typeof obj.key === 'string'
   );
 }
 

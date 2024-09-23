@@ -61,6 +61,80 @@ export class CursorReader implements StateReader {
         this.inlineStartInfo = inlineStartInfo;
     }
 
+    private parseContext(userMessage: any): Context[] {
+        let context: Context[] = [];
+        // Parse and add selections to panelChat.context if available
+        if (userMessage.selections && Array.isArray(userMessage.selections)) {
+            userMessage.selections.forEach((selection: any) => (
+                context.push({
+                    context_type: "selection",
+                    key: uuidv4(),
+                    value: {
+                        human_readable: selection.uri?.fsPath || '',
+                        uri: selection.uri?.fsPath || '',
+                        range: {
+                            startLine: selection.range?.selectionStartLineNumber || 0,
+                            startColumn: selection.range?.selectionStartColumn || 0,
+                            endLine: selection.range?.positionLineNumber || 0,
+                                endColumn: selection.range?.positionColumn || 0
+                            },
+                        text: selection.rawText || ''
+                    }
+                }))
+            );
+        }
+        // Parse and add file selections to context if available
+        if (userMessage.fileSelections && Array.isArray(userMessage.fileSelections)) {
+            userMessage.fileSelections.forEach((fileSelection: any) => {
+                if (fileSelection.uri) {
+                    context.push({
+                        context_type: "file",
+                        key: uuidv4(),
+                        value: {
+                            human_readable: fileSelection.uri.fsPath || '',
+                            uri: fileSelection.uri.fsPath || '',
+                            isCurrentFile: fileSelection.isCurrentFile || false,
+                        }
+                    });
+                }
+            });
+        }
+        // Parse and add folder selections to context if available
+        if (userMessage.folderSelections && Array.isArray(userMessage.folderSelections)) {
+            userMessage.folderSelections.forEach((folderSelection: any) => {
+                if (folderSelection.relativePath) {
+                    context.push({
+                        context_type: "folder",
+                        key: uuidv4(),
+                        value: {
+                            human_readable: folderSelection.relativePath,
+                            relativePath: folderSelection.relativePath,
+                        }
+                    });
+                }
+            });
+        }
+
+        // Parse and add selected docs to context if available
+        if (userMessage.selectedDocs && Array.isArray(userMessage.selectedDocs)) {
+            userMessage.selectedDocs.forEach((doc: any) => {
+                if (doc.docId) {
+                    context.push({
+                        context_type: "selected_doc",
+                        key: uuidv4(),
+                        value: {
+                            human_readable: doc.name || '',
+                            docId: doc.docId,
+                            name: doc.name || '',
+                            url: doc.url || '',
+                        }
+                    });
+                }
+            });
+        }
+        return context;
+    }
+
     /**
      * Processes the editor content during inline chat acceptance.
      */
@@ -141,13 +215,14 @@ export class CursorReader implements StateReader {
                     const aiBubble = filteredBubbles[i + 1];
 
                     if (userBubble && userBubble.type === 'user' && aiBubble && aiBubble.type === 'ai') {
+                        
                         const messageEntry: MessageEntry = {
                             id: userBubble.id,
                             messageText: userBubble.text || '',
                             responseText: aiBubble.text || '',
                             model: aiBubble.modelType || 'Unknown',
                             timestamp: new Date(tab.lastSendTime).toISOString(),
-                            context: [], // Extract context if needed,
+                            context: this.parseContext(userBubble), // Extract context if needed,
                             kv_store: {}
                         };
                         panelChat.messages.push(messageEntry);

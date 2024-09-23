@@ -120,6 +120,36 @@ export class VSCodeReader implements StateReader {
         }
     }
 
+    private parseContext(request: any): Context[] {
+        let context: Context[] = [];
+
+        if (request.contentReferences && Array.isArray(request.contentReferences)) {
+            request.contentReferences.forEach((ref: any) => {
+                if (ref.kind === 'reference' && ref.reference) {
+                    const { range, uri } = ref.reference;
+                    if (range && uri) {
+                        context.push({
+                            context_type: "selection",
+                            key: uuidv4(),
+                            value: {
+                                human_readable: uri.fsPath || '',
+                                uri: uri.fsPath || '',
+                                range: {
+                                    startLine: range.startLineNumber || 0,
+                                    startColumn: range.startColumn || 0,
+                                    endLine: range.endLineNumber || 0,
+                                    endColumn: range.endColumn || 0
+                                },
+                                text: '' // Note: We don't have the actual text content here
+                            }
+                        });
+                    }
+                }
+            });
+        }
+        return context;
+    }
+
     /**
      * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
      */
@@ -174,24 +204,7 @@ export class VSCodeReader implements StateReader {
                     const timestamp: string = typeof request.timestamp === 'string' ? request.timestamp : new Date().toISOString();
     
                     // Extract context if available
-                    let contextData: Context[]  = [];
-                    if (Array.isArray(request.context)) {
-                        contextData = request.context
-                            .map((ctx: any) => {
-                                if (typeof ctx.type === 'string' && typeof ctx.value === 'string') {
-                                    switch (ctx.type) {
-                                        case 'RelativePath':
-                                        case 'SymbolFromReferences':
-                                        case 'SymbolInFile':
-                                            return { context_type: ctx.type, key: ctx.key, value: ctx.value } as Context;
-                                        default:
-                                            return undefined;
-                                    }
-                                }
-                                return undefined;
-                            })
-                            .filter((ctx: Context | undefined) => ctx !== undefined) as Context[];
-                    }
+                    let contextData: Context[]  = this.parseContext(request);
     
                     return {
                         id, // Assign new UUID to MessageEntry
