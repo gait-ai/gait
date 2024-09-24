@@ -123,19 +123,6 @@ export interface DeletedChats {
   deletedPanelChatIDs: string[];
 }
 
-export interface LastAppended {
-  order: string[]; // Ordered list of PanelChat UUIDs
-  lastAppendedMap: { [panelChatId: string]: number };
-}
-
-export function isLastAppended(obj: any): obj is LastAppended {
-  return (
-    Array.isArray(obj.order) && obj.order.every((id: any) => typeof id === 'string') &&
-    typeof obj.lastAppendedMap === 'object' && obj.lastAppendedMap !== null &&
-    Object.values(obj.lastAppendedMap).every((value: any) => typeof value === 'number')
-  );
-}
-
 export interface PanelMatchedRange {
   range: vscode.Range;
   matchedLines: string[];
