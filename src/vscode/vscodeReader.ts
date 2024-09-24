@@ -7,7 +7,6 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 const SCHEMA_VERSION = '1.0';
 
-
 /**
  * Interface representing an interactive session.
  */
@@ -23,7 +22,6 @@ interface InteractiveSession {
         copilot: any[];
     }
 }
-
 
 /**
  * Validates if the object is a valid InteractiveSession.
@@ -84,7 +82,7 @@ export class VSCodeReader implements StateReader {
      */
     public async startInline(inlineStartInfo: Inline.InlineStartInfo) {
         const interactiveSessions = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
-        this.interactiveSessions= interactiveSessions;
+        this.interactiveSessions = interactiveSessions;
         this.inlineStartInfo = inlineStartInfo;
     }
 
@@ -113,7 +111,8 @@ export class VSCodeReader implements StateReader {
             const newChat = getSingleNewEditorText(oldInteractiveSessions, newInteractiveSessions);
             const inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, diff, newChat);
 
-            Inline.writeInlineChat(inlineChatInfoObj);
+            // **Modified**: Pass `filepath` separately using `lastInline.fileName`
+            Inline.writeInlineChat(lastInline.fileName, inlineChatInfoObj);
             this.interactiveSessions = null;
         } else {
             throw new Error('No valid content stored in last_inline_start');
@@ -187,25 +186,25 @@ export class VSCodeReader implements StateReader {
                     }
                     // Safely extract responseText
                     let responseText: string = '';
-    
+
                     if (Array.isArray(request.response)) {
                         // Concatenate all response values into a single string, separated by newlines
                         const validResponses = request.response
                             .map((response: any) => response.value)
                             .filter((value: any) => typeof value === 'string' && value.trim() !== '');
-    
+
                         responseText = validResponses.join('\n');
                     } else if (typeof request.response?.value === 'string') {
                         responseText = request.response.value;
                     }
-    
+
                     // Extract model and timestamp if available
                     const model: string = typeof request.model === 'string' ? request.model : 'Unknown';
                     const timestamp: string = typeof request.timestamp === 'string' ? request.timestamp : new Date().toISOString();
-    
+
                     // Extract context if available
                     let contextData: Context[]  = this.parseContext(request);
-    
+
                     return {
                         id, // Assign new UUID to MessageEntry
                         messageText,
@@ -217,7 +216,7 @@ export class VSCodeReader implements StateReader {
                 }).filter((entry: MessageEntry) =>
                     entry.messageText.trim() !== '' && entry.responseText.trim() !== ''
                 );
-    
+
                 return {
                     ai_editor,
                     customTitle,
@@ -227,7 +226,7 @@ export class VSCodeReader implements StateReader {
                     messages
                 } as PanelChat;
             });
-    
+
             return panelChats;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to parse panel chat: ${error instanceof Error ? error.message : 'Unknown error'}`);

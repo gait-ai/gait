@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
-import { InlineStartInfo } from './inline';
+import * as path from 'path';
+import * as fs from 'fs';
+import { InlineStartInfo, FileChats } from './inline';
+
+const SCHEMA_VERSION = '1.0';
 
 export interface Context {
 	context_type: string
@@ -60,6 +64,51 @@ export interface StashedState {
   schemaVersion: string;
   deletedChats: DeletedChats;
   kv_store: { [key: string]: any };
+}
+
+export interface ConsolidatedGaitData {
+  stashedState: StashedState;
+  fileChats: FileChats[];
+}
+
+export function readConsolidatedGaitData(gaitDir: string): ConsolidatedGaitData {
+    const gaitFilePath = path.join(gaitDir, 'consolidatedGaitData.json');
+    const initialState: ConsolidatedGaitData = {
+        stashedState: {
+            panelChats: [],
+            schemaVersion: SCHEMA_VERSION,
+            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+            kv_store: {}
+        },
+        fileChats: []
+    };
+ 
+    try {
+        if (!fs.existsSync(gaitFilePath)) {
+            fs.writeFileSync(gaitFilePath, JSON.stringify(initialState, null, 2), 'utf-8');
+            console.log(`consolidatedGaitData.json not found. Initialized with empty data.`);
+            return initialState;
+        }
+
+        const content = fs.readFileSync(gaitFilePath, 'utf-8').trim();
+        if (content === '') {
+            fs.writeFileSync(gaitFilePath, JSON.stringify(initialState, null, 2), 'utf-8');
+            console.log(`consolidatedGaitData.json is empty. Initialized with empty data.`);
+            return initialState;
+        }
+
+        return JSON.parse(content);
+    } catch (error) {
+        console.error(`Error reading consolidatedGaitData.json:`, error);
+        vscode.window.showErrorMessage(`consolidatedGaitData.json is malformed. Reinitializing the file.`);
+        fs.writeFileSync(gaitFilePath, JSON.stringify(initialState, null, 2), 'utf-8');
+        return initialState;
+    }
+}
+
+export async function writeConsolidatedGaitData(gaitDir: string, data: ConsolidatedGaitData): Promise<void> {
+  const gaitFilePath = path.join(gaitDir, 'consolidatedGaitData.json');
+  fs.writeFileSync(gaitFilePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
 export function isStashedState(obj: any): obj is StashedState {

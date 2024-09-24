@@ -55,9 +55,23 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
  */
 function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
     const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
+    const stashedPath = path.join(gaitFolderPath, 'consolidatedGaitData.json');
     if (!fs.existsSync(gaitFolderPath)) {
         fs.mkdirSync(gaitFolderPath);
         vscode.window.showInformationMessage(`${GAIT_FOLDER_NAME} folder created successfully`);
+    }
+
+    if (!fs.existsSync(stashedPath)) {
+        fs.writeFileSync(stashedPath, JSON.stringify({
+            stashedState: {
+                panelChats: [],
+                schemaVersion: '1.0',
+                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+                kv_store: {}
+            },
+            inlineChats: []
+        }, null, 2));
+        vscode.window.showInformationMessage('consolidatedGaitData.json created successfully');
     }
 
 
@@ -230,7 +244,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register the deleteInlineChat command
     const deleteInlineChatCommand = vscode.commands.registerCommand('gait-copilot.removeInlineChat', (args) => {
         console.log("Removing inline chat", args);
-        Inline.removeInlineChat(args.filePath, args.inline_chat_id);
+        Inline.removeInlineChat(args.fileName, args.inline_chat_id);
         debouncedRedecorate(context);
     });
 
