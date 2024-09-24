@@ -20,6 +20,8 @@ let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider
 let decorationsActive = true;
 
 let isRedecorating = false;
+let lastCursorPosition: vscode.Position | null = null;
+let changeQueue: vscode.TextDocumentContentChangeEvent[] = [];
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
     let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -31,6 +33,43 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
         timeout = setTimeout(() => func(...args), waitFor);
     };
 }
+/**
+ * Handles file changes to detect AI-generated changes.
+ */
+function handleFileChange(event: vscode.TextDocumentChangeEvent, stateReader: StateReader, context: vscode.ExtensionContext) {
+    const changes = event.contentChanges;
+    const editor = vscode.window.activeTextEditor;
+
+    if (!editor || changes.length === 0) {
+        return;
+    }
+
+    const currentCursorPosition = editor.selection.active;
+    const isCursorMoved = lastCursorPosition && !lastCursorPosition.isEqual(currentCursorPosition);
+
+    // Add changes to the queue
+    changeQueue.push(...changes);
+
+    // Check if changes are AI-generated
+    const isAIChange = changes.some(change => change.text.length > 100 && !isCursorMoved); // Example threshold for AI-generated change
+
+    if (isAIChange) {
+        stateReader.acceptInline(editor).catch(error => {
+            vscode.window.showErrorMessage(`Failed to process AI-generated changes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        });
+
+        debouncedRedecorate(context);
+    }
+
+    // Update last cursor position
+    lastCursorPosition = currentCursorPosition;
+
+    // Clear the queue if the last change is more than a second old
+    setTimeout(() => {
+        changeQueue = [];
+    }, 1000);
+}
+
 /**
  * Function to redecorate the editor with debounce.
  */
@@ -367,7 +406,8 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Add a new event listener for text changes
-    vscode.workspace.onDidChangeTextDocument(() => {
+    vscode.workspace.onDidChangeTextDocument((event) => {
+        handleFileChange(event, stateReader, context);
         debouncedRedecorate(context);
     });
 }
