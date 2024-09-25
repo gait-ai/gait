@@ -13,7 +13,7 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
     let newKeybindings: Keybinding[] = [];
 
     const sharedKeybindings = [{
-        key: "cmd+g",
+        key: "cmd+shift+g",
         command: "gait-copilot.toggleDecorations",
     }]
     if (tool === "Cursor") {

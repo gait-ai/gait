@@ -46,7 +46,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateReader: StateReader, context: vscode.ExtensionContext) {
     const changes = event.contentChanges;
     const editor = vscode.window.activeTextEditor;
-    if (!event.document.fileName || event.reason || !editor || changes.length === 0 || event.document.fileName.includes(path.join(GAIT_FOLDER_NAME))) {
+    if (!event.document.fileName || event.reason || !editor || changes.length === 0 || event.document.fileName.includes(path.join(GAIT_FOLDER_NAME)) || event.document.fileName.includes("rendererLog")){
         return;
     }
 
@@ -456,14 +456,14 @@ export function activate(context: vscode.ExtensionContext) {
         decorationsActive = !decorationsActive;
         if (decorationsActive) {
             debouncedRedecorate(context);
-            vscode.window.showInformationMessage('Decorations activated.');
+            vscode.window.showInformationMessage('Gait context activated.');
         } else {
             if (disposibleDecorations) {
                 disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
                 disposibleDecorations.hoverProvider.dispose();
                 disposibleDecorations = undefined;
             }
-            vscode.window.showInformationMessage('Decorations deactivated.');
+            vscode.window.showInformationMessage('Gait context deactivated.');
         }
     });
 
