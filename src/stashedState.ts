@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { isStashedState, StashedState } from './types';
 import vscode from 'vscode';
+import { compressSync, decompressSync } from 'zstd-codec';
 
 function stashedStateFilePath(): string {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -17,10 +18,12 @@ function stashedStateFilePath(): string {
 export function readStashedState(): StashedState {
     const filePath = stashedStateFilePath();
     try {
-        // Read the current file content as StashedState
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-        let stashedState: StashedState;
-        stashedState = JSON.parse(fileContent);
+        const compressedContent = fs.readFileSync(filePath);
+        //const decompressedBuffer = decompressSync(compressedContent);
+        //const fileContent = decompressedBuffer.toString('utf-8');
+        const fileContent = compressedContent.toString('utf-8');
+        const stashedState: StashedState = JSON.parse(fileContent);
+
         if (!isStashedState(stashedState)) {
             throw new Error('Invalid stashed state');
         }
@@ -34,7 +37,13 @@ export function readStashedState(): StashedState {
 export function writeStashedState(stashedState: StashedState): void {
     const filePath = stashedStateFilePath();
     try {
-        fs.writeFileSync(filePath, JSON.stringify(stashedState, null, 2));
+        const jsonString = JSON.stringify(stashedState, null, 2);
+
+        // Compress the JSON string using zstd-codec
+        //const compressedBuffer = compressSync(Buffer.from(jsonString, 'utf-8'));
+
+        // Write the compressed buffer to the file
+        fs.writeFileSync(filePath, jsonString);
     } catch (error) {
         vscode.window.showErrorMessage(`Error writing stashed state: ${(error as Error).message}`);
         throw new Error('Error writing stashed state');
