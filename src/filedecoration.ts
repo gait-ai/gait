@@ -62,7 +62,7 @@ export function matchDiffToCurrentFile(
     // Extract all added lines from the diff
     let addedLines = diff
         .filter(change => change.added)
-        .flatMap(change => change.value.split('\n').map(line => line.trim()))
+        .flatMap(change => change.value.split('\n').map(line => line.trim()));
     addedLines = addedLines.filter(line => line.length > 0); // Remove empty lines
 
     const minBlockSize = 1;
@@ -96,7 +96,7 @@ export function matchDiffToCurrentFile(
                     }
 
                     // If we don't have enough non-blank lines, break
-                    if (nonBlankCount < blockSize) break;
+                    if (nonBlankCount < blockSize) {break;}
 
                     const currentDocBlock = documentLines.slice(docStart, docEnd)
                         .filter(line => line.trim().length > 0)
@@ -210,7 +210,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
 
     const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
     const stashedState: StashedState = readStashedPanelChats(gaitDir);
-    const fileChats = Inline.loadFileChats(baseName);
+    const inlineChats = stashedState.inlineChats;
 
     const currentPanelChats = [
         ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []),
@@ -276,23 +276,24 @@ export function decorateActive(context: vscode.ExtensionContext) {
 
     const rangesToInline: Inline.InlineMatchedRange[] = [];
     decorationIndex = 0;
-    for (const chat of Object.values(fileChats.inlineChats)) {
-        const currentRanges = matchDiffToCurrentFile(editor.document, chat.diffs, 0.8);
-        if (currentRanges.length > 0) {
+    for (const chat of Object.values(inlineChats)) {
+        for (const diff of chat.file_diff) {
+            const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs, 0.8);
+            if (currentRanges.length > 0) {
+                const color = generateColors(decorationIndex);
+                decorationIndex += 1;
 
-            const color = generateColors(decorationIndex);
-            decorationIndex += 1;
-
-            // Create a new decoration type with the unique color
-            currentRanges.forEach(range => {
-                rangesToInline.push({
-                    range: range.ranges,
-                    matchedLines: range.originalLines,
-                    inlineChat: chat,
-                    similarity: range.similarity
+                // Create a new decoration type with the unique color
+                currentRanges.forEach(range => {
+                    rangesToInline.push({
+                        range: range.ranges,
+                        matchedLines: range.originalLines,
+                        inlineChat: chat,
+                        similarity: range.similarity
+                    });
+                    addDecorationType(color, range.ranges);
                 });
-                addDecorationType(color, range.ranges);
-            });
+            }
         }
     }
 

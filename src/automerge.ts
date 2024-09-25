@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { StashedState, isStashedState } from './types';
-import { FileChats } from './inline';
 
 export async function handleMerge(context: vscode.ExtensionContext) {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -44,10 +43,7 @@ async function resolveMergeConflicts(document: vscode.TextDocument) {
         
         if (document.fileName.endsWith('stashedPanelChats.json')) {
             mergedContent = mergeStashedStates(version1, version2);
-        } else {
-            mergedContent = mergeInlineChats(version1, version2);
-        }
-
+        } 
         if (mergedContent) {
             const edit = new vscode.WorkspaceEdit();
             edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), mergedContent);
@@ -105,6 +101,7 @@ function mergeStashedStates(ourVersion: string, theirVersion: string): string | 
 
         const mergedState: StashedState = {
             panelChats: [...ourState.panelChats, ...theirState.panelChats],
+            inlineChats: [...ourState.inlineChats, ...theirState.inlineChats],
             schemaVersion: ourState.schemaVersion,
             deletedChats: {
                 deletedMessageIDs: [...new Set([...ourState.deletedChats.deletedMessageIDs, ...theirState.deletedChats.deletedMessageIDs])],
@@ -119,35 +116,3 @@ function mergeStashedStates(ourVersion: string, theirVersion: string): string | 
         return null;
     }
 }
-
-function mergeInlineChats(ourVersion: string, theirVersion: string): string | null {
-    try {
-        const ourFileChats: FileChats = JSON.parse(ourVersion);
-        const theirFileChats: FileChats = JSON.parse(theirVersion);
-
-        const mergedFileChats: FileChats = {
-            fileName: ourFileChats.fileName,
-            inlineChats: { ...ourFileChats.inlineChats }
-        };
-
-        // Merge inline chats
-        for (const [chatId, theirChat] of Object.entries(theirFileChats.inlineChats)) {
-            if (chatId in mergedFileChats.inlineChats) {
-                // If the chat exists in both versions, keep the one with the later endTimestamp
-                const ourChat = mergedFileChats.inlineChats[chatId];
-                if (new Date(theirChat.endTimestamp) > new Date(ourChat.endTimestamp)) {
-                    mergedFileChats.inlineChats[chatId] = theirChat;
-                }
-            } else {
-                // If the chat only exists in their version, add it to the merged version
-                mergedFileChats.inlineChats[chatId] = theirChat;
-            }
-        }
-
-        return JSON.stringify(mergedFileChats, null, 2);
-    } catch (error) {
-        console.error('Error merging inline chats:', error);
-        return null;
-    }
-}
-

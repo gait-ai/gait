@@ -91,7 +91,7 @@ export class VSCodeReader implements StateReader {
     /**
      * Processes the editor content during inline chat acceptance.
      */
-    public async acceptInline(editor: vscode.TextEditor) {
+    public async acceptInline(editor: vscode.TextEditor, file_diffs: Inline.FileDiff[] | null) {
         const oldInteractiveSessions: any = this.interactiveSessions;
         if (!isValidInteractiveSession(oldInteractiveSessions)) {
             throw new Error('Old interactive sessions are invalid or not found.');
@@ -100,24 +100,24 @@ export class VSCodeReader implements StateReader {
         const newContent = editor.document.getText();
         const lastInline = this.inlineStartInfo;
         this.inlineStartInfo = null;
-        if (Inline.isInlineStartInfo(lastInline)) {
-            const diff = Diff.diffLines(lastInline.content, newContent);
-            await vscode.commands.executeCommand('inlineChat.acceptChanges');
 
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            const newInteractiveSessions: any = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
-            
-            if (!isValidInteractiveSession(newInteractiveSessions)) {
-                throw new Error('New interactive sessions are invalid or not found.');
-            }
-            const newChat = getSingleNewEditorText(oldInteractiveSessions, newInteractiveSessions);
-            const inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, diff, newChat);
+        await vscode.commands.executeCommand('inlineChat.acceptChanges');
 
-            Inline.writeInlineChat(inlineChatInfoObj);
-            this.interactiveSessions = null;
-        } else {
-            throw new Error('No valid content stored in last_inline_start');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const newInteractiveSessions: any = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
+        const prompt = getSingleNewEditorText(oldInteractiveSessions, newInteractiveSessions);
+        if (!isValidInteractiveSession(newInteractiveSessions)) {
+            throw new Error('New interactive sessions are invalid or not found.');
         }
+        let inlineChatInfoObj: Inline.InlineChatInfo;
+        if (lastInline && Inline.isInlineStartInfo(lastInline)) {
+            inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, newContent, prompt);
+        } else {
+            throw new Error('No inlineChatInfo found.');
+        }
+
+        Inline.writeInlineChat(inlineChatInfoObj);
+        this.interactiveSessions = null;
     }
 
     private parseContext(request: any): Context[] {

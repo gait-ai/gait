@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
-import * as Diff from 'diff';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
-
+import {diffLines} from 'diff';
+import { readStashedState, writeStashedState } from './stashedState';
+import { StashedState } from './types';
 
 export interface InlineStartInfo {
     fileName: string;
@@ -16,18 +17,24 @@ export interface InlineStartInfo {
     parent_inline_chat_id: string | null;
 }
 
-export interface InlineChatInfo {
-    inline_chat_id: string;
-    fileName: string;
-    content: string;
-    lineCount: number;
-    startTimestamp: string;
-    startSelection: vscode.Position,
-    endSelection: vscode.Position,
-    selectionContent: string;
-    endTimestamp: string;
-    prompt: string;
+export interface FileDiff {
+    file_path: string;
+    before_content: string;
+    after_content: string;
     diffs: Diff.Change[];
+}
+
+export interface InlineChatInfo {
+    inline_chat_id: string,
+    file_diff: FileDiff[],
+    selection: {
+        file_path: string;
+        startSelection: vscode.Position,
+        endSelection: vscode.Position,
+        selectionContent: string;
+    } | null,
+    timestamp: string;
+    prompt: string;
     parent_inline_chat_id: string | null;
 }
 
@@ -39,79 +46,30 @@ export interface InlineMatchedRange {
     similarity: number;
 }
 
-export interface FileChats {
-    fileName: string;
-    inlineChats: { [key: string]: InlineChatInfo };
+
+export function removeInlineChatInfo(inline_chat_id: string, stashedState: StashedState): StashedState {
+    stashedState.inlineChats = stashedState.inlineChats.filter((inlineChat) => inlineChat.inline_chat_id !== inline_chat_id);
+    return stashedState;
 }
 
-export function removeInlineChatInfo(inline_chat_id: string, fileChats: FileChats): FileChats {
-    delete fileChats.inlineChats[inline_chat_id];
-    return fileChats;
-}
-
-export function addInlineChatInfo(inlineChatInfo: InlineChatInfo, fileChats: FileChats): FileChats {
-    fileChats.inlineChats[inlineChatInfo.inline_chat_id] = inlineChatInfo;
-    return fileChats;
-}
-
-export function filenameToRelativePath(baseName: string): string {
-    const fileName = baseName.replace(/\//g, "_") + ".json";
-    return `.gait/${fileName}`;
-}
-
-export function filenameToStoragePath(baseName: string): string  {
-    const relativePath = filenameToRelativePath(baseName);
-
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const workspaceFolderPath = workspaceFolder?.uri.fsPath;
-
-    return `${workspaceFolderPath}/${relativePath}`;
-}
-
-export function currentFileToStoragePath(): string | undefined {
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-        const document = editor.document;
-        const baseName = vscode.workspace.asRelativePath(document.uri);
-        return filenameToStoragePath(baseName);
-    }
-    return undefined;
-}
-
-export function loadFileChats(filepath: string): FileChats {
-    let storagePath: string;
-    try {
-        storagePath = path.resolve(filenameToStoragePath(filepath));
-        let fileContent = fs.readFileSync(storagePath, 'utf-8');
-        const fileChats: FileChats = JSON.parse(fileContent);
-        return fileChats;
-    } catch (error) {
-        return {
-            fileName: filepath,
-            inlineChats: {},
-        };
-    }
-}
-
-export function dumpFileChats(fileChat: FileChats): void {
-    const filePath = path.resolve(filenameToStoragePath(fileChat.fileName));
-    const fileContent = JSON.stringify(fileChat, null, 4);
-    fs.writeFileSync(filePath, fileContent);
+export function addInlineChatInfo(inlineChatInfo: InlineChatInfo, stashedState: StashedState): StashedState {
+    stashedState.inlineChats.push(inlineChatInfo);
+    return stashedState;
 }
 
 export function writeInlineChat(inlineChatInfo: InlineChatInfo){
-    const filepath = inlineChatInfo.fileName;
-    const fileChats = loadFileChats(filepath);
-    const updatedFileChats = addInlineChatInfo(inlineChatInfo, fileChats);
-    dumpFileChats(updatedFileChats);
+    const stashedState = readStashedState();
+    const updatedFileChats = addInlineChatInfo(inlineChatInfo, stashedState);
+    writeStashedState(updatedFileChats);
 }
 
 
-export function removeInlineChat(filepath: string, inline_chat_id: string){
-    const fileChats = loadFileChats(filepath);
-    const updatedFileChats = removeInlineChatInfo(inline_chat_id, fileChats);
-    dumpFileChats(updatedFileChats);
+export function removeInlineChat(inline_chat_id: string){
+    const stashedState = readStashedState();
+    const updatedFileChats = removeInlineChatInfo(inline_chat_id, stashedState);
+    writeStashedState(updatedFileChats);
 }
+
 export function isInlineStartInfo(obj: unknown): obj is InlineStartInfo {
 	return (
 		typeof obj === 'object' &&
@@ -134,19 +92,23 @@ export function isInlineStartInfo(obj: unknown): obj is InlineStartInfo {
 	);
 }
 
-export function InlineStartToInlineChatInfo(inlineStartInfo: InlineStartInfo, diffs : Diff.Change[], prompt: string): InlineChatInfo {
+export function InlineStartToInlineChatInfo(inlineStartInfo: InlineStartInfo, after_content: string, prompt: string): InlineChatInfo {
     return {
-        inline_chat_id :  uuidv4(),
-        fileName: inlineStartInfo.fileName,
-        content: inlineStartInfo.content,
-        lineCount: inlineStartInfo.lineCount,
-        startTimestamp: inlineStartInfo.startTimestamp,
-        startSelection: inlineStartInfo.startSelection,
-        endSelection: inlineStartInfo.endSelection,
-        selectionContent: inlineStartInfo.selectionContent,
-        endTimestamp: new Date().toISOString(),
+        inline_chat_id: uuidv4(),
+        file_diff: [{
+            file_path: inlineStartInfo.fileName,
+            before_content: inlineStartInfo.content,
+            after_content: after_content,
+            diffs: diffLines(inlineStartInfo.content, after_content)
+        }],
+        selection: {
+            file_path: inlineStartInfo.fileName,
+            startSelection: inlineStartInfo.startSelection,
+            endSelection: inlineStartInfo.endSelection,
+            selectionContent: inlineStartInfo.selectionContent
+        },
+        timestamp: new Date().toISOString(),
         prompt: prompt,
-        diffs: diffs,
-        parent_inline_chat_id: inlineStartInfo.parent_inline_chat_id,
+        parent_inline_chat_id: inlineStartInfo.parent_inline_chat_id
     };
 }

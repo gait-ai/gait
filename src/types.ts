@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { InlineStartInfo } from './inline';
+import { InlineChatInfo, InlineStartInfo, FileDiff } from './inline';
 
 export interface Context {
 	context_type: string
@@ -57,6 +57,7 @@ export function isPanelChat(obj: any): obj is PanelChat {
 
 export interface StashedState {
   panelChats: PanelChat[];
+  inlineChats: InlineChatInfo[];
   schemaVersion: string;
   deletedChats: DeletedChats;
   kv_store: { [key: string]: any };
@@ -104,7 +105,7 @@ export interface StateReader {
   /**
   * Processes the editor content during inline chat acceptance.
   */
-  acceptInline(editor: vscode.TextEditor): Promise<void>;
+  acceptInline(editor: vscode.TextEditor, file_diffs: FileDiff[] | null): Promise<void>;
 
   /**
   * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.

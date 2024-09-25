@@ -2,10 +2,24 @@ import * as vscode from 'vscode';
 import * as Inline from './inline';
 import * as Diff from 'diff';
 import * as path from 'path';
-import { getIdToCommitInfo, InlineCommitData } from './inlinegit';
+import { CommitData } from './panelgit';
+import { getRelativePath } from './utils';
 
-export async function createHoverContent(markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, InlineCommitData> | undefined): Promise<vscode.MarkdownString> {
-    const { prompt, diffs, endTimestamp, parent_inline_chat_id } = inlineChat;
+export async function createHoverContent(markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, CommitData> | undefined): Promise<vscode.MarkdownString> {
+    const { prompt, timestamp, parent_inline_chat_id } = inlineChat;
+
+    // Find the diff that matches the current document's file path
+    const documentPath = getRelativePath(document);
+    const matchingDiff = inlineChat.file_diff.find(diff => path.normalize(diff.file_path) === path.normalize(documentPath));
+    
+    // Set diffs to the matching diff's diffs, or an empty array if no match found
+    const diffs = matchingDiff ? matchingDiff.diffs : [];
+    // Log an error if no matching diff is found
+    if (!matchingDiff) {
+        console.error(`No matching diff found for document path: ${documentPath}`);
+        throw new Error(`No matching diff found for document path: ${documentPath}`);
+    }
+
     const commitInfo = idToCommitInfo?.get(inlineChat.inline_chat_id);
 
     const author = commitInfo?.author ?? "You";
@@ -16,11 +30,11 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     markdown.isTrusted = true; // Allows advanced Markdown features
 
     // Display the prompt with a smaller, circular user icon
-    const timeDiffMs = new Date().getTime() - new Date(endTimestamp).getTime();
+    const timeDiffMs = new Date().getTime() - new Date(timestamp).getTime();
     const hoursSinceEdit = Math.floor(timeDiffMs / (1000 * 3600));
     const daysSinceEdit = Math.floor(timeDiffMs / (1000 * 3600 * 24));
     const timeAgo = daysSinceEdit === 0 ? `${hoursSinceEdit} hours ago` : daysSinceEdit === 1 ? 'yesterday' : `${daysSinceEdit} days ago`;
-    markdown.appendMarkdown(`### ${author ?? "You"}: ${prompt} (${new Date(endTimestamp).toISOString().split('T')[0]}) (${timeAgo}) \n\n---\n`);
+    markdown.appendMarkdown(`### ${author ?? "You"}: ${prompt} (${new Date(timestamp).toISOString().split('T')[0]}) (${timeAgo}) \n\n---\n`);
     markdown.appendMarkdown(`**Commit**: ${commitMessage} (${commitHash}) \n\n---\n`);
     // Flatten the diffs into individual lines
     let lineBasedDiffs: Diff.Change[] = [];
@@ -71,11 +85,11 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
         inline_chat_id: inlineChat.inline_chat_id
     }))}`);
     const openFileCommand = vscode.Uri.parse(`command:gait-copilot.openFileWithContent?${encodeURIComponent(JSON.stringify({
-        content: inlineChat.content,
-        title: `${path.basename(inlineChat.fileName)} (at prompt time)`,
+        content: matchingDiff.before_content,
+        title: `${path.basename(matchingDiff.file_path)} (at prompt time)`,
         languageId: vscode.window.activeTextEditor?.document.languageId,
-        selectionStart: inlineChat.startSelection,
-        selectionEnd: inlineChat.endSelection
+        selectionStart: inlineChat.selection?.startSelection,
+        selectionEnd: inlineChat.selection?.endSelection
     }))}`);
     
     markdown.appendMarkdown(`[View File at Prompt Time](${openFileCommand}) | ` +
@@ -89,14 +103,14 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     }))}`);
         markdown.appendMarkdown(` | [Continue This Inline Chat Annotation](${continueCommand})`);
     }
-    if (parent_inline_chat_id) {
-        // Load the parent inline chat
-        const baseName = vscode.workspace.asRelativePath(document.uri);
-        const fileChats = Inline.loadFileChats(baseName);
-        const parentInlineChat = fileChats.inlineChats[parent_inline_chat_id];
-        markdown.appendMarkdown('\n\n---\n\n**Parent Chat:**\n\n');
-        createHoverContent(markdown, parentInlineChat, document, null, idToCommitInfo);
-    }
+    // if (parent_inline_chat_id) {
+    //     // Load the parent inline chat
+    //     const baseName = vscode.workspace.asRelativePath(document.uri);
+    //     const fileChats = StashedState.(baseName);
+    //     const parentInlineChat = fileChats.inlineChats[parent_inline_chat_id];
+    //     markdown.appendMarkdown('\n\n---\n\n**Parent Chat:**\n\n');
+    //     createHoverContent(markdown, parentInlineChat, document, null, idToCommitInfo);
+    // }
     return markdown;
 }
 
@@ -108,7 +122,7 @@ export async function createHover(matchedRange: Inline.InlineMatchedRange, docum
         console.warn('No workspace folder found.');
     } else {
         try {
-            idToCommitInfo = await getIdToCommitInfo(workspaceFolder.uri.fsPath, Inline.filenameToRelativePath(vscode.workspace.asRelativePath(document.uri)));
+            idToCommitInfo = undefined;
         } catch (error) {
             console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
         }
