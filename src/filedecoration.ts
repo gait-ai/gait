@@ -183,10 +183,21 @@ function computeBlockSimilarity(docBlock: string[], addedBlock: string[]): numbe
         if (docBlock.length <= 2 && !/[a-zA-Z0-9]/.test(docLine) && !/[a-zA-Z0-9]/.test(addedLine)) {
             continue;
         }
+        // Only compute Levenshtein distance if the lines are similar in length
+        const lengthDifference = Math.abs(docLine.length - addedLine.length);
+        const averageLength = (docLine.length + addedLine.length) / 2;
+        const lengthSimilarityThreshold = 0.3; // Adjust this value as needed
 
-        const distance = levenshtein.get(docLine, addedLine);
-        const maxLength = Math.max(docLine.length, addedLine.length);
-        const similarity = maxLength === 0 ? 1 : 1 - distance / maxLength;
+        let similarity: number;
+
+        if (lengthDifference / averageLength <= lengthSimilarityThreshold) {
+            const distance = levenshtein.get(docLine, addedLine);
+            const maxLength = Math.max(docLine.length, addedLine.length);
+            similarity = maxLength === 0 ? 1 : 1 - distance / maxLength;
+        } else {
+            // If lengths are too different, consider them dissimilar
+            similarity = 0;
+        }
         totalSimilarity += similarity;
         validLines++;
     }
@@ -261,7 +272,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
                 }
                 
                 if (currentRanges.length > 0) {
-                    const color = generateColors(decorationIndex, 'orange');
+                    const color = generateColors(decorationIndex);
                     decorationIndex += 1;
 
                     function lineInRangesToPanel(line: number) {
@@ -315,9 +326,11 @@ export function decorateActive(context: vscode.ExtensionContext) {
     }
 
     const rangesToInline: Inline.InlineMatchedRange[] = [];
-    decorationIndex = 0;
     for (const chat of Object.values(inlineChats)) {
         for (const diff of chat.file_diff) {
+            if (diff.file_path === baseName) {
+                continue;
+            }
             const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs, 0.8);
             if (currentRanges.length > 0) {
                 const color = generateColors(decorationIndex);

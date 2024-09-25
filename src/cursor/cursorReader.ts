@@ -151,7 +151,7 @@ export class CursorReader implements StateReader {
             try {
                 newChat = getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4))[0];
             } catch (error) {
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait for 5 seconds
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 5 seconds
                 attempts++;
                 continue;
             }

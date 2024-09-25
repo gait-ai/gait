@@ -452,20 +452,19 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    const activateDecorationsCommand = vscode.commands.registerCommand('gait-copilot.activateDecorations', () => {
-        decorationsActive = true;
-        debouncedRedecorate(context);
-        vscode.window.showInformationMessage('Decorations activated.');
-    });
-
-    const deactivateDecorationsCommand = vscode.commands.registerCommand('gait-copilot.deactivateDecorations', () => {
-        decorationsActive = false;
-        if (disposibleDecorations) {
-            disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
-            disposibleDecorations.hoverProvider.dispose();
-            disposibleDecorations = undefined;
+    const toggleDecorationsCommand = vscode.commands.registerCommand('gait-copilot.toggleDecorations', () => {
+        decorationsActive = !decorationsActive;
+        if (decorationsActive) {
+            debouncedRedecorate(context);
+            vscode.window.showInformationMessage('Decorations activated.');
+        } else {
+            if (disposibleDecorations) {
+                disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
+                disposibleDecorations.hoverProvider.dispose();
+                disposibleDecorations = undefined;
+            }
+            vscode.window.showInformationMessage('Decorations deactivated.');
         }
-        vscode.window.showInformationMessage('Decorations deactivated.');
     });
 
     const handleMergeCommand = vscode.commands.registerCommand('gait-copilot.handleMerge', () => {
@@ -479,8 +478,7 @@ export function activate(context: vscode.ExtensionContext) {
         inlineChatContinue, 
         deleteInlineChatCommand, 
         openFileWithContentCommand,
-        activateDecorationsCommand,
-        deactivateDecorationsCommand,
+        toggleDecorationsCommand,
         deletePanelChatCommand,
         registerGaitChatParticipantCommand, // Add the new command here
         exportPanelChatsToMarkdownCommand,
