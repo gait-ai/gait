@@ -210,7 +210,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
 
     const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
     const stashedState: StashedState = readStashedPanelChats(gaitDir);
-    const inlineChats = stashedState.inlineChats;
+    const inlineChats = stashedState.inlineChats || [];
 
     const currentPanelChats = [
         ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []),
