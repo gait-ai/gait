@@ -5,7 +5,15 @@ import { readVSCodeState } from '../tools/dbReader';
 import { Context, MessageEntry, PanelChat, StashedState, StateReader } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
-const SCHEMA_VERSION = '1.0';
+
+function fnv1aHash(str: string): number {
+    let hash = 2166136261; // FNV offset basis
+    for (let i = 0; i < str.length; i++) {
+        hash ^= str.charCodeAt(i);
+        hash = (hash * 16777619) >>> 0; // FNV prime and keep it 32-bit unsigned
+    }
+    return hash;
+}
 
 
 /**
@@ -181,12 +189,6 @@ export class VSCodeReader implements StateReader {
                 // Extract messages
                 const messages: MessageEntry[] = panel.requests.map((request: any) => {
                     const messageText: string = typeof request.message?.text === 'string' ? request.message.text : '';
-                    let id: string = '';
-                    if (request.result && request.result.metadata && typeof request.result.metadata.modelMessageId === 'string') {
-                        id = request.result.metadata.modelMessageId;
-                    } else {
-                        id = uuidv4();
-                    }
                     // Safely extract responseText
                     let responseText: string = '';
     
@@ -208,8 +210,14 @@ export class VSCodeReader implements StateReader {
                     // Extract context if available
                     let contextData: Context[]  = this.parseContext(request);
     
+                    let id: string = '';
+                    if (request.result && request.result.metadata && typeof request.result.metadata.modelMessageId === 'string') {
+                        id = request.result.metadata.modelMessageId;
+                    } else {
+                        id = fnv1aHash(messageText + responseText).toString();
+                    }
                     return {
-                        id, // Assign new UUID to MessageEntry
+                        id, 
                         messageText,
                         responseText,
                         model,
