@@ -262,6 +262,17 @@ export async function associateFileWithMessage(messageId: string, filePath: stri
 
     if (!messageFound) {
         vscode.window.showInformationMessage(`Adding associated panel chat to stashed state`);
+        // Find the message in newPanelChat with the matching messageId
+        const targetMessage = newPanelChat.messages.find(message => message.id === messageId);
+        if (targetMessage) {
+            // Set the kv_store with the file_paths including the new filePath
+            targetMessage.kv_store = {
+                ...targetMessage.kv_store,
+                file_paths: [...(targetMessage.kv_store?.file_paths || []), filePath]
+            };
+        } else {
+          throw new Error(`Message with ID ${messageId} not found in the new panel chat.`);
+        }
         stashedState.panelChats.push(newPanelChat);
         await writeStashedPanelChats(gaitDir, stashedState);
         return;
