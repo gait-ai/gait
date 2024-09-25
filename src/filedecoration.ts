@@ -247,9 +247,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
                 const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[], 0.8);
                 if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.ranges.end.line - range.ranges.start.line + 1), 0) > code.split('\n').length / 2) {
                     // If more than half of the code lines match, associate the file with the message
-                    const filePath = editor.document.uri.fsPath;
-                    const relativeFilePath = vscode.workspace.asRelativePath(filePath);
-                    associateFileWithMessage(message.id, relativeFilePath, panelChat).catch(error => {
+                    associateFileWithMessage(message.id, baseName, panelChat).catch(error => {
                         console.error(`Failed to associate file with message: ${error}`);
                     });
                 }

@@ -173,7 +173,7 @@ export class VSCodeReader implements StateReader {
                 const customTitle: string = typeof panel.customTitle === 'string' ? panel.customTitle : '';
     
                 // Determine if this PanelChat has an existing UUID
-                let id: string = typeof panel.sessionId === 'string' ? panel.sessionId : '';
+                let id: string = panel.sessionId;
         
                 const parent_id: string | null = null;
                 const created_on: string = typeof panel.creationDate === 'string' ? panel.creationDate : new Date().toISOString();
@@ -184,6 +184,8 @@ export class VSCodeReader implements StateReader {
                     let id: string = '';
                     if (request.result && request.result.metadata && typeof request.result.metadata.modelMessageId === 'string') {
                         id = request.result.metadata.modelMessageId;
+                    } else {
+                        id = uuidv4();
                     }
                     // Safely extract responseText
                     let responseText: string = '';
