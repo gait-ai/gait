@@ -227,13 +227,11 @@ export class CursorReader implements StateReader {
                     kv_store: {}
                 };
                 // Filter out bubbles with empty text
-                const filteredBubbles = tab.bubbles.filter((bubble: any) => bubble.text && bubble.text.trim() !== '');
-                tab.bubbles = filteredBubbles;
 
                 // Group bubbles into pairs (user message and AI response)
-                for (let i = 0; i < filteredBubbles.length; i += 2) {
-                    const userBubble = filteredBubbles[i];
-                    const aiBubble = filteredBubbles[i + 1];
+                for (let i = 0; i < tab.bubbles.length; i += 2) {
+                    const userBubble = tab.bubbles[i];
+                    const aiBubble = tab.bubbles[i + 1];
 
                     if (userBubble && userBubble.type === 'user' && aiBubble && aiBubble.type === 'ai') {
                         

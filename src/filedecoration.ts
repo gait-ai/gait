@@ -236,6 +236,14 @@ export function decorateActive(context: vscode.ExtensionContext) {
     }
 
     let decorationIndex = 0;
+    // Sort currentPanelChats by time in ascending order (latest first)
+    currentPanelChats.sort((a, b) => {
+        const timeA = a.created_on;
+        const timeB = b.created_on;
+        return new Date(timeA).getTime() - new Date(timeB).getTime();
+    });
+    
+
     for (const panelChat of currentPanelChats) {
         for (const message of panelChat.messages) {
             if (message.kv_store && 'file_paths' in message.kv_store && !message.kv_store.file_paths.includes(baseName)) {
@@ -256,16 +264,50 @@ export function decorateActive(context: vscode.ExtensionContext) {
                     const color = generateColors(decorationIndex, 'orange');
                     decorationIndex += 1;
 
-                    // Create a new decoration type with the unique color
-                    currentRanges.forEach(range => {
-                        rangesToPanel.push(...currentRanges.map(range => ({
+                    function lineInRangesToPanel(line: number) {
+                        return rangesToPanel.some(range => 
+                            range.range.start.line <= line && 
+                            range.range.end.line >= line
+                        );
+                    }
+                    function addRange(range: {ranges: vscode.Range, originalLines: string[], similarity: number}) {
+                        rangesToPanel.push({
                             range: range.ranges,
                             matchedLines: range.originalLines,
                             panelChat: panelChat,
                             message_id: message.id,
                             similarity: range.similarity
-                          })));
+                        });
                         addDecorationType(color, range.ranges);
+                    }
+
+                    currentRanges.forEach(range => {
+                        let currentStart = range.ranges.start.line;
+                        let currentEnd = currentStart;
+
+                        for (let i = range.ranges.start.line; i <= range.ranges.end.line; i++) {
+                            if (lineInRangesToPanel(i)) {
+                                if (currentStart !== currentEnd) {
+                                    addRange({
+                                        ranges: new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
+                                        originalLines: range.originalLines,
+                                        similarity: range.similarity
+                                    });
+                                }
+                                currentStart = i + 1;
+                                currentEnd = i + 1;
+                            } else {
+                                currentEnd = i;
+                            }
+                        }
+
+                        if (currentStart <= range.ranges.end.line) {
+                            addRange({
+                                ranges: new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
+                                originalLines: range.originalLines,
+                                similarity: range.similarity
+                            });
+                        }
                     });
                 }
             }
