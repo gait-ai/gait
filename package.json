@@ -104,6 +104,10 @@
                 "command": "gait-copilot.startInlineChat",
                 "key": "cmd+i",
                 "when": "editorFocus && inlineChatHasProvider && !editorReadonly"
+            },
+            {
+                "key": "cmd+shift+g",
+                "command": "gait-copilot.toggleDecorations"
             }
         ]
     },
