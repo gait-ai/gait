@@ -38,10 +38,6 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
                 when: "editorFocus"
             },
             {
-                command: "gait-copilot.acceptInlineChat",
-                key: "cmd+shift+space",
-            },
-            {
                 key: "cmd+a cmd+s",
                 command: "editor.action.inlineDiffs.acceptAll",
                 when: "editorTextFocus && (arbitrary function)"
@@ -59,11 +55,6 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
                 command: "gait-copilot.startInlineChat",
                 key: "cmd+i",
                 when: "editorFocus && inlineChatHasProvider && !editorReadonly"
-            },
-            {
-                command: "gait-copilot.acceptInlineChat",
-                key: "cmd+enter",
-                when: "inlineChatHasProvider && inlineChatVisible && !inlineChatDocumentChanged || inlineChatHasProvider && inlineChatVisible && config.inlineChat.mode != 'preview'"
             }
         ];
     }
