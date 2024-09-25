@@ -6,129 +6,130 @@ import * as path from 'path';
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
 import { PanelChat, PanelChatMode, StashedState, StateReader } from './types';
+import { readStashedState, writeStashedState } from './stashedState';
 
 /**
  * Reads the stashed panel chats and deleted chats from .gait/stashedPanelChats.json.
  * Accounts for cases where the file is empty or contains malformed JSON.
  */
-export function readStashedPanelChats(gaitDir: string): StashedState {
-  const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
-  const initialState: StashedState = { 
-    panelChats: [], 
-    inlineChats: [],
-    schemaVersion: SCHEMA_VERSION,
-    deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
-    kv_store: {}
-  };
-  try {
-    if (!fs.existsSync(stashedPath)) {
-      // Initialize with empty stashedState and deletedChats
-      fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
-      //console.log(`stashedPanelChats.json not found. Initialized with empty stashedState and deletedChats.`);
-      return initialState;
-    }
+// export function readStashedPanelChats(gaitDir: string): StashedState {
+//   const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
+//   const initialState: StashedState = { 
+//     panelChats: [], 
+//     inlineChats: [],
+//     schemaVersion: SCHEMA_VERSION,
+//     deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+//     kv_store: {}
+//   };
+//   try {
+//     if (!fs.existsSync(stashedPath)) {
+//       // Initialize with empty stashedState and deletedChats
+//       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
+//       //console.log(`stashedPanelChats.json not found. Initialized with empty stashedState and deletedChats.`);
+//       return initialState;
+//     }
 
-    const stats = fs.statSync(stashedPath);
-    if (stats.size === 0) {
-      fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
-      //console.log(`stashedPanelChats.json is empty. Initialized with empty stashedState and deletedChats.`);
-      return initialState;
-    }
+//     const stats = fs.statSync(stashedPath);
+//     if (stats.size === 0) {
+//       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
+//       //console.log(`stashedPanelChats.json is empty. Initialized with empty stashedState and deletedChats.`);
+//       return initialState;
+//     }
 
-    const content = fs.readFileSync(stashedPath, 'utf-8').trim();
+//     const content = fs.readFileSync(stashedPath, 'utf-8').trim();
 
-    if (content === '') {
-      fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
-      //console.log(`stashedPanelChats.json contains only whitespace. Initialized with empty stashedState and deletedChats.`);
-      return initialState;
-    }
+//     if (content === '') {
+//       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
+//       //console.log(`stashedPanelChats.json contains only whitespace. Initialized with empty stashedState and deletedChats.`);
+//       return initialState;
+//     }
 
-    let parsed: StashedState;
+//     let parsed: StashedState;
 
-    try {
-      parsed = JSON.parse(content);
-    } catch (parseError) {
-      console.error(`Error parsing stashedPanelChats.json:`, parseError);
-      vscode.window.showErrorMessage(`stashedPanelChats.json is malformed. Reinitializing the file.`);
+//     try {
+//       parsed = JSON.parse(content);
+//     } catch (parseError) {
+//       console.error(`Error parsing stashedPanelChats.json:`, parseError);
+//       vscode.window.showErrorMessage(`stashedPanelChats.json is malformed. Reinitializing the file.`);
       
-      // Reinitialize the file with default state
-      const initialState: StashedState = { 
-        panelChats: [], 
-        inlineChats: [],
-        schemaVersion: SCHEMA_VERSION,
-        deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
-        kv_store: {}
-      };
-      fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
-      return initialState;
-    }
+//       // Reinitialize the file with default state
+//       const initialState: StashedState = { 
+//         panelChats: [], 
+//         inlineChats: [],
+//         schemaVersion: SCHEMA_VERSION,
+//         deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+//         kv_store: {}
+//       };
+//       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
+//       return initialState;
+//     }
 
-    // Ensure that all required properties are present
-    let isModified = false;
+//     // Ensure that all required properties are present
+//     let isModified = false;
 
-    if (!Array.isArray(parsed.panelChats)) {
-      parsed.panelChats = [];
-      isModified = true;
-      console.warn(`panelChats property missing or not an array. Initialized as empty array.`);
-    }
+//     if (!Array.isArray(parsed.panelChats)) {
+//       parsed.panelChats = [];
+//       isModified = true;
+//       console.warn(`panelChats property missing or not an array. Initialized as empty array.`);
+//     }
 
-    if (typeof parsed.schemaVersion !== 'string') {
-      parsed.schemaVersion = SCHEMA_VERSION;
-      isModified = true;
-      console.warn(`schemaVersion property missing or not a string. Initialized to default schema version.`);
-    }
+//     if (typeof parsed.schemaVersion !== 'string') {
+//       parsed.schemaVersion = SCHEMA_VERSION;
+//       isModified = true;
+//       console.warn(`schemaVersion property missing or not a string. Initialized to default schema version.`);
+//     }
 
-    if (!parsed.deletedChats || typeof parsed.deletedChats !== 'object') {
-      parsed.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
-      isModified = true;
-      console.warn(`deletedChats property missing or invalid. Initialized to default.`);
-    } else {
-      // Further ensure that deletedChats has 'deletedMessageIDs' and 'deletedPanelChatIDs'
-      if (!Array.isArray(parsed.deletedChats.deletedMessageIDs)) {
-        parsed.deletedChats.deletedMessageIDs = [];
-        isModified = true;
-        console.warn(`deletedChats.deletedMessageIDs missing or not an array. Initialized as empty array.`);
-      }
+//     if (!parsed.deletedChats || typeof parsed.deletedChats !== 'object') {
+//       parsed.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
+//       isModified = true;
+//       console.warn(`deletedChats property missing or invalid. Initialized to default.`);
+//     } else {
+//       // Further ensure that deletedChats has 'deletedMessageIDs' and 'deletedPanelChatIDs'
+//       if (!Array.isArray(parsed.deletedChats.deletedMessageIDs)) {
+//         parsed.deletedChats.deletedMessageIDs = [];
+//         isModified = true;
+//         console.warn(`deletedChats.deletedMessageIDs missing or not an array. Initialized as empty array.`);
+//       }
 
-      if (!Array.isArray(parsed.deletedChats.deletedPanelChatIDs)) {
-        parsed.deletedChats.deletedPanelChatIDs = [];
-        isModified = true;
-        console.warn(`deletedChats.deletedPanelChatIDs missing or not an array. Initialized as empty array.`);
-      }
-    }
+//       if (!Array.isArray(parsed.deletedChats.deletedPanelChatIDs)) {
+//         parsed.deletedChats.deletedPanelChatIDs = [];
+//         isModified = true;
+//         console.warn(`deletedChats.deletedPanelChatIDs missing or not an array. Initialized as empty array.`);
+//       }
+//     }
 
-    if (isModified) {
-      // Write the corrected state back to the file
-      fs.writeFileSync(stashedPath, JSON.stringify(parsed, null, 2), 'utf-8');
-      //console.log(`stashedPanelChats.json was missing some properties. Updated with default values.`);
-    }
+//     if (isModified) {
+//       // Write the corrected state back to the file
+//       fs.writeFileSync(stashedPath, JSON.stringify(parsed, null, 2), 'utf-8');
+//       //console.log(`stashedPanelChats.json was missing some properties. Updated with default values.`);
+//     }
 
-    ////console.log(`Read stashedState from stashedPanelChats.json:`, parsed);
-    return parsed;
-  } catch (error) {
-    console.error(`Error reading stashedPanelChats.json:`, error);
-    vscode.window.showErrorMessage(`Error reading stashedPanelChats.json: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    // Return an empty state to prevent application crash
-    return { 
-      panelChats: [], 
-      inlineChats: [],
-      schemaVersion: SCHEMA_VERSION,
-      deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
-      kv_store: {}
-    };
-  }
-}
+//     ////console.log(`Read stashedState from stashedPanelChats.json:`, parsed);
+//     return parsed;
+//   } catch (error) {
+//     console.error(`Error reading stashedPanelChats.json:`, error);
+//     vscode.window.showErrorMessage(`Error reading stashedPanelChats.json: ${error instanceof Error ? error.message : 'Unknown error'}`);
+//     // Return an empty state to prevent application crash
+//     return { 
+//       panelChats: [], 
+//       inlineChats: [],
+//       schemaVersion: SCHEMA_VERSION,
+//       deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+//       kv_store: {}
+//     };
+//   }
+// }
 
-async function writeStashedPanelChats(gaitDir: string, stashedState: StashedState): Promise<void> {
-  const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
-  try {
-    fs.writeFileSync(stashedPath, JSON.stringify(stashedState, null, 2), 'utf-8');
-    //console.log(`Updated stashedPanelChats.json with stashedState.`);
-  } catch (error) {
-    console.error(`Error writing to stashedPanelChats.json:`, error);
-    throw error;
-  }
-}
+// async function writeStashedPanelChats(gaitDir: string, stashedState: StashedState): Promise<void> {
+//   const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
+//   try {
+//     fs.writeFileSync(stashedPath, JSON.stringify(stashedState, null, 2), 'utf-8');
+//     //console.log(`Updated stashedPanelChats.json with stashedState.`);
+//   } catch (error) {
+//     console.error(`Error writing to stashedPanelChats.json:`, error);
+//     throw error;
+//   }
+// }
 
 function sanitizePanelChats(panelChats: PanelChat[]): PanelChat[] {
   // Regular expression to match the unwanted command strings
@@ -185,7 +186,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       }
 
       // Read the existing stashedPanelChats.json as existingStashedState
-      let existingStashedState = readStashedPanelChats(gaitDir);
+      let existingStashedState = readStashedState();
       let currentPanelChats = [];
 
       // Parse the current panelChats
@@ -218,7 +219,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       context.workspaceState.update('currentPanelChats', currentPanelChats);
 
       // Write back to stashedPanelChats.json
-      await writeStashedPanelChats(gaitDir, existingStashedState);
+      await writeStashedState(existingStashedState);
     } catch (error) {
       console.error(`Error monitoring and saving state:`, error);
       vscode.window.showErrorMessage(`Error monitoring and saving state: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -241,7 +242,7 @@ export async function associateFileWithMessage(messageId: string, filePath: stri
     }
 
     const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-    let stashedState = readStashedPanelChats(gaitDir);
+    let stashedState = readStashedState();
 
     let messageFound = false;
     for (const panelChat of stashedState.panelChats) {
@@ -274,11 +275,11 @@ export async function associateFileWithMessage(messageId: string, filePath: stri
           throw new Error(`Message with ID ${messageId} not found in the new panel chat.`);
         }
         stashedState.panelChats.push(newPanelChat);
-        await writeStashedPanelChats(gaitDir, stashedState);
+        await writeStashedState(stashedState);
         return;
     }
     vscode.window.showInformationMessage(`Associated file with message: ${messageId}`);
 
-    await writeStashedPanelChats(gaitDir, stashedState);
+    await writeStashedState(stashedState);
 }
 
