@@ -25,7 +25,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         vscode.window.showErrorMessage('No workspace folder found.');
         return;
     }
-    let context = this._context
+    let context = this._context;
 
     const repoPath = workspaceFolder.uri.fsPath;
     const filePath = '.gait/stashedPanelChats.json'; // Replace with your actual file path relative to repo
@@ -40,7 +40,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 commitMessage: commit.commitMessage,
                 author: commit.author,
                 date: new Date(commit.date),
-                panelChats: commit.panelChats // Updated to use panelChats
+                panelChats: commit.panelChats,
+                inlineChats: commit.inlineChats
             })).sort((a, b) => b.date.getTime() - a.date.getTime());
 
             // Handle uncommitted changes by appending them to the commits array
@@ -50,7 +51,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     author: 'You',
                     commitMessage: 'Uncommitted Changes',
                     date: new Date(), // Current date and time
-                    panelChats: gitHistory.uncommitted.panelChats // Updated to use panelChats
+                    panelChats: gitHistory.uncommitted.panelChats, // Updated to use panelChats
+                    inlineChats: gitHistory.uncommitted.inlineChats
                 };
                 this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
             }
@@ -63,7 +65,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 commitMessage: commit.commitMessage,
                 author: commit.author,
                 date: new Date(commit.date),
-                panelChats: commit.panelChats // Updated to use panelChats
+                panelChats: commit.panelChats,
+                inlineChats: commit.inlineChats
             })).sort((a, b) => b.date.getTime() - a.date.getTime());
 
             // Handle uncommitted changes by appending them to the commits array
@@ -73,7 +76,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     author: 'You',
                     commitMessage: 'Added Chats',
                     date: new Date(), // Current date and time
-                    panelChats: gitHistory.uncommitted.panelChats // Updated to use panelChats
+                    panelChats: gitHistory.uncommitted.panelChats,
+                    inlineChats: gitHistory.uncommitted.inlineChats
                 };
                 this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
             }
@@ -92,7 +96,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         author: 'You',
                         commitMessage: 'Unadded Chats',
                         date: new Date(), // Current date and time
-                        panelChats:filteredCurrentPanelChats // Updated to use panelChats
+                        panelChats:filteredCurrentPanelChats, // Updated to use panelChats
+                        inlineChats:[]
                     };
                     this._commits.unshift(unaddedCommit); // Add to the beginning for visibility
                 }

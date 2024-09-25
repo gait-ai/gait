@@ -3,6 +3,7 @@ import * as path from 'path';
 
 import simpleGit, { SimpleGit } from 'simple-git';
 import { StashedState, PanelChat, isStashedState } from './types';
+import { InlineChatInfo } from './inline';
 
 const SCHEMA_VERSION = '1.0';
 
@@ -12,10 +13,12 @@ export type CommitData = {
     commitMessage: string;
     author: string;
     panelChats: PanelChat[]; // Updated from messages to panelChats
+    inlineChats: InlineChatInfo[];
 };
 
 export type UncommittedData = {
     panelChats: PanelChat[]; // Updated from messages to panelChats
+    inlineChats: InlineChatInfo[];
 };
 
 export type GitHistoryData = {
@@ -86,7 +89,7 @@ function ensureDeletedChats(stashedState: StashedState, commitHash: string) {
 function processCommit(
     parsedContent: StashedState,
     currentMessageIds: Set<string>,
-    currentPanelChatIds: Set<string>,
+    currentInlineChatIds: Set<string>,
     seenMessageIds: Set<string>,
     commitData: CommitData,
     commitHash: string
@@ -95,6 +98,18 @@ function processCommit(
 
     const deletedPanelChatIds = new Set(parsedContent.deletedChats.deletedPanelChatIDs);
     const deletedMessageIds = new Set(parsedContent.deletedChats.deletedMessageIDs);
+
+    if (Array.isArray(parsedContent.inlineChats)) {
+        for (const inlineChat of parsedContent.inlineChats) {
+            const inlineChatId = inlineChat.inline_chat_id;
+            if (!currentInlineChatIds.has(inlineChatId)) {
+                continue;
+            }
+            commitData.inlineChats.push(inlineChat);
+        }
+    } else {
+        console.log("parsedContent.inlineChats", parsedContent.inlineChats);
+    }
 
     for (const panelChat of parsedContent.panelChats) {
         const panelChatId = panelChat.id;
@@ -188,6 +203,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
         // Initialize with default structure if parsing fails
         parsedCurrent = {
             panelChats: [],
+            inlineChats: [],
             schemaVersion: SCHEMA_VERSION,
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
@@ -291,6 +307,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
                 commitMessage,
                 author: authorName,
                 panelChats: [], // Initialize panelChats
+                inlineChats: [],
             };
             allCommitsMap.set(commitHash, commitData);
             log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
@@ -351,6 +368,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
             log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
             parsedUncommitted = {
                 panelChats: [],
+                inlineChats: [],
                 schemaVersion: SCHEMA_VERSION,
                 deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
                 kv_store: {}
@@ -392,11 +410,14 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
             };
         }).filter(pc => pc.messages.length > 0);
 
+        const allCurrentInlineChats: InlineChatInfo[] = parsedUncommitted.inlineChats;
+
         log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`, LogLevel.INFO);
 
         if (allCurrentPanelChats.length > 0) {
             uncommitted = {
                 panelChats: allCurrentPanelChats,
+                inlineChats: allCurrentInlineChats
             };
             log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`, LogLevel.INFO);
         } else {
@@ -446,6 +467,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         // If reading fails, initialize with default structure
         currentContent = JSON.stringify({
             panelChats: [],
+            inlineChats: [],
             schemaVersion: SCHEMA_VERSION,
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
         }, null, 2);
@@ -463,6 +485,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         // Initialize with default structure if parsing fails
         parsedCurrent = {
             panelChats: [],
+            inlineChats: [],
             schemaVersion: SCHEMA_VERSION,
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
@@ -587,6 +610,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
                 commitMessage,
                 author: authorName,
                 panelChats: [], // Initialize panelChats
+                inlineChats: [],
             };
             allCommitsMap.set(commitHash, commitData);
             console.log(`Initialized CommitData for commit ${commitHash}.`);
@@ -647,6 +671,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             console.warn(`Warning: Failed to parse current JSON content: ${(error as Error).message}`);
             parsedUncommitted = {
                 panelChats: [],
+                inlineChats: [],
                 schemaVersion: SCHEMA_VERSION,
                 deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
                 kv_store: {}
@@ -687,12 +712,14 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
                 messages: filteredMessages
             };
         }).filter(pc => pc.messages.length > 0);
+        const allCurrentInlineChats: InlineChatInfo[] = parsedUncommitted.inlineChats;
 
         console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
 
         if (allCurrentPanelChats.length > 0) {
             uncommitted = {
                 panelChats: allCurrentPanelChats,
+                inlineChats: allCurrentInlineChats
             };
             console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
         } else {
@@ -721,6 +748,17 @@ export async function getIdToCommitInfo(repoPath: string, filePath: string): Pro
         for (const message of panelChat.messages) { // Iterate through messages within each panelChat
           idToCommitInfo.set(message.id, commit);
         }
+      }
+    }
+    return idToCommitInfo;
+}
+
+export async function getInlineChatIdToCommitInfo(repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
+    const gitHistory  = await getGitHistory(repoPath, filePath);
+    const idToCommitInfo = new Map<string, CommitData>();
+    for (const commit of gitHistory.commits) {
+      for (const inlineChat of commit.inlineChats) { // Updated to iterate through inlineChats
+        idToCommitInfo.set(inlineChat.inline_chat_id, commit);
       }
     }
     return idToCommitInfo;

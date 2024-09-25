@@ -15,6 +15,7 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
   const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
   const initialState: StashedState = { 
     panelChats: [], 
+    inlineChats: [],
     schemaVersion: SCHEMA_VERSION,
     deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
     kv_store: {}
@@ -53,6 +54,7 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
       // Reinitialize the file with default state
       const initialState: StashedState = { 
         panelChats: [], 
+        inlineChats: [],
         schemaVersion: SCHEMA_VERSION,
         deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
         kv_store: {}
@@ -109,6 +111,7 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
     // Return an empty state to prevent application crash
     return { 
       panelChats: [], 
+      inlineChats: [],
       schemaVersion: SCHEMA_VERSION,
       deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
       kv_store: {}
