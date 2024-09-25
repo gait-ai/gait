@@ -355,8 +355,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     const nonce = getNonce();
     const prismCssPath = vscode.Uri.joinPath(this._context.extensionUri, 'media', 'prism.css');
     const prismJsPath = vscode.Uri.joinPath(this._context.extensionUri, 'media', 'prism.js');
+    const markedJsPath = vscode.Uri.joinPath(this._context.extensionUri, 'media', 'marked.js'); // Path to Marked.js
     const prismCssUri = webview.asWebviewUri(prismCssPath);
     const prismJsUri = webview.asWebviewUri(prismJsPath);
+    const markedJsUri = webview.asWebviewUri(markedJsPath); // URI for Marked.js
 
     return `
 <!DOCTYPE html>
@@ -378,6 +380,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     
     <!-- Prism.js CSS -->
     <link href="${prismCssUri}" rel="stylesheet" />
+    <!-- Marked.js -->
+    <script src="${markedJsUri}" nonce="${nonce}"></script>
 
     <style nonce="${nonce}">
         body {
@@ -694,7 +698,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             }
 
             // Escape and append the remaining text after the last code block
-            formattedText += escapeHtml(responseText.slice(lastIndex));
+            formattedText += marked.parse(escapeHtml(responseText.slice(lastIndex)));
             return formattedText;
         }
 
