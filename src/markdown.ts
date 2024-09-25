@@ -8,7 +8,7 @@ import { CommitData } from './panelgit';
  * @returns A formatted markdown string.
  */
 export function panelChatsToMarkdown(panelChats: ({commit: CommitData, panelChat: PanelChat})[]): string {
-    console.log("panelChats: ", panelChats);
+    //console.log("panelChats: ", panelChats);
     let markdown = `# Panel Chats and Git History\n\n`;
 
     panelChats.forEach(panelChat => {

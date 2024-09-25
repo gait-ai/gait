@@ -130,7 +130,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleDeletePanelChat(panelChatId: string) {
-    console.log(`Received request to delete panel chat with ID: ${panelChatId}`);
+    //console.log(`Received request to delete panel chat with ID: ${panelChatId}`);
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('No workspace folder found.');
@@ -165,25 +165,25 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
         // Remove the panel chat from panelChats
         stashedState.panelChats.splice(panelChatIndex, 1);
-        console.log(`Removed PanelChat with ID: ${panelChatId} from panelChats.`);
+        //console.log(`Removed PanelChat with ID: ${panelChatId} from panelChats.`);
 
         // Add the panel chat ID to deletedChats.deletedPanelChatIDs if not already present
         if (!stashedState.deletedChats.deletedPanelChatIDs.includes(panelChatId)) {
             stashedState.deletedChats.deletedPanelChatIDs.push(panelChatId);
-            console.log(`Added PanelChat ID ${panelChatId} to deletedPanelChatIDs.`);
+            //console.log(`Added PanelChat ID ${panelChatId} to deletedPanelChatIDs.`);
         } else {
-            console.log(`PanelChat ID ${panelChatId} is already marked as deleted.`);
+            //console.log(`PanelChat ID ${panelChatId} is already marked as deleted.`);
         }
 
         // Write the updated stashedState back to the file
         fs.writeFileSync(filePath, JSON.stringify(stashedState, null, 2), 'utf-8');
-        console.log(`Updated ${filePath} after deleting PanelChat.`);
+        //console.log(`Updated ${filePath} after deleting PanelChat.`);
 
         // Optionally, commit the change to Git
         // const git: SimpleGit = simpleGit(repoPath);
         // await git.add(filePath);
         // await git.commit(`Delete PanelChat with ID ${panelChatId}`);
-        // console.log(`Committed deletion of PanelChat ID ${panelChatId} to Git.`);
+        // //console.log(`Committed deletion of PanelChat ID ${panelChatId} to Git.`);
 
         vscode.window.showInformationMessage(`PanelChat with ID ${panelChatId} has been deleted.`);
 
@@ -211,27 +211,27 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
       webviewView.webview.onDidReceiveMessage(message => {
           switch (message.command) {
               case 'webviewReady':
-                  console.log('Webview is ready.');
+                  //console.log('Webview is ready.');
                   this.updateContent();
                   break;
               case 'deleteMessage':
-                  console.log('Delete message command received.');
+                  //console.log('Delete message command received.');
                   this.handleDeleteMessage(message.id);
                   break;
               case 'deletePanelChat': // New case for deleting panel chats
-                  console.log('Delete panel chat command received.');
+                  //console.log('Delete panel chat command received.');
                   this.handleDeletePanelChat(message.id);
                   break;
               case 'refresh':
-                  console.log('Refresh command received.');
+                  //console.log('Refresh command received.');
                   this.updateContent();
                   break;
               case 'switchView':
-                  console.log('Switch view command received:', message.view);
+                  //console.log('Switch view command received:', message.view);
                   this.handleSwitchView(message.view);
                   break;
               default:
-                  console.log('Received unknown command:', message.command);
+                  //console.log('Received unknown command:', message.command);
                   break;
           }
       });
@@ -280,7 +280,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
    * @param messageId - The ID of the message to delete.
    */
   private async handleDeleteMessage(messageId: string) {
-      console.log(`Received request to delete message with ID: ${messageId}`);
+      //console.log(`Received request to delete message with ID: ${messageId}`);
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       if (!workspaceFolder) {
           vscode.window.showErrorMessage('No workspace folder found.');
@@ -312,14 +312,14 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
               const messageIndex = panelChat.messages.findIndex(msg => msg.id === messageId);
               if (messageIndex !== -1) {
                   messageFound = true;
-                  console.log(`Marking message with ID: ${messageId} as deleted in PanelChat ${panelChat.id}`);
+                  //console.log(`Marking message with ID: ${messageId} as deleted in PanelChat ${panelChat.id}`);
 
                   // Add the message ID to deletedChats.deletedMessageIDs if not already present
                   if (!stashedState.deletedChats.deletedMessageIDs.includes(messageId)) {
                       stashedState.deletedChats.deletedMessageIDs.push(messageId);
-                      console.log(`Added message ID ${messageId} to deletedMessageIDs.`);
+                      //console.log(`Added message ID ${messageId} to deletedMessageIDs.`);
                   } else {
-                      console.log(`Message ID ${messageId} is already marked as deleted.`);
+                      //console.log(`Message ID ${messageId} is already marked as deleted.`);
                   }
 
                   break; // Exit the loop once the message is found
@@ -333,13 +333,13 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
           // Write the updated stashedState back to the file
           fs.writeFileSync(filePath, JSON.stringify(stashedState, null, 2), 'utf-8');
-          console.log(`Updated ${filePath} after marking message as deleted.`);
+          //console.log(`Updated ${filePath} after marking message as deleted.`);
 
           // Commit the change to Git (Optional)
           // const git: SimpleGit = simpleGit(repoPath);
           // await git.add(filePath);
           // await git.commit(`Delete message with ID ${messageId}`);
-          // console.log(`Committed deletion of message ID ${messageId} to Git.`);
+          // //console.log(`Committed deletion of message ID ${messageId} to Git.`);
 
           vscode.window.showInformationMessage(`Message with ID ${messageId} has been deleted.`);
 
@@ -784,10 +784,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             // Handle "Yes" button click
             document.getElementById('confirmYes').onclick = function() {
                 if (type === 'message') {
-                    console.log('Sending deleteMessage command for ID: ' + id);
+                    //console.log('Sending deleteMessage command for ID: ' + id);
                     vscode.postMessage({ command: 'deleteMessage', id: id });
                 } else if (type === 'panelChat') {
-                    console.log('Sending deletePanelChat command for ID: ' + id);
+                    //console.log('Sending deletePanelChat command for ID: ' + id);
                     vscode.postMessage({ command: 'deletePanelChat', id: id });
                 }
                 // Hide the modal after action
@@ -978,7 +978,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
          */
         // Notify the extension that the Webview is ready
         vscode.postMessage({ command: 'webviewReady' });
-        console.log('Webview is ready.');
+        //console.log('Webview is ready.');
     </script>
 </body>
 </html>

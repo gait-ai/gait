@@ -137,7 +137,7 @@ export class CursorReader implements StateReader {
     private async getNewPrompt(){
         const oldInlineChats: any = this.inlineChats;
         let newInlineChats: any;
-        console.log("Getting new prompt");
+        //console.log("Getting new prompt");
 
         const maxAttempts = 12; // 60 seconds total (12 * 5 seconds)
         let attempts = 0;
@@ -147,7 +147,7 @@ export class CursorReader implements StateReader {
         } | undefined;
         while (attempts < maxAttempts) {
             newInlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
-            console.log("New inline chats: ", newInlineChats.length);
+            //console.log("New inline chats: ", newInlineChats.length);
             try {
                 newChat = getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4))[0];
             } catch (error) {
@@ -178,7 +178,7 @@ export class CursorReader implements StateReader {
         this.inlineStartInfo = null;
         let inlineChatInfoObj: Inline.InlineChatInfo;
         const newChat = await this.getNewPrompt();
-        console.log("New chat: ", JSON.stringify(newChat));
+        //console.log("New chat: ", JSON.stringify(newChat));
         if (Inline.isInlineStartInfo(lastInline) && newChat.commandType === 1) {
             inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, newContent, newChat.text);
 

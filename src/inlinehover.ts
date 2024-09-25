@@ -50,20 +50,7 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     });
 
     // Find all lines that match `matchedLines`
-    let surroundingLines: Diff.Change[] = [];
-    if (matchedRange) {
-        const { matchedLines } = matchedRange;
-        lineBasedDiffs.forEach((diffLine, index) => {
-            if (matchedLines.some(line => diffLine.value.includes(line))) {
-                // Include the 3 surrounding lines before and after the match
-                const start = Math.max(0, index - 3);
-                const end = Math.min(lineBasedDiffs.length, index + 4); // +4 because slice is exclusive at the end
-                surroundingLines = surroundingLines.concat(lineBasedDiffs.slice(start, end));
-            }
-        });
-    } else {
-        surroundingLines = diffs.filter(diff => diff.added || diff.removed).map(diff => ({...diff, value: diff.value.trim()}));
-    }
+    let surroundingLines: Diff.Change[] = diffs.filter(diff => diff.added || diff.removed).map(diff => ({...diff, value: diff.value.trim()}));
 
     // Ensure that there are lines to display
     if (surroundingLines.length > 0) {

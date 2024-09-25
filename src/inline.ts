@@ -41,9 +41,7 @@ export interface InlineChatInfo {
 
 export interface InlineMatchedRange {
     range: vscode.Range;
-    matchedLines: string[];
     inlineChat: InlineChatInfo;
-    similarity: number;
 }
 
 

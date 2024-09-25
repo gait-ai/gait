@@ -66,7 +66,7 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
     newKeybindings = [...newKeybindings, ...sharedKeybindings];
 
     const extensionPackageJsonPath = path.resolve(context.extensionPath, 'package.json');
-    console.log("extensionPackageJsonPath", extensionPackageJsonPath);
+    //console.log("extensionPackageJsonPath", extensionPackageJsonPath);
     const extensionPackageJson = fs.readFileSync(extensionPackageJsonPath, 'utf8');
     const extensionPackageJsonObj = JSON.parse(extensionPackageJson);
     if (!areKeybindingsEqual(extensionPackageJsonObj.contributes.keybindings, newKeybindings)) {
