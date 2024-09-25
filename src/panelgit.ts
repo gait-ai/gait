@@ -4,6 +4,7 @@ import * as path from 'path';
 import simpleGit, { SimpleGit } from 'simple-git';
 import { StashedState, PanelChat, isStashedState } from './types';
 import { InlineChatInfo } from './inline';
+import { readStashedState } from './stashedState'; // Ensure this uses gzip
 
 const SCHEMA_VERSION = '1.0';
 
@@ -78,7 +79,7 @@ function ensureDeletedChats(stashedState: StashedState, commitHash: string) {
 }
 
 /**
- * Processes a single commit's stashedPanelChats.json and extracts active PanelChats and Messages.
+ * Processes a single commit's stashedPanelChats.json.gz and extracts active PanelChats and Messages.
  * @param parsedContent - The parsed StashedState from the commit.
  * @param currentMessageIds - Set of active message IDs.
  * @param currentPanelChatIds - Set of active PanelChat IDs.
@@ -172,32 +173,17 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
         throw new Error(`File not found: ${absoluteFilePath}`);
     }
 
-    // Step 1: Read the current stashedPanelChats.json to collect existing message and panelChat IDs
-    let currentContent: string;
+    // Step 1: Read the current stashedPanelChats.json.gz to collect existing message and panelChat IDs
     let parsedCurrent: StashedState;
     const currentMessageIds: Set<string> = new Set();
     const currentPanelChatIds: Set<string> = new Set();
 
     try {
-        currentContent = fs.readFileSync(absoluteFilePath, 'utf-8');
-        log(`Successfully read ${absoluteFilePath}`, LogLevel.INFO);
-    } catch (error) {
-        log(`Warning: Failed to read current file content: ${(error as Error).message}`, LogLevel.WARN);
-        // If reading fails, initialize with default structure
-        currentContent = JSON.stringify({
-            panelChats: [],
-            schemaVersion: SCHEMA_VERSION,
-            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
-        }, null, 2);
-        log(`Initialized default stashedPanelChats.json structure.`, LogLevel.INFO);
-    }
-
-    try {
-        parsedCurrent = JSON.parse(currentContent);
+        parsedCurrent = readStashedState(); // This now handles gzip decompression
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure.');
         }
-        log(`Parsed current stashedPanelChats.json successfully.`, LogLevel.INFO);
+        log(`Parsed current stashedPanelChats.json.gz successfully.`, LogLevel.INFO);
     } catch (error) {
         log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
         // Initialize with default structure if parsing fails
@@ -208,7 +194,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
         };
-        log(`Initialized default stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
+        log(`Initialized default stashedPanelChats.json.gz structure due to parsing failure.`, LogLevel.INFO);
     }
 
     // Ensure deletedChats exists
@@ -268,12 +254,6 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
         const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
         const commitMessage = commitMsgParts.join('\t');
 
-        // Skip commits that are solely for deletions
-        if (commitMessage.startsWith('Delete message with ID') || commitMessage.startsWith('Delete PanelChat with ID')) {
-            log(`Skipping deletion commit ${commitHash}: ${commitMessage}`, LogLevel.INFO);
-            continue;
-        }
-
         // Get the file content at this commit
         let fileContent: string;
         try {
@@ -284,14 +264,19 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
             continue; // Skip this commit
         }
 
-        // Parse the JSON content as StashedState
+        // Since the file is now gzip-compressed, decompress it before parsing
         let parsedContent: StashedState;
         try {
-            parsedContent = JSON.parse(fileContent);
+            // Import zlib for decompression
+            const zlib = require('zlib');
+            const buffer = Buffer.from(fileContent, 'utf-8');
+            const decompressedBuffer = zlib.gunzipSync(buffer);
+            const jsonString = decompressedBuffer.toString('utf-8');
+            parsedContent = JSON.parse(jsonString);
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+            log(`Parsed stashedPanelChats.json.gz for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
             log(`Content: ${fileContent}`, LogLevel.WARN);
@@ -341,67 +326,49 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
         status.created.includes(filePath)
     ) {
         // Get the current (uncommitted) file content
-        log("stashedPanelChats.json is modified", LogLevel.INFO);
-        let currentUncommittedContent: string;
+        log("stashedPanelChats.json.gz is modified", LogLevel.INFO);
+        let currentUncommittedContent: StashedState;
         try {
-            currentUncommittedContent = fs.readFileSync(absoluteFilePath, 'utf-8');
-            log(`Successfully read uncommitted stashedPanelChats.json.`, LogLevel.INFO);
+            currentUncommittedContent = readStashedState(); // Use the updated readStashedState
+            log(`Successfully read uncommitted stashedPanelChats.json.gz.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to read current file content: ${(error as Error).message}`, LogLevel.WARN);
-            currentUncommittedContent = JSON.stringify({
-                panelChats: [],
-                schemaVersion: SCHEMA_VERSION,
-                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
-            }, null, 2); // Default to empty StashedState
-            log(`Initialized default uncommitted stashedPanelChats.json structure.`, LogLevel.INFO);
-        }
-
-        // Parse the JSON content as StashedState
-        let parsedUncommitted: StashedState;
-        try {
-            parsedUncommitted = JSON.parse(currentUncommittedContent);
-            if (!isStashedState(parsedUncommitted)) {
-                throw new Error('Parsed content does not match StashedState structure.');
-            }
-            log(`Parsed uncommitted stashedPanelChats.json successfully.`, LogLevel.INFO);
-        } catch (error) {
-            log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
-            parsedUncommitted = {
+            currentUncommittedContent = {
                 panelChats: [],
                 inlineChats: [],
                 schemaVersion: SCHEMA_VERSION,
                 deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
                 kv_store: {}
             }; // Default to empty StashedState
-            log(`Initialized default uncommitted stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
+            log(`Initialized default uncommitted stashedPanelChats.json.gz structure due to reading failure.`, LogLevel.INFO);
         }
 
         // Ensure deletedChats exists
-        if (!parsedUncommitted.deletedChats) {
-            parsedUncommitted.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
+        if (!currentUncommittedContent.deletedChats) {
+            currentUncommittedContent.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
             log(`'deletedChats' was undefined in uncommitted changes. Initialized with empty arrays.`, LogLevel.WARN);
         }
 
         // Ensure deletedPanelChatIDs exists and is an array
-        if (!Array.isArray(parsedUncommitted.deletedChats.deletedPanelChatIDs)) {
-            parsedUncommitted.deletedChats.deletedPanelChatIDs = [];
+        if (!Array.isArray(currentUncommittedContent.deletedChats.deletedPanelChatIDs)) {
+            currentUncommittedContent.deletedChats.deletedPanelChatIDs = [];
             log(`'deletedPanelChatIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`, LogLevel.WARN);
         }
 
         // Ensure deletedMessageIDs exists and is an array
-        if (!Array.isArray(parsedUncommitted.deletedChats.deletedMessageIDs)) {
-            parsedUncommitted.deletedChats.deletedMessageIDs = [];
+        if (!Array.isArray(currentUncommittedContent.deletedChats.deletedMessageIDs)) {
+            currentUncommittedContent.deletedChats.deletedMessageIDs = [];
             log(`'deletedMessageIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`, LogLevel.WARN);
         }
 
-        const uncommittedDeletedPanelChatIds = new Set(parsedUncommitted.deletedChats.deletedPanelChatIDs);
-        const uncommittedDeletedMessageIds = new Set(parsedUncommitted.deletedChats.deletedMessageIDs);
+        const uncommittedDeletedPanelChatIds = new Set(currentUncommittedContent.deletedChats.deletedPanelChatIDs);
+        const uncommittedDeletedMessageIds = new Set(currentUncommittedContent.deletedChats.deletedMessageIDs);
 
         // Aggregate all panelChats from uncommitted changes, excluding deleted ones
-        const allCurrentPanelChats: PanelChat[] = parsedUncommitted.panelChats.filter(pc => 
+        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.panelChats.filter(pc =>
             !uncommittedDeletedPanelChatIds.has(pc.id)
         ).map(pc => {
-            const filteredMessages = pc.messages.filter(msg => 
+            const filteredMessages = pc.messages.filter(msg =>
                 !uncommittedDeletedMessageIds.has(msg.id) && currentMessageIds.has(msg.id)
             );
             return {
@@ -410,7 +377,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
             };
         }).filter(pc => pc.messages.length > 0);
 
-        const allCurrentInlineChats: InlineChatInfo[] = parsedUncommitted.inlineChats;
+        const allCurrentInlineChats: InlineChatInfo[] = currentUncommittedContent.inlineChats;
 
         log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`, LogLevel.INFO);
 
@@ -453,35 +420,19 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         throw new Error(`Target file not found: ${absoluteTargetFilePath}`);
     }
 
-    // Step 1: Read the current stashedPanelChats.json to collect existing message and panelChat IDs
-    let currentContent: string;
+    // Step 1: Read the current stashedPanelChats.json.gz to collect existing message and panelChat IDs
     let parsedCurrent: StashedState;
     const currentMessageIds: Set<string> = new Set();
     const currentPanelChatIds: Set<string> = new Set();
 
     try {
-        currentContent = fs.readFileSync(absoluteFilePath, 'utf-8');
-        //console.log(`Successfully read ${absoluteFilePath}`);
-    } catch (error) {
-        console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
-        // If reading fails, initialize with default structure
-        currentContent = JSON.stringify({
-            panelChats: [],
-            inlineChats: [],
-            schemaVersion: SCHEMA_VERSION,
-            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
-        }, null, 2);
-        //console.log(`Initialized default stashedPanelChats.json structure.`);
-    }
-
-    try {
-        parsedCurrent = JSON.parse(currentContent);
+        parsedCurrent = readStashedState(); // This now handles gzip decompression
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure.');
         }
-        //console.log(`Parsed current stashedPanelChats.json successfully.`);
+        log(`Parsed current stashedPanelChats.json.gz successfully.`, LogLevel.INFO);
     } catch (error) {
-        console.warn(`Warning: Failed to parse current JSON content: ${(error as Error).message}`);
+        log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
         // Initialize with default structure if parsing fails
         parsedCurrent = {
             panelChats: [],
@@ -490,25 +441,25 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
         };
-        //console.log(`Initialized default stashedPanelChats.json structure due to parsing failure.`);
+        log(`Initialized default stashedPanelChats.json.gz structure due to parsing failure.`, LogLevel.INFO);
     }
 
     // Ensure deletedChats exists
     if (!parsedCurrent.deletedChats) {
         parsedCurrent.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
-        console.warn(`'deletedChats' was undefined. Initialized with empty arrays.`);
+        log(`'deletedChats' was undefined. Initialized with empty arrays.`, LogLevel.WARN);
     }
 
     // Ensure deletedPanelChatIDs exists and is an array
     if (!Array.isArray(parsedCurrent.deletedChats.deletedPanelChatIDs)) {
         parsedCurrent.deletedChats.deletedPanelChatIDs = [];
-        console.warn(`'deletedPanelChatIDs' was undefined or not an array. Initialized as empty array.`);
+        log(`'deletedPanelChatIDs' was undefined or not an array. Initialized as empty array.`, LogLevel.WARN);
     }
 
     // Ensure deletedMessageIDs exists and is an array
     if (!Array.isArray(parsedCurrent.deletedChats.deletedMessageIDs)) {
         parsedCurrent.deletedChats.deletedMessageIDs = [];
-        console.warn(`'deletedMessageIDs' was undefined or not an array. Initialized as empty array.`);
+        log(`'deletedMessageIDs' was undefined or not an array. Initialized as empty array.`, LogLevel.WARN);
     }
 
     const deletedPanelChatIds = new Set(parsedCurrent.deletedChats.deletedPanelChatIDs);
@@ -526,7 +477,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         }
     }
 
-    //console.log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`);
+    log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`, LogLevel.INFO);
 
     // Step 2: Get the commit history for the main file with --follow to track renames
     // '--reverse' ensures commits are ordered from oldest to newest
@@ -535,7 +486,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
     let logData: string;
     try {
         logData = await git.raw(logArgs);
-        //console.log(`Retrieved git log data successfully.`);
+        log(`Retrieved git log data successfully.`, LogLevel.INFO);
     } catch (error) {
         throw new Error(`Failed to retrieve git log for ${filePath}: ${(error as Error).message}`);
     }
@@ -587,14 +538,19 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             continue; // Skip this commit
         }
 
-        // Parse the JSON content as StashedState
+        // Since the file is now gzip-compressed, decompress it before parsing
         let parsedContent: StashedState;
         try {
-            parsedContent = JSON.parse(fileContent);
+            // Import zlib for decompression
+            const zlib = require('zlib');
+            const buffer = Buffer.from(fileContent, 'utf-8');
+            const decompressedBuffer = zlib.gunzipSync(buffer);
+            const jsonString = decompressedBuffer.toString('utf-8');
+            parsedContent = JSON.parse(jsonString);
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            //console.log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`);
+            //console.log(`Parsed stashedPanelChats.json.gz for commit ${commitHash} successfully.`);
         } catch (error) {
             console.warn(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`);
             console.warn(`Content: ${fileContent}`);
@@ -644,67 +600,49 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         status.created.includes(filePath)
     ) {
         // Get the current (uncommitted) file content
-        //console.log("stashedPanelChats.json is modified");
-        let currentUncommittedContent: string;
+        //console.log("stashedPanelChats.json.gz is modified");
+        let currentUncommittedContent: StashedState;
         try {
-            currentUncommittedContent = fs.readFileSync(absoluteFilePath, 'utf-8');
-            //console.log(`Successfully read uncommitted stashedPanelChats.json.`);
+            currentUncommittedContent = readStashedState(); // Use the updated readStashedState
+            //console.log(`Successfully read uncommitted stashedPanelChats.json.gz.`);
         } catch (error) {
             console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
-            currentUncommittedContent = JSON.stringify({
-                panelChats: [],
-                schemaVersion: SCHEMA_VERSION,
-                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
-            }, null, 2); // Default to empty StashedState
-            //console.log(`Initialized default uncommitted stashedPanelChats.json structure.`);
-        }
-
-        // Parse the JSON content as StashedState
-        let parsedUncommitted: StashedState;
-        try {
-            parsedUncommitted = JSON.parse(currentUncommittedContent);
-            if (!isStashedState(parsedUncommitted)) {
-                throw new Error('Parsed content does not match StashedState structure.');
-            }
-            //console.log(`Parsed uncommitted stashedPanelChats.json successfully.`);
-        } catch (error) {
-            console.warn(`Warning: Failed to parse current JSON content: ${(error as Error).message}`);
-            parsedUncommitted = {
+            currentUncommittedContent = {
                 panelChats: [],
                 inlineChats: [],
                 schemaVersion: SCHEMA_VERSION,
                 deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
                 kv_store: {}
             }; // Default to empty StashedState
-            //console.log(`Initialized default uncommitted stashedPanelChats.json structure due to parsing failure.`);
+            //console.log(`Initialized default uncommitted stashedPanelChats.json.gz structure due to reading failure.`);
         }
 
         // Ensure deletedChats exists
-        if (!parsedUncommitted.deletedChats) {
-            parsedUncommitted.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
-            console.warn(`'deletedChats' was undefined in uncommitted changes. Initialized with empty arrays.`);
+        if (!currentUncommittedContent.deletedChats) {
+            currentUncommittedContent.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
+            log(`'deletedChats' was undefined in uncommitted changes. Initialized with empty arrays.`, LogLevel.WARN);
         }
 
         // Ensure deletedPanelChatIDs exists and is an array
-        if (!Array.isArray(parsedUncommitted.deletedChats.deletedPanelChatIDs)) {
-            parsedUncommitted.deletedChats.deletedPanelChatIDs = [];
-            console.warn(`'deletedPanelChatIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`);
+        if (!Array.isArray(currentUncommittedContent.deletedChats.deletedPanelChatIDs)) {
+            currentUncommittedContent.deletedChats.deletedPanelChatIDs = [];
+            log(`'deletedPanelChatIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`, LogLevel.WARN);
         }
 
         // Ensure deletedMessageIDs exists and is an array
-        if (!Array.isArray(parsedUncommitted.deletedChats.deletedMessageIDs)) {
-            parsedUncommitted.deletedChats.deletedMessageIDs = [];
-            console.warn(`'deletedMessageIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`);
+        if (!Array.isArray(currentUncommittedContent.deletedChats.deletedMessageIDs)) {
+            currentUncommittedContent.deletedChats.deletedMessageIDs = [];
+            log(`'deletedMessageIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`, LogLevel.WARN);
         }
 
-        const uncommittedDeletedPanelChatIds = new Set(parsedUncommitted.deletedChats.deletedPanelChatIDs);
-        const uncommittedDeletedMessageIds = new Set(parsedUncommitted.deletedChats.deletedMessageIDs);
+        const uncommittedDeletedPanelChatIds = new Set(currentUncommittedContent.deletedChats.deletedPanelChatIDs);
+        const uncommittedDeletedMessageIds = new Set(currentUncommittedContent.deletedChats.deletedMessageIDs);
 
         // Aggregate all panelChats from uncommitted changes, excluding deleted ones
-        const allCurrentPanelChats: PanelChat[] = parsedUncommitted.panelChats.filter(pc => 
+        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.panelChats.filter(pc =>
             !uncommittedDeletedPanelChatIds.has(pc.id)
         ).map(pc => {
-            const filteredMessages = pc.messages.filter(msg => 
+            const filteredMessages = pc.messages.filter(msg =>
                 !uncommittedDeletedMessageIds.has(msg.id) && currentMessageIds.has(msg.id)
             );
             return {
@@ -712,7 +650,8 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
                 messages: filteredMessages
             };
         }).filter(pc => pc.messages.length > 0);
-        const allCurrentInlineChats: InlineChatInfo[] = parsedUncommitted.inlineChats;
+
+        const allCurrentInlineChats: InlineChatInfo[] = currentUncommittedContent.inlineChats;
 
         //console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
 
@@ -740,6 +679,12 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
     };
 }
 
+/**
+ * Maps message and inline chat IDs to their respective commit information.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the target file within the repository.
+ * @returns A Promise resolving to a Map where keys are IDs and values are CommitData.
+ */
 export async function getIdToCommitInfo(repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
     const gitHistory  = await getGitHistory(repoPath, filePath);
     const idToCommitInfo = new Map<string, CommitData>();
@@ -753,6 +698,12 @@ export async function getIdToCommitInfo(repoPath: string, filePath: string): Pro
     return idToCommitInfo;
 }
 
+/**
+ * Maps inline chat IDs to their respective commit information.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the target file within the repository.
+ * @returns A Promise resolving to a Map where keys are inline chat IDs and values are CommitData.
+ */
 export async function getInlineChatIdToCommitInfo(repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
     const gitHistory  = await getGitHistory(repoPath, filePath);
     const idToCommitInfo = new Map<string, CommitData>();

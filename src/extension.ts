@@ -377,7 +377,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-            const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
+            const stashedPath = path.join(gaitDir, 'stashedPanelChats.json.gz');
 
             if (!fs.existsSync(stashedPath)) {
                 vscode.window.showErrorMessage('stashedPanelChats.json does not exist.');

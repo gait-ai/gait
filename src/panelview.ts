@@ -5,6 +5,7 @@ import * as path from 'path';
 import simpleGit, { SimpleGit } from 'simple-git';
 import { MessageEntry, StashedState, PanelChat, isStashedState } from './types';
 import {CommitData, UncommittedData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile} from './panelgit';
+import { readStashedState, writeStashedState } from './stashedState';
 
 const SCHEMA_VERSION = '1.0';
 
@@ -28,7 +29,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     let context = this._context;
 
     const repoPath = workspaceFolder.uri.fsPath;
-    const filePath = '.gait/stashedPanelChats.json'; // Replace with your actual file path relative to repo
+    const filePath = '.gait/stashedPanelChats.json.gz'; // Replace with your actual file path relative to repo
 
     try {
         if (this._isFilteredView && additionalFilePath) {
@@ -138,23 +139,14 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     }
 
     const repoPath = workspaceFolder.uri.fsPath;
-    const filePath = path.join(repoPath, '.gait', 'stashedPanelChats.json');
+    const filePath = path.join(repoPath, '.gait', 'stashedPanelChats.json.gz');
 
     try {
         // Read the current file content as StashedState
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         let stashedState: StashedState;
 
-        try {
-            stashedState = JSON.parse(fileContent);
-            if (!isStashedState(stashedState)) {
-                throw new Error('Parsed content does not match StashedState structure.');
-            }
-        } catch (parseError) {
-            vscode.window.showErrorMessage(`Failed to parse stashedPanelChats.json: ${(parseError as Error).message}`);
-            console.error(`Error parsing stashedPanelChats.json:`, parseError);
-            return;
-        }
+        stashedState = readStashedState();
 
         // Find the panel chat to delete
         const panelChatIndex = stashedState.panelChats.findIndex(pc => pc.id === panelChatId);
@@ -176,14 +168,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         }
 
         // Write the updated stashedState back to the file
-        fs.writeFileSync(filePath, JSON.stringify(stashedState, null, 2), 'utf-8');
+        writeStashedState(stashedState)
         //console.log(`Updated ${filePath} after deleting PanelChat.`);
-
-        // Optionally, commit the change to Git
-        // const git: SimpleGit = simpleGit(repoPath);
-        // await git.add(filePath);
-        // await git.commit(`Delete PanelChat with ID ${panelChatId}`);
-        // //console.log(`Committed deletion of PanelChat ID ${panelChatId} to Git.`);
 
         vscode.window.showInformationMessage(`PanelChat with ID ${panelChatId} has been deleted.`);
 
@@ -288,23 +274,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
       }
 
       const repoPath = workspaceFolder.uri.fsPath;
-      const filePath = path.join(repoPath, '.gait', 'stashedPanelChats.json');
+      const filePath = path.join(repoPath, '.gait', 'stashedPanelChats.json.gz');
 
       try {
           // Read the current file content as StashedState
           const fileContent = fs.readFileSync(filePath, 'utf-8');
-          let stashedState: StashedState;
-
-          try {
-              stashedState = JSON.parse(fileContent);
-              if (!isStashedState(stashedState)) {
-                  throw new Error('Parsed content does not match StashedState structure.');
-              }
-          } catch (parseError) {
-              vscode.window.showErrorMessage(`Failed to parse stashedPanelChats.json: ${(parseError as Error).message}`);
-              console.error(`Error parsing stashedPanelChats.json:`, parseError);
-              return;
-          }
+          let stashedState: StashedState = readStashedState();
 
           let messageFound = false;
           // Iterate through panelChats to find the message
@@ -332,7 +307,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
           }
 
           // Write the updated stashedState back to the file
-          fs.writeFileSync(filePath, JSON.stringify(stashedState, null, 2), 'utf-8');
+          writeStashedState(stashedState);
           //console.log(`Updated ${filePath} after marking message as deleted.`);
 
           // Commit the change to Git (Optional)
