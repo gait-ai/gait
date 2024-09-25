@@ -358,6 +358,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
    */
   private getHtmlForWebview(webview: vscode.Webview): string {
     const nonce = getNonce();
+    const prismCssPath = vscode.Uri.joinPath(this._context.extensionUri, 'media', 'prism.css');
+    const prismJsPath = vscode.Uri.joinPath(this._context.extensionUri, 'media', 'prism.js');
+    const markedJsPath = vscode.Uri.joinPath(this._context.extensionUri, 'media', 'marked.js'); // Path to Marked.js
+    const prismCssUri = webview.asWebviewUri(prismCssPath);
+    const prismJsUri = webview.asWebviewUri(prismJsPath);
+    const markedJsUri = webview.asWebviewUri(markedJsPath); // URI for Marked.js
 
     return `
 <!DOCTYPE html>
@@ -366,7 +372,23 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Git Commit History</title>
-    <style>
+    
+ <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'none';
+        style-src 'nonce-${nonce}' ${webview.cspSource};
+        script-src 'nonce-${nonce}' ${webview.cspSource};
+        connect-src 'self';
+        img-src 'self';
+        font-src 'self';
+    ">
+    
+    <!-- Prism.js CSS -->
+    <link href="${prismCssUri}" rel="stylesheet" />
+    <!-- Marked.js -->
+    <script src="${markedJsUri}" nonce="${nonce}"></script>
+
+    <style nonce="${nonce}">
         body {
             font-family: var(--vscode-font-family);
             background-color: var(--vscode-editor-background);
@@ -400,6 +422,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             padding: 15px;
             margin-bottom: 15px;
             background-color: var(--vscode-editor-inactiveSelectionBackground);
+        }
+        .commit-date {
+            color: var(--vscode-descriptionForeground);
+            font-size: 0.9em;
         }
         .commit-header {
             display: flex;
@@ -480,13 +506,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-editorWidget-background);
             word-wrap: break-word;
         }
-        .code-block {
+        pre {
             background-color: var(--vscode-textCodeBlock-background);
             padding: 8px;
             border-radius: 3px;
             font-family: var(--vscode-editor-font-family);
-            white-space: pre-wrap;
             overflow-x: auto;
+        }
+        code {
+            font-family: var(--vscode-editor-font-family);
+            font-size: 0.9em;
         }
         .no-commits, .no-messages {
             text-align: center;
@@ -562,6 +591,21 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
         }
+
+        .hidden {
+            display: none;
+        }
+
+        .visible {
+            display: flex; /* or block, depending on your layout needs */
+        }
+
+
+        /* Override Prism.js styles if necessary */
+        /* Example: Adjusting code block background */
+        pre[class*="language-"] {
+            background: var(--vscode-textCodeBlock-background) !important;
+        }
     </style>
 </head>
 <body>
@@ -586,7 +630,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     </div>
 
     <!-- Confirmation Modal -->
-    <div id="confirmModal" class="modal" style="display: none;">
+    <div id="confirmModal" class="modal hidden">
         <div class="modal-content">
             <p>Are you sure you want to delete this item?</p>
             <div class="modal-buttons">
@@ -596,7 +640,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         </div>
     </div>
 
+    <!-- Prism.js JS -->
+    <script src="${prismJsUri}" nonce="${nonce}"> </script>
+
     <script nonce="${nonce}">
+
         const vscode = acquireVsCodeApi();
 
         /**
@@ -615,32 +663,50 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
 
-        /**
-         * Formats the response text, converting code blocks into styled divs.
-         * @param {string} responseText - The response text to format.
-         * @returns {string} - The formatted HTML string.
-         */
         function formatResponse(responseText) {
             if (typeof responseText !== 'string') {
                 console.warn('formatResponse received non-string responseText:', responseText);
                 return '<em>Invalid response text.</em>';
             }
 
-            const codeBlockRegex = /\`\`\`([^\`]+)\`\`\`/g;
+            // Enhanced regex to handle optional newline after language specifier
+            const codeBlockRegex = /\`\`\`(\\w+)?\\n?([\\s\\S]+?)\`\`\`/g;
             let formattedText = '';
             let lastIndex = 0;
             let match;
+            let matchFound = false;
+
+            console.warn('Response text:', responseText); // Debugging log
 
             while ((match = codeBlockRegex.exec(responseText)) !== null) {
+                matchFound = true;
                 const index = match.index;
+                console.warn('Matched code block:', match[0]); // Debugging log
+
+                // Escape and append text before the code block
                 formattedText += escapeHtml(responseText.slice(lastIndex, index));
-                formattedText += \`<div class="code-block">\${escapeHtml(match[1].trim())}</div>\`;
+
+                const language = match[1] ? match[1].trim().replace(/\\n+$/, '') : '';
+                const code = match[2] ? escapeHtml(match[2].trim()) : '';
+
+                console.warn('Language', JSON.stringify(language));// Debugging log
+                console.warn('Code', JSON.stringify(code)); // Debugging log
+
+                // Append the formatted code block
+                formattedText += \`<pre><code class="language-\${language}">\${code}</code></pre>\`;
+
                 lastIndex = index + match[0].length;
             }
 
-            formattedText += escapeHtml(responseText.slice(lastIndex));
+            if (!matchFound) {
+                console.warn('No code blocks found in responseText.');
+            }
+
+            // Escape and append the remaining text after the last code block
+            formattedText += marked.parse(escapeHtml(responseText.slice(lastIndex)));
             return formattedText;
         }
+
 
         /**
          * Attaches click listeners to commit headers to toggle visibility of commit details.
@@ -655,6 +721,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                             details.style.display = 'none';
                         } else {
                             details.style.display = 'block';
+                            const codeBlocks = details.querySelectorAll('pre code');
+                            console.log('Found code blocks:', codeBlocks);
+                            codeBlocks.forEach((block) => {
+                                Prism.highlightElement(block);
+                            });
                         }
                     }
                 });
@@ -706,7 +777,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 ? 'Are you sure you want to delete this message?' 
                 : 'Are you sure you want to delete this PanelChat?';
 
-            modal.style.display = 'flex';
+            // Remove 'hidden' and add 'visible' to show the modal
+            modal.classList.remove('hidden');
+            modal.classList.add('visible');
 
             // Handle "Yes" button click
             document.getElementById('confirmYes').onclick = function() {
@@ -717,15 +790,29 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     console.log('Sending deletePanelChat command for ID: ' + id);
                     vscode.postMessage({ command: 'deletePanelChat', id: id });
                 }
-                modal.style.display = 'none';
+                // Hide the modal after action
+                modal.classList.remove('visible');
+                modal.classList.add('hidden');
             };
 
             // Handle "No" button click
             document.getElementById('confirmNo').onclick = function() {
                 console.log('Deletion cancelled by user.');
-                modal.style.display = 'none';
+                // Hide the modal
+                modal.classList.remove('visible');
+                modal.classList.add('hidden');
             };
         }
+
+        // Close the modal when clicking outside of the modal content
+        window.onclick = function(event) {
+            const modal = document.getElementById('confirmModal');
+            if (event.target == modal) {
+                modal.classList.remove('visible');
+                modal.classList.add('hidden');
+            }
+        };
+
 
         /**
          * Closes the modal when clicking outside of the modal content.
@@ -774,7 +861,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         commitHeader.className = 'commit-header';
                         commitHeader.innerHTML = \`
                             <h3>\${escapeHtml(commit.commitMessage)}</h3>
-                            <span style="color: var(--vscode-descriptionForeground); font-size: 0.9em;">\${new Date(commit.date).toLocaleString()}</span>
+                            <span class="commit-date">\${new Date(commit.date).toLocaleString()}</span>
                             <!-- Optional: Add a delete commit button if needed -->
                         \`;
                         commitDiv.appendChild(commitHeader);
@@ -897,8 +984,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 </html>
     `;
 }
-
-
 
 }
 
