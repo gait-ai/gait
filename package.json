@@ -74,13 +74,8 @@
                 "category": "Gait"
             },
             {
-                "command": "gait-copilot.activateDecorations",
-                "title": "Activate Decorations",
-                "category": "Gait"
-            },
-            {
-                "command": "gait-copilot.deactivateDecorations",
-                "title": "Deactivate Decorations",
+                "command": "gait-copilot.toggleDecorations",
+                "title": "Toggle Decorations",
                 "category": "Gait"
             },
             {

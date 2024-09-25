@@ -24,14 +24,14 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
     if (!fs.existsSync(stashedPath)) {
       // Initialize with empty stashedState and deletedChats
       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
-      console.log(`stashedPanelChats.json not found. Initialized with empty stashedState and deletedChats.`);
+      //console.log(`stashedPanelChats.json not found. Initialized with empty stashedState and deletedChats.`);
       return initialState;
     }
 
     const stats = fs.statSync(stashedPath);
     if (stats.size === 0) {
       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
-      console.log(`stashedPanelChats.json is empty. Initialized with empty stashedState and deletedChats.`);
+      //console.log(`stashedPanelChats.json is empty. Initialized with empty stashedState and deletedChats.`);
       return initialState;
     }
 
@@ -39,7 +39,7 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
 
     if (content === '') {
       fs.writeFileSync(stashedPath, JSON.stringify(initialState, null, 2), 'utf-8');
-      console.log(`stashedPanelChats.json contains only whitespace. Initialized with empty stashedState and deletedChats.`);
+      //console.log(`stashedPanelChats.json contains only whitespace. Initialized with empty stashedState and deletedChats.`);
       return initialState;
     }
 
@@ -100,10 +100,10 @@ export function readStashedPanelChats(gaitDir: string): StashedState {
     if (isModified) {
       // Write the corrected state back to the file
       fs.writeFileSync(stashedPath, JSON.stringify(parsed, null, 2), 'utf-8');
-      console.log(`stashedPanelChats.json was missing some properties. Updated with default values.`);
+      //console.log(`stashedPanelChats.json was missing some properties. Updated with default values.`);
     }
 
-    //console.log(`Read stashedState from stashedPanelChats.json:`, parsed);
+    ////console.log(`Read stashedState from stashedPanelChats.json:`, parsed);
     return parsed;
   } catch (error) {
     console.error(`Error reading stashedPanelChats.json:`, error);
@@ -123,7 +123,7 @@ async function writeStashedPanelChats(gaitDir: string, stashedState: StashedStat
   const stashedPath = path.join(gaitDir, 'stashedPanelChats.json');
   try {
     fs.writeFileSync(stashedPath, JSON.stringify(stashedState, null, 2), 'utf-8');
-    console.log(`Updated stashedPanelChats.json with stashedState.`);
+    //console.log(`Updated stashedPanelChats.json with stashedState.`);
   } catch (error) {
     console.error(`Error writing to stashedPanelChats.json:`, error);
     throw error;
@@ -181,7 +181,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       // Ensure the .gait directory exists
       if (!fs.existsSync(gaitDir)) {
         fs.mkdirSync(gaitDir, { recursive: true });
-        console.log(`Created directory: ${gaitDir}`);
+        //console.log(`Created directory: ${gaitDir}`);
       }
 
       // Read the existing stashedPanelChats.json as existingStashedState
@@ -204,13 +204,13 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
 
           if (newMessages.length > 0) {
             existingPanelChat.messages.push(...newMessages);
-            console.log(`monitorPanelChatAsync: Appended ${newMessages.length} new messages to existing PanelChat ${panelChatId}.`);
+            //console.log(`monitorPanelChatAsync: Appended ${newMessages.length} new messages to existing PanelChat ${panelChatId}.`);
           }
         } else {
           // PanelChat does not exist, add it to panelChats
           if (panelChatMode === 'AddAllChats') {
             existingStashedState.panelChats.push(incomingPanelChat);
-            console.log(`monitorPanelChatAsync: Added new PanelChat ${panelChatId} with ${incomingPanelChat.messages.length} messages.`);
+            //console.log(`monitorPanelChatAsync: Added new PanelChat ${panelChatId} with ${incomingPanelChat.messages.length} messages.`);
           } 
           currentPanelChats.push(incomingPanelChat);
         }

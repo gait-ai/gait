@@ -90,10 +90,8 @@ export function isLastAppended(obj: any): obj is LastAppended {
 
 export interface PanelMatchedRange {
   range: vscode.Range;
-  matchedLines: string[];
   panelChat: PanelChat;
   message_id: string;
-  similarity: number;
 }
 
 export interface StateReader {   

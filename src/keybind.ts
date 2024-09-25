@@ -11,6 +11,11 @@ interface Keybinding {
 
 export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL) {
     let newKeybindings: Keybinding[] = [];
+
+    const sharedKeybindings = [{
+        key: "cmd+shift+g",
+        command: "gait-copilot.toggleDecorations",
+    }]
     if (tool === "Cursor") {
         newKeybindings = [{
                 key: "cmd+e",
@@ -58,9 +63,10 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
             }
         ];
     }
+    newKeybindings = [...newKeybindings, ...sharedKeybindings];
 
     const extensionPackageJsonPath = path.resolve(context.extensionPath, 'package.json');
-    console.log("extensionPackageJsonPath", extensionPackageJsonPath);
+    //console.log("extensionPackageJsonPath", extensionPackageJsonPath);
     const extensionPackageJson = fs.readFileSync(extensionPackageJsonPath, 'utf8');
     const extensionPackageJsonObj = JSON.parse(extensionPackageJson);
     if (!areKeybindingsEqual(extensionPackageJsonObj.contributes.keybindings, newKeybindings)) {

@@ -44,155 +44,66 @@ function extractCodeBlocks(text: string): string[] {
     return codeBlocks;
 }
 
-/**
- * Matches blocks of added lines from the diff to the current document.
- * @param document The VSCode text document.
- * @param diff The array of diff changes.
- * @param similarityThreshold The minimum similarity threshold for a match.
- * @returns An array of VSCode ranges that match the added diff blocks.
- */
 export function matchDiffToCurrentFile(
     document: vscode.TextDocument,
-    diff: Diff.Change[],
-    similarityThreshold: number
-): {ranges: vscode.Range, originalLines: string[], similarity: number }[] {
-    const matchedRanges: {ranges: vscode.Range, originalLines: string[], similarity: number }[] = [];
+    diff: Diff.Change[]
+): vscode.Range[] {
     const documentLines = document.getText().split('\n');
 
-    // Extract all added lines from the diff
-    let addedLines = diff
-        .filter(change => change.added)
-        .flatMap(change => change.value.split('\n').map(line => line.trim()));
-    addedLines = addedLines.filter(line => line.length > 0); // Remove empty lines
+    // Extract all added lines from the diff and create a Set for faster lookup
+    const addedLinesSet = new Set(
+        diff.filter(change => change.added)
+           .flatMap(change => change.value.split('\n').map(line => line.trim()))
+           .filter(line => line.length > 0 && /[a-zA-Z0-9]/.test(line))
+    );
 
-    const minBlockSize = 1;
+    if (addedLinesSet.size === 0) {
+        return [];
+    }
 
-    while (addedLines.length >= minBlockSize) {
-        let bestMatch = {
-            similarity: 0,
-            docStart: -1,
-            docEnd: 0,
-            addedStart: -1,
-            addedBlockSize: 0,
-        };
+    const matchingLineNumbers: number[] = [];
 
-        // Iterate through possible block sizes starting from the maximum possible
-        for (let blockSize = addedLines.length; blockSize >= minBlockSize; blockSize--) {
-            
-            for (let addedStart = 0; addedStart <= addedLines.length - blockSize; addedStart++) {
-                const currentAddedBlock = addedLines.slice(addedStart, addedStart + blockSize);
-
-                // Slide through the document to find the best matching block
-                let docStart = 0;
-                let docEnd = 0;
-                while (docEnd < documentLines.length) {
-                    // Count non-blank lines
-                    let nonBlankCount = 0;
-                    while (docEnd < documentLines.length && nonBlankCount < blockSize) {
-                        if (documentLines[docEnd].trim().length > 0) {
-                            nonBlankCount++;
-                        }
-                        docEnd++;
-                    }
-
-                    // If we don't have enough non-blank lines, break
-                    if (nonBlankCount < blockSize) {break;}
-
-                    const currentDocBlock = documentLines.slice(docStart, docEnd)
-                        .filter(line => line.trim().length > 0)
-                        .map(line => line.trim());
-                    
-                    const similarity = computeBlockSimilarity(currentDocBlock, currentAddedBlock);
-
-                    if (similarity > bestMatch.similarity) {
-                        bestMatch = {
-                            similarity,
-                            docStart,
-                            docEnd,
-                            addedStart,
-                            addedBlockSize: blockSize
-                        };
-                    }
-
-                    // Early exit if perfect match is found
-                    if (similarity === 1) {
-                        break;
-                    }
-
-                    // Move docStart to the next non-blank line
-                    while (docStart < docEnd && documentLines[docStart].trim().length === 0) {
-                        docStart++;
-                    }
-                    docStart++;
-                    docEnd = docStart;
-                }
-
-                // Early exit if perfect match is found
-                if (bestMatch.similarity === 1) {
-                    break;
-                }
-            }
-
-            // Early exit if perfect match is found
-            if (bestMatch.similarity === 1) {
-                break;
-            }
-        }
-
-        // Check if the best match meets the similarity threshold
-        if (bestMatch.similarity >= similarityThreshold && bestMatch.docStart !== -1) {
-            const { docStart, docEnd, addedStart, addedBlockSize } = bestMatch;
-
-            // Create a range covering the matched block in the document
-            const startPos = new vscode.Position(docStart, 0);
-            const endPos = new vscode.Position(docEnd-1, documentLines[docEnd-1].length);
-            matchedRanges.push(
-                {ranges: new vscode.Range(startPos, endPos),
-                originalLines: addedLines.splice(addedStart, addedStart + addedBlockSize),
-                similarity: bestMatch.similarity
-                } );
-            ;
-        } else {
-            // No more matches found that meet the threshold
-            break;
+    // Collect all matching line numbers
+    for (let i = 0; i < documentLines.length; i++) {
+        const trimmedLine = documentLines[i].trim();
+        if (addedLinesSet.has(trimmedLine)) {
+            matchingLineNumbers.push(i);
         }
     }
 
-    return matchedRanges;
+    // Merge consecutive line numbers into ranges
+    const ranges: vscode.Range[] = [];
+    let rangeStart = -1;
+
+    for (let i = 0; i < matchingLineNumbers.length; i++) {
+        if (rangeStart === -1) {
+            rangeStart = matchingLineNumbers[i];
+        } else if (matchingLineNumbers[i] !== matchingLineNumbers[i-1] + 1) {
+            // End of a consecutive range
+            ranges.push(new vscode.Range(
+                new vscode.Position(rangeStart, 0),
+                new vscode.Position(matchingLineNumbers[i-1], documentLines[matchingLineNumbers[i-1]].length)
+            ));
+            rangeStart = matchingLineNumbers[i];
+        }
+    }
+
+    // Add the last range if there is one
+    if (rangeStart !== -1) {
+        ranges.push(new vscode.Range(
+            new vscode.Position(rangeStart, 0),
+            new vscode.Position(matchingLineNumbers[matchingLineNumbers.length-1], 
+                                documentLines[matchingLineNumbers[matchingLineNumbers.length-1]].length)
+        ));
+    }
+    // Filter out ranges that are a single line
+    const multiLineRanges = ranges.filter(range => 
+        range.start.line !== range.end.line
+    );
+
+    return ranges;
 }
 
-/**
- * Computes the average similarity between two blocks of lines.
- * @param docBlock The block of lines from the document.
- * @param addedBlock The block of lines from the diff.
- * @returns The average similarity score between 0 and 1.
- */
-function computeBlockSimilarity(docBlock: string[], addedBlock: string[]): number {
-    if (docBlock.length !== addedBlock.length) {
-        return 0;
-    }
-
-    let totalSimilarity = 0;
-    let validLines = 0;
-
-    for (let i = 0; i < docBlock.length; i++) {
-        const docLine = docBlock[i].trim();
-        const addedLine = addedBlock[i].trim();
-
-        // Skip trivial lines for small blocks
-        if (docBlock.length <= 2 && !/[a-zA-Z0-9]/.test(docLine) && !/[a-zA-Z0-9]/.test(addedLine)) {
-            continue;
-        }
-
-        const distance = levenshtein.get(docLine, addedLine);
-        const maxLength = Math.max(docLine.length, addedLine.length);
-        const similarity = maxLength === 0 ? 1 : 1 - distance / maxLength;
-        totalSimilarity += similarity;
-        validLines++;
-    }
-
-    return validLines === 0 ? 0 : totalSimilarity / validLines;
-}
 
 export function decorateActive(context: vscode.ExtensionContext) {
     const editor = vscode.window.activeTextEditor;
@@ -252,8 +163,8 @@ export function decorateActive(context: vscode.ExtensionContext) {
             const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
             const codeBlocks = extractCodeBlocks(message.responseText);
             for (const code of codeBlocks) {
-                const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[], 0.8);
-                if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.ranges.end.line - range.ranges.start.line + 1), 0) > code.split('\n').length / 2) {
+                const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
+                if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
                     // If more than half of the code lines match, associate the file with the message
                     associateFileWithMessage(message.id, baseName, panelChat).catch(error => {
                         console.error(`Failed to associate file with message: ${error}`);
@@ -261,7 +172,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
                 }
                 
                 if (currentRanges.length > 0) {
-                    const color = generateColors(decorationIndex, 'orange');
+                    const color = generateColors(decorationIndex);
                     decorationIndex += 1;
 
                     function lineInRangesToPanel(line: number) {
@@ -270,29 +181,24 @@ export function decorateActive(context: vscode.ExtensionContext) {
                             range.range.end.line >= line
                         );
                     }
-                    function addRange(range: {ranges: vscode.Range, originalLines: string[], similarity: number}) {
+                    function addRange(range: vscode.Range) {
                         rangesToPanel.push({
-                            range: range.ranges,
-                            matchedLines: range.originalLines,
+                            range: range,
                             panelChat: panelChat,
                             message_id: message.id,
-                            similarity: range.similarity
                         });
-                        addDecorationType(color, range.ranges);
+                        addDecorationType(color, range);
                     }
 
                     currentRanges.forEach(range => {
-                        let currentStart = range.ranges.start.line;
+                        let currentStart = range.start.line;
                         let currentEnd = currentStart;
 
-                        for (let i = range.ranges.start.line; i <= range.ranges.end.line; i++) {
+                        for (let i = range.start.line; i <= range.end.line; i++) {
                             if (lineInRangesToPanel(i)) {
                                 if (currentStart !== currentEnd) {
-                                    addRange({
-                                        ranges: new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
-                                        originalLines: range.originalLines,
-                                        similarity: range.similarity
-                                    });
+                                    addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
+                                    );
                                 }
                                 currentStart = i + 1;
                                 currentEnd = i + 1;
@@ -301,12 +207,10 @@ export function decorateActive(context: vscode.ExtensionContext) {
                             }
                         }
 
-                        if (currentStart <= range.ranges.end.line) {
-                            addRange({
-                                ranges: new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
-                                originalLines: range.originalLines,
-                                similarity: range.similarity
-                            });
+                        if (currentStart <= range.end.line) {
+                            addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
+                
+                            );
                         }
                     });
                 }
@@ -315,10 +219,12 @@ export function decorateActive(context: vscode.ExtensionContext) {
     }
 
     const rangesToInline: Inline.InlineMatchedRange[] = [];
-    decorationIndex = 0;
     for (const chat of Object.values(inlineChats)) {
         for (const diff of chat.file_diff) {
-            const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs, 0.8);
+            if (diff.file_path === baseName) {
+                continue;
+            }
+            const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs);
             if (currentRanges.length > 0) {
                 const color = generateColors(decorationIndex);
                 decorationIndex += 1;
@@ -326,12 +232,10 @@ export function decorateActive(context: vscode.ExtensionContext) {
                 // Create a new decoration type with the unique color
                 currentRanges.forEach(range => {
                     rangesToInline.push({
-                        range: range.ranges,
-                        matchedLines: range.originalLines,
+                        range: range,
                         inlineChat: chat,
-                        similarity: range.similarity
                     });
-                    addDecorationType(color, range.ranges);
+                    addDecorationType(color, range);
                 });
             }
         }
@@ -352,14 +256,17 @@ export function decorateActive(context: vscode.ExtensionContext) {
                 if (panelRanges.length === 0) {
                     return undefined;
                 }
-                const hover = await PanelHover.createPanelHover(panelRanges[0], editor.document);
+                const oldestRange = panelRanges.reduce((max, current) => 
+                    current.panelChat.created_on < max.panelChat.created_on ? current : max
+                );
+                const hover = await PanelHover.createPanelHover(oldestRange, editor.document);
                 return hover;
             }
             // Find the range with the highest similarity
-            const highestSimilarityRange = ranges.reduce((max, current) => 
-                current.similarity > max.similarity ? current : max
+            const oldestRange = ranges.reduce((max, current) => 
+                current.inlineChat.timestamp < max.inlineChat.timestamp ? current : max
             );
-            const hover = await InlineHover.createHover(highestSimilarityRange, editor.document);
+            const hover = await InlineHover.createHover(oldestRange, editor.document);
             return hover;
         }
     });

@@ -19,7 +19,7 @@ import { getRelativePath } from './utils';
 const GAIT_FOLDER_NAME = '.gait';
 
 let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider: vscode.Disposable } | undefined;
-let decorationsActive = true;
+let decorationsActive = false;
 
 let isRedecorating = false;
 let changeQueue: { cursor_position: vscode.Position, 
@@ -40,13 +40,30 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
         timeout = setTimeout(() => func(...args), waitFor);
     };
 }
+
+
+function getFileContent(file_path: string): string {
+    if (fileState[file_path]) {
+        //console.log("File content from fileState:", fileState[file_path]);
+        return fileState[file_path];
+    } else {
+        // Read the file content from the file system
+        try {
+            //console.log("Reading file from file system:", file_path);
+            return fs.readFileSync(file_path, 'utf8');
+        } catch (error) {
+            console.error(`Error reading file ${file_path}: ${error}`);
+            return '';
+        }
+    }
+}
 /**
  * Handles file changes to detect AI-generated changes.
  */
 async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateReader: StateReader, context: vscode.ExtensionContext) {
     const changes = event.contentChanges;
     const editor = vscode.window.activeTextEditor;
-    if (!event.document.fileName || event.reason || !editor || changes.length === 0 || event.document.fileName.includes(path.join(GAIT_FOLDER_NAME))) {
+    if (!event.document.fileName || event.reason || !editor || changes.length === 0 || event.document.fileName.includes(path.join(GAIT_FOLDER_NAME)) || event.document.fileName.includes("rendererLog")){
         return;
     }
 
@@ -59,21 +76,6 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateRead
     // Check if the change is not from clipboard paste
     const clipboardContent = await vscode.env.clipboard.readText();
     const isClipboardPaste = changes.some(change => change.text === clipboardContent);
-    function getFileContent(file_path: string): string {
-        if (fileState[file_path]) {
-            console.log("File content from fileState:", fileState[file_path]);
-            return fileState[file_path];
-        } else {
-            // Read the file content from the file system
-            try {
-                console.log("Reading file from file system:", file_path);
-                return fs.readFileSync(file_path, 'utf8');
-            } catch (error) {
-                console.error(`Error reading file ${file_path}: ${error}`);
-                return '';
-            }
-        }
-    }
     if (!isClipboardPaste && isAIChange) {
         const timestamp = Date.now();
         changeQueue.push({
@@ -83,7 +85,7 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateRead
             timestamp,
             document_content: getFileContent(event.document.uri.fsPath),
         });
-        console.log("Detected AI change");
+        //console.log("Detected AI change");
     } else {
         const file_path: string = getRelativePath(event.document);
 
@@ -94,22 +96,23 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateRead
 function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContext) {
     // Check if there are changes in the queue
     if (changeQueue.length > 0) {
+        vscode.window.showInformationMessage("Trigger ai accept on " + changeQueue[changeQueue.length - 1].document_uri);
         const lastChange = changeQueue[changeQueue.length - 1];
         const currentTime = Date.now();
         
         if (currentTime - lastChange.timestamp > 1000) {
             // Print out the changeQueue
-            console.log("Current changeQueue:");
+            //console.log("Current changeQueue:");
             changeQueue.forEach((change, index) => {
-                console.log(`Change ${index + 1}:`);
-                console.log(`  Cursor Position: ${change.cursor_position.line}:${change.cursor_position.character}`);
-                console.log(`  Document URI: ${change.document_uri}`);
-                console.log(`  Timestamp: ${new Date(change.timestamp).toISOString()}`);
-                console.log(`  Changes:`);
+                //console.log(`Change ${index + 1}:`);
+                //console.log(`  Cursor Position: ${change.cursor_position.line}:${change.cursor_position.character}`);
+                //console.log(`  Document URI: ${change.document_uri}`);
+                //console.log(`  Timestamp: ${new Date(change.timestamp).toISOString()}`);
+                //console.log(`  Changes:`);
                 change.changes.forEach((c, i) => {
-                    console.log(`    Change ${i + 1}:`);
-                    console.log(`      Range: ${c.range.start.line}:${c.range.start.character} - ${c.range.end.line}:${c.range.end.character}`);
-                    console.log(`      Text: ${c.text}`);
+                    //console.log(`    Change ${i + 1}:`);
+                    //console.log(`      Range: ${c.range.start.line}:${c.range.start.character} - ${c.range.end.line}:${c.range.end.character}`);
+                    //console.log(`      Text: ${c.text}`);
                 });
             });
             // Get the file content for each changed file
@@ -150,21 +153,21 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                     console.error(`Error processing file ${filePath}: ${error}`);
                 }
             });
-            console.log("File Diffs:");
+            //console.log("File Diffs:");
             fileDiffs.forEach((diff, index) => {
-                console.log(`File ${index + 1}: ${diff.file_path}`);
-                console.log("Diffs:");
+                //console.log(`File ${index + 1}: ${diff.file_path}`);
+                //console.log("Diffs:");
                 diff.diffs.forEach((change, changeIndex) => {
                     if (change.added) {
-                        console.log(`  Added Change ${changeIndex + 1}:`);
-                        console.log(`    ${change.value.replace(/\n/g, "\n    ")}`);
+                        //console.log(`  Added Change ${changeIndex + 1}:`);
+                        //console.log(`    ${change.value.replace(/\n/g, "\n    ")}`);
                     }
                 });
             });
 
             const editor = vscode.window.activeTextEditor;
             if (editor) {
-                console.log("Accepting inline AI change");
+                //console.log("Accepting inline AI change");
                 stateReader.acceptInline(editor, fileDiffs).catch(error => {
                     vscode.window.showErrorMessage(`Failed to process editor content: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 });
@@ -225,7 +228,7 @@ export function activate(context: vscode.ExtensionContext) {
     const panelChatMode: PanelChatMode = 'AddAllChats';
     // Set panelChatMode in extension workspaceStorage
     context.workspaceState.update('panelChatMode', panelChatMode);
-    console.log(`PanelChatMode set to: ${panelChatMode}`);
+    //console.log(`PanelChatMode set to: ${panelChatMode}`);
 
     generateKeybindings(context, tool);
 
@@ -251,7 +254,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(PanelViewProvider.viewType, provider, { webviewOptions: { retainContextWhenHidden: true } })
     );
 
-    console.log('WebviewViewProvider registered for', PanelViewProvider.viewType);
+    //console.log('WebviewViewProvider registered for', PanelViewProvider.viewType);
 
     const updateSidebarCommand = vscode.commands.registerCommand('gait-copilot.updateSidebar', async () => {
         vscode.window.showInformationMessage('Updating sidebar content');
@@ -361,7 +364,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register the deleteInlineChat command
     const deleteInlineChatCommand = vscode.commands.registerCommand('gait-copilot.removeInlineChat', (args) => {
-        console.log("Removing inline chat", args);
+        //console.log("Removing inline chat", args);
         Inline.removeInlineChat(args.inline_chat_id);
         debouncedRedecorate(context);
     });
@@ -441,31 +444,30 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const registerGaitChatParticipantCommand = vscode.commands.registerCommand('gait-copilot.registerGaitChatParticipant', (args) => {
-        console.log("Registering gait chat participant", args);
+        //console.log("Registering gait chat participant", args);
         try {
             activateGaitParticipant(context, args.contextString);
             vscode.window.showInformationMessage('Gait chat participant loaded with edit history!');
             vscode.commands.executeCommand(startPanelCommand);
         } catch (error) {
-            console.log("Error registering gait chat participant", error);
+            //console.log("Error registering gait chat participant", error);
             vscode.window.showErrorMessage(`Failed to register gait chat participant: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     });
 
-    const activateDecorationsCommand = vscode.commands.registerCommand('gait-copilot.activateDecorations', () => {
-        decorationsActive = true;
-        debouncedRedecorate(context);
-        vscode.window.showInformationMessage('Decorations activated.');
-    });
-
-    const deactivateDecorationsCommand = vscode.commands.registerCommand('gait-copilot.deactivateDecorations', () => {
-        decorationsActive = false;
-        if (disposibleDecorations) {
-            disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
-            disposibleDecorations.hoverProvider.dispose();
-            disposibleDecorations = undefined;
+    const toggleDecorationsCommand = vscode.commands.registerCommand('gait-copilot.toggleDecorations', () => {
+        decorationsActive = !decorationsActive;
+        if (decorationsActive) {
+            debouncedRedecorate(context);
+            vscode.window.showInformationMessage('Gait context activated.');
+        } else {
+            if (disposibleDecorations) {
+                disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
+                disposibleDecorations.hoverProvider.dispose();
+                disposibleDecorations = undefined;
+            }
+            vscode.window.showInformationMessage('Gait context deactivated.');
         }
-        vscode.window.showInformationMessage('Decorations deactivated.');
     });
 
     const handleMergeCommand = vscode.commands.registerCommand('gait-copilot.handleMerge', () => {
@@ -479,8 +481,7 @@ export function activate(context: vscode.ExtensionContext) {
         inlineChatContinue, 
         deleteInlineChatCommand, 
         openFileWithContentCommand,
-        activateDecorationsCommand,
-        deactivateDecorationsCommand,
+        toggleDecorationsCommand,
         deletePanelChatCommand,
         registerGaitChatParticipantCommand, // Add the new command here
         exportPanelChatsToMarkdownCommand,

@@ -43,7 +43,7 @@ function log(message: string, level: LogLevel = LogLevel.INFO) {
     if (level >= CURRENT_LOG_LEVEL) {
         switch (level) {
             case LogLevel.INFO:
-                console.log(message);
+                //console.log(message);
                 break;
             case LogLevel.WARN:
                 console.warn(message);
@@ -108,7 +108,7 @@ function processCommit(
             commitData.inlineChats.push(inlineChat);
         }
     } else {
-        console.log("parsedContent.inlineChats", parsedContent.inlineChats);
+        //console.log("parsedContent.inlineChats", parsedContent.inlineChats);
     }
 
     for (const panelChat of parsedContent.panelChats) {
@@ -441,7 +441,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
 export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: string, targetFilePath: string): Promise<GitHistoryData> {
     const git: SimpleGit = simpleGit(repoPath);
 
-    console.log("Starting getGitHistoryThatTouchesFile");
+    //console.log("Starting getGitHistoryThatTouchesFile");
 
     // Ensure both files exist in the repository
     const absoluteFilePath = path.resolve(repoPath, filePath);
@@ -461,7 +461,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
 
     try {
         currentContent = fs.readFileSync(absoluteFilePath, 'utf-8');
-        console.log(`Successfully read ${absoluteFilePath}`);
+        //console.log(`Successfully read ${absoluteFilePath}`);
     } catch (error) {
         console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
         // If reading fails, initialize with default structure
@@ -471,7 +471,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             schemaVersion: SCHEMA_VERSION,
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
         }, null, 2);
-        console.log(`Initialized default stashedPanelChats.json structure.`);
+        //console.log(`Initialized default stashedPanelChats.json structure.`);
     }
 
     try {
@@ -479,7 +479,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure.');
         }
-        console.log(`Parsed current stashedPanelChats.json successfully.`);
+        //console.log(`Parsed current stashedPanelChats.json successfully.`);
     } catch (error) {
         console.warn(`Warning: Failed to parse current JSON content: ${(error as Error).message}`);
         // Initialize with default structure if parsing fails
@@ -490,7 +490,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
         };
-        console.log(`Initialized default stashedPanelChats.json structure due to parsing failure.`);
+        //console.log(`Initialized default stashedPanelChats.json structure due to parsing failure.`);
     }
 
     // Ensure deletedChats exists
@@ -526,7 +526,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         }
     }
 
-    console.log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`);
+    //console.log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`);
 
     // Step 2: Get the commit history for the main file with --follow to track renames
     // '--reverse' ensures commits are ordered from oldest to newest
@@ -535,25 +535,25 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
     let logData: string;
     try {
         logData = await git.raw(logArgs);
-        console.log(`Retrieved git log data successfully.`);
+        //console.log(`Retrieved git log data successfully.`);
     } catch (error) {
         throw new Error(`Failed to retrieve git log for ${filePath}: ${(error as Error).message}`);
     }
 
     const logLines = logData.split('\n').filter(line => line.trim() !== '');
-    console.log(`Processing ${logLines.length} commits from git log.`);
+    //console.log(`Processing ${logLines.length} commits from git log.`);
 
     const allCommitsMap: Map<string, CommitData> = new Map();
     const seenMessageIds: Set<string> = new Set();
 
     for (const line of logLines) {
-        console.log("Processing Line: ", line);
+        //console.log("Processing Line: ", line);
         const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
         const commitMessage = commitMsgParts.join('\t');
 
         // Skip commits that are solely for deletions
         if (commitMessage.startsWith('Delete message with ID') || commitMessage.startsWith('Delete PanelChat with ID')) {
-            console.log(`Skipping deletion commit ${commitHash}: ${commitMessage}`);
+            //console.log(`Skipping deletion commit ${commitHash}: ${commitMessage}`);
             continue;
         }
 
@@ -564,9 +564,9 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             const files = filesChanged.split('\n').map(f => f.trim());
             if (files.includes(targetFilePath)) {
                 modifiesTargetFile = true;
-                console.log(`Commit ${commitHash} modifies target file ${targetFilePath}.`);
+                //console.log(`Commit ${commitHash} modifies target file ${targetFilePath}.`);
             } else {
-                console.log(`Commit ${commitHash} does not modify target file ${targetFilePath}. Skipping.`);
+                //console.log(`Commit ${commitHash} does not modify target file ${targetFilePath}. Skipping.`);
             }
         } catch (error) {
             console.warn(`Warning: Failed to retrieve files changed in commit ${commitHash}: ${(error as Error).message}`);
@@ -581,7 +581,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         let fileContent: string;
         try {
             fileContent = await git.raw(['show', `${commitHash}:${filePath}`]);
-            console.log(`Retrieved file content for commit ${commitHash}.`);
+            //console.log(`Retrieved file content for commit ${commitHash}.`);
         } catch (error) {
             console.warn(`Warning: Could not retrieve file at commit ${commitHash}. It might have been deleted or renamed.`);
             continue; // Skip this commit
@@ -594,7 +594,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            console.log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`);
+            //console.log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`);
         } catch (error) {
             console.warn(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`);
             console.warn(`Content: ${fileContent}`);
@@ -613,7 +613,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
                 inlineChats: [],
             };
             allCommitsMap.set(commitHash, commitData);
-            console.log(`Initialized CommitData for commit ${commitHash}.`);
+            //console.log(`Initialized CommitData for commit ${commitHash}.`);
         }
 
         // Process the commit's panelChats
@@ -625,30 +625,30 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
 
     // **New Addition:** Filter out commits with empty panelChats
     allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
-    console.log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`);
+    //console.log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`);
 
     // Step 3: Check for uncommitted changes
     let status;
     try {
         status = await git.status();
-        console.log(`Retrieved git status successfully.`);
+        //console.log(`Retrieved git status successfully.`);
     } catch (error) {
         throw new Error(`Failed to retrieve git status: ${(error as Error).message}`);
     }
 
     let uncommitted: UncommittedData | null = null;
-    console.log("Checking uncommitted changes");
+    //console.log("Checking uncommitted changes");
     if (
         status.modified.includes(filePath) ||
         status.not_added.includes(filePath) ||
         status.created.includes(filePath)
     ) {
         // Get the current (uncommitted) file content
-        console.log("stashedPanelChats.json is modified");
+        //console.log("stashedPanelChats.json is modified");
         let currentUncommittedContent: string;
         try {
             currentUncommittedContent = fs.readFileSync(absoluteFilePath, 'utf-8');
-            console.log(`Successfully read uncommitted stashedPanelChats.json.`);
+            //console.log(`Successfully read uncommitted stashedPanelChats.json.`);
         } catch (error) {
             console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
             currentUncommittedContent = JSON.stringify({
@@ -656,7 +656,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
                 schemaVersion: SCHEMA_VERSION,
                 deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] }
             }, null, 2); // Default to empty StashedState
-            console.log(`Initialized default uncommitted stashedPanelChats.json structure.`);
+            //console.log(`Initialized default uncommitted stashedPanelChats.json structure.`);
         }
 
         // Parse the JSON content as StashedState
@@ -666,7 +666,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
             if (!isStashedState(parsedUncommitted)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            console.log(`Parsed uncommitted stashedPanelChats.json successfully.`);
+            //console.log(`Parsed uncommitted stashedPanelChats.json successfully.`);
         } catch (error) {
             console.warn(`Warning: Failed to parse current JSON content: ${(error as Error).message}`);
             parsedUncommitted = {
@@ -676,7 +676,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
                 deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
                 kv_store: {}
             }; // Default to empty StashedState
-            console.log(`Initialized default uncommitted stashedPanelChats.json structure due to parsing failure.`);
+            //console.log(`Initialized default uncommitted stashedPanelChats.json structure due to parsing failure.`);
         }
 
         // Ensure deletedChats exists
@@ -714,25 +714,25 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         }).filter(pc => pc.messages.length > 0);
         const allCurrentInlineChats: InlineChatInfo[] = parsedUncommitted.inlineChats;
 
-        console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
+        //console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
 
         if (allCurrentPanelChats.length > 0) {
             uncommitted = {
                 panelChats: allCurrentPanelChats,
                 inlineChats: allCurrentInlineChats
             };
-            console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
+            //console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
         } else {
-            console.log("No uncommitted new panelChats found.");
+            //console.log("No uncommitted new panelChats found.");
         }
     }
 
-    console.log("Returning commits and uncommitted data.");
-    console.log(`Total Commits: ${allCommits.length}`);
+    //console.log("Returning commits and uncommitted data.");
+    //console.log(`Total Commits: ${allCommits.length}`);
     if (uncommitted) {
-        console.log(`Uncommitted PanelChats: ${uncommitted.panelChats.length}`);
+        //console.log(`Uncommitted PanelChats: ${uncommitted.panelChats.length}`);
     } else {
-        console.log(`No uncommitted changes.`);
+        //console.log(`No uncommitted changes.`);
     }
     return {
         commits: allCommits,
