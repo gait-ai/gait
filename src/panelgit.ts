@@ -115,6 +115,8 @@ function processCommit(
     commitData: CommitData,
     commitHash: string
 ) {
+
+    console.log("Commit Hash: ", commitHash);
     ensureDeletedChats(parsedContent, commitHash);
 
     const deletedPanelChatIds = new Set(parsedContent.deletedChats.deletedPanelChatIDs);
@@ -159,6 +161,8 @@ function processCommit(
 
         for (const messageEntry of panelChat.messages) {
             const messageId = messageEntry.id;
+            console.log("Message ID: ", messageId);
+            console.log("Seen Message IDs: ", seenMessageIds);
 
             // Only include active and unseen messages
             if (currentMessageIds.has(messageId) && !seenMessageIds.has(messageId)) {
@@ -388,7 +392,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
             !uncommittedDeletedPanelChatIds.has(pc.id)
         ).map(pc => {
             const filteredMessages = pc.messages.filter(msg =>
-                !uncommittedDeletedMessageIds.has(msg.id) && currentMessageIds.has(msg.id)
+                !uncommittedDeletedMessageIds.has(msg.id) && currentMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
             );
             return {
                 ...pc,
