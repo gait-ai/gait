@@ -94,6 +94,11 @@ export interface PanelMatchedRange {
   message_id: string;
 }
 
+export interface TimedFileDiffs {
+  timestamp: string;
+  file_diffs: FileDiff[]
+}
+
 export interface StateReader {   
   /**
   * Initializes the extension by reading interactive sessions.
@@ -103,7 +108,12 @@ export interface StateReader {
   /**
   * Processes the editor content during inline chat acceptance.
   */
-  acceptInline(editor: vscode.TextEditor, file_diffs: FileDiff[] | null): Promise<void>;
+  pushFileDiffs(file_diffs: FileDiff[]): void;
+
+  /**
+  * Processes the editor content during inline chat acceptance.
+  */
+  matchPromptsToDiff(): Promise<void>;
 
   /**
   * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.

@@ -4,9 +4,10 @@ import * as Diff from 'diff';
 import * as levenshtein from 'fast-levenshtein';
 import * as path from 'path';
 import * as InlineHover from './inlinehover';
-import { associateFileWithMessage, readStashedPanelChats } from './panelChats';
+import { associateFileWithMessage } from './panelChats';
 import { PanelChat, PanelMatchedRange, StashedState } from './types';
 import * as PanelHover from './panelHover';
+import { readStashedState } from './stashedState';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
 const colorHueMap: Record<ColorType, number> = {
@@ -120,7 +121,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
     }
 
     const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
-    const stashedState: StashedState = readStashedPanelChats(gaitDir);
+    const stashedState: StashedState = readStashedState();
     const inlineChats = stashedState.inlineChats || [];
 
     const currentPanelChats = [

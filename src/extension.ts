@@ -177,14 +177,9 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
 
             const editor = vscode.window.activeTextEditor;
             if (editor) {
-                console.log("Accepting inline AI change");
-                stateReader.acceptInline(editor, fileDiffs).catch(error => {
-                    vscode.window.showErrorMessage(`Failed to process editor content: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                });
-    
-                debouncedRedecorate(context);
+                // console.log("Accepting inline AI change");
+                stateReader.pushFileDiffs(fileDiffs);
             }            
-            // Clear the change queue
         }
     }
 }
@@ -514,8 +509,9 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Set up an interval to trigger accept every second
-    const acceptInterval = setInterval(() => {
+    const acceptInterval = setInterval(async () => {
         triggerAccept(stateReader, context);
+        await stateReader.matchPromptsToDiff();
     }, 1000);
 
     // Make sure to clear the interval when the extension is deactivated
