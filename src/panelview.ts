@@ -310,12 +310,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
           writeStashedState(stashedState);
           //console.log(`Updated ${filePath} after marking message as deleted.`);
 
-          // Commit the change to Git (Optional)
-          // const git: SimpleGit = simpleGit(repoPath);
-          // await git.add(filePath);
-          // await git.commit(`Delete message with ID ${messageId}`);
-          // //console.log(`Committed deletion of message ID ${messageId} to Git.`);
-
           vscode.window.showInformationMessage(`Message with ID ${messageId} has been deleted.`);
 
           // Refresh the webview content
