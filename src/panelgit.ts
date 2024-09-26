@@ -5,6 +5,8 @@ import simpleGit, { SimpleGit } from 'simple-git';
 import { StashedState, PanelChat, isStashedState } from './types';
 import { InlineChatInfo } from './inline';
 import { readStashedState } from './stashedState'; // Ensure this uses gzip
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 
 const SCHEMA_VERSION = '1.0';
 
@@ -53,6 +55,24 @@ function log(message: string, level: LogLevel = LogLevel.INFO) {
                 console.error(message);
                 break;
         }
+    }
+}
+
+const execFileAsync = promisify(execFile);
+const zlib = require('zlib');
+
+/**
+ * Executes a Git command and returns the output as a Buffer.
+ * @param args - Array of Git command arguments.
+ * @param repoPath - The path to the Git repository.
+ * @returns A Promise resolving to a Buffer containing the command output.
+ */
+async function gitShowBuffer(args: string[], repoPath: string): Promise<Buffer> {
+    try {
+        const { stdout } = await execFileAsync('git', args, { cwd: repoPath, encoding: null });
+        return Buffer.from(stdout); // 'stdout' is a Buffer when 'encoding' is set to null
+    } catch (error) {
+        throw new Error(`Git command failed: ${(error as Error).message}`);
     }
 }
 
@@ -238,6 +258,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
 
     let logData: string;
     try {
+        // Use simple-git to get the log data
         logData = await git.raw(logArgs);
         log(`Retrieved git log data successfully.`, LogLevel.INFO);
     } catch (error) {
@@ -254,23 +275,22 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
         const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
         const commitMessage = commitMsgParts.join('\t');
 
-        // Get the file content at this commit
-        let fileContent: string;
+        // Get the file content at this commit using child_process
+        let fileBuffer: Buffer;
+        let decompressedBuffer: Buffer;
         try {
-            fileContent = await git.raw(['show', `${commitHash}:${filePath}`]);
-            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
+            fileBuffer = await gitShowBuffer(['show', `${commitHash}:${filePath}`], repoPath);
+            decompressedBuffer = zlib.gunzipSync(fileBuffer);
+            log(`Retrieved and decompressed file content for commit ${commitHash}.`, LogLevel.INFO);
         } catch (error) {
-            log(`Warning: Could not retrieve file at commit ${commitHash}. It might have been deleted or renamed.`, LogLevel.WARN);
+            log(`Warning: Could not retrieve or decompress file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
+            log(`Error: ${(error as Error).message}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
-        // Since the file is now gzip-compressed, decompress it before parsing
+        // Decompress and parse JSON
         let parsedContent: StashedState;
         try {
-            // Import zlib for decompression
-            const zlib = require('zlib');
-            const buffer = Buffer.from(fileContent, 'utf-8');
-            const decompressedBuffer = zlib.gunzipSync(buffer);
             const jsonString = decompressedBuffer.toString('utf-8');
             parsedContent = JSON.parse(jsonString);
             if (!isStashedState(parsedContent)) {
@@ -279,7 +299,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
             log(`Parsed stashedPanelChats.json.gz for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
-            log(`Content: ${fileContent}`, LogLevel.WARN);
+            log(`Content Decompressed Buffer: ${decompressedBuffer}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
@@ -308,7 +328,6 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
     // **New Addition:** Filter out commits with empty panelChats
     allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
     log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
-
     // Step 3: Check for uncommitted changes
     let status;
     try {
@@ -404,6 +423,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
         uncommitted,
     };
 }
+
 
 export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: string, targetFilePath: string): Promise<GitHistoryData> {
     const git: SimpleGit = simpleGit(repoPath);
@@ -529,31 +549,30 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         }
 
         // Get the file content at this commit
-        let fileContent: string;
+        let fileBuffer: Buffer;
+        let decompressedBuffer: Buffer;
         try {
-            fileContent = await git.raw(['show', `${commitHash}:${filePath}`]);
-            //console.log(`Retrieved file content for commit ${commitHash}.`);
+            fileBuffer = await gitShowBuffer(['show', `${commitHash}:${filePath}`], repoPath);
+            decompressedBuffer = zlib.gunzipSync(fileBuffer);
+            log(`Retrieved and decompressed file content for commit ${commitHash}.`, LogLevel.INFO);
         } catch (error) {
-            console.warn(`Warning: Could not retrieve file at commit ${commitHash}. It might have been deleted or renamed.`);
+            log(`Warning: Could not retrieve or decompress file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
+            log(`Error: ${(error as Error).message}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
-        // Since the file is now gzip-compressed, decompress it before parsing
+        // Decompress and parse JSON
         let parsedContent: StashedState;
         try {
-            // Import zlib for decompression
-            const zlib = require('zlib');
-            const buffer = Buffer.from(fileContent, 'utf-8');
-            const decompressedBuffer = zlib.gunzipSync(buffer);
             const jsonString = decompressedBuffer.toString('utf-8');
             parsedContent = JSON.parse(jsonString);
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            //console.log(`Parsed stashedPanelChats.json.gz for commit ${commitHash} successfully.`);
+            log(`Parsed stashedPanelChats.json.gz for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
-            console.warn(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`);
-            console.warn(`Content: ${fileContent}`);
+            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
+            log(`Content Decompressed Buffer: ${decompressedBuffer}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
