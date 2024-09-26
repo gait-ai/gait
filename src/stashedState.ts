@@ -3,6 +3,7 @@ import path from 'path';
 import { isStashedState, StashedState } from './types';
 import vscode from 'vscode';
 import zlib from 'zlib'; // Import the zlib library for Gzip compression
+import { InlineChatInfo } from './inline';
 
 /**
  * Returns the file path for the stashed state with a .gz extension.
@@ -79,4 +80,13 @@ export function writeStashedState(stashedState: StashedState): void {
         vscode.window.showErrorMessage(`Error writing stashed state: ${(error as Error).message}`);
         throw new Error('Error writing stashed state');
     }
+}
+
+export function getInlineParent(id: string): InlineChatInfo | undefined {
+    const stashedState = readStashedState();
+    const parent = stashedState.inlineChats.find((parent) => parent.inline_chat_id === id);
+    if (!parent) {
+        return undefined;
+    }
+    return parent;
 }

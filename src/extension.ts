@@ -63,6 +63,20 @@ function getFileContent(file_path: string): string {
 async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateReader: StateReader, context: vscode.ExtensionContext) {
     const changes = event.contentChanges;
     const editor = vscode.window.activeTextEditor;
+    // Check if the file is in the workspace directory
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder found. Extension failed.');
+        return; // No workspace folder open
+    }
+
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+    const filePath = event.document.uri.fsPath;
+
+    if (!filePath.startsWith(workspacePath)) {
+        console.log(`File ${filePath} is not in the workspace directory`);
+        return; // File is not in the workspace directory
+    }
     if (!event.document.fileName || event.reason || !editor || changes.length === 0 || event.document.fileName.includes(path.join(GAIT_FOLDER_NAME)) || event.document.fileName.includes("rendererLog")){
         return;
     }
@@ -85,18 +99,14 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateRead
             timestamp,
             document_content: getFileContent(event.document.uri.fsPath),
         });
-        //console.log("Detected AI change");
-    } else {
-        const file_path: string = getRelativePath(event.document);
-
-        fileState[file_path] = event.document.getText();
     }
+    const file_path: string = getRelativePath(event.document);
+    fileState[file_path] = event.document.getText();
 }
 
 function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContext) {
     // Check if there are changes in the queue
     if (changeQueue.length > 0) {
-        vscode.window.showInformationMessage("Trigger ai accept on " + changeQueue[changeQueue.length - 1].document_uri);
         const lastChange = changeQueue[changeQueue.length - 1];
         const currentTime = Date.now();
         
@@ -167,7 +177,7 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
 
             const editor = vscode.window.activeTextEditor;
             if (editor) {
-                //console.log("Accepting inline AI change");
+                console.log("Accepting inline AI change");
                 stateReader.acceptInline(editor, fileDiffs).catch(error => {
                     vscode.window.showErrorMessage(`Failed to process editor content: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 });

@@ -55,16 +55,15 @@ function isValidInteractiveSession(obj: any): obj is InteractiveSession {
  * Retrieves a single new editor text from the sessions.
  */
 function getSingleNewEditorText(oldSessions: InteractiveSession, newSessions: InteractiveSession): string {
-    const oldEditorTexts = new Set(oldSessions.history.editor.map(entry => entry.text));
-    const newEditorTexts = newSessions.history.editor
-        .filter(entry => entry.text && !oldEditorTexts.has(entry.text))
-        .map(entry => entry.text);
 
-    if (newEditorTexts.length !== 1) {
-        throw new Error(newEditorTexts.length === 0 ? "No new editor text found." : "Multiple new editor texts found.");
+    const oldEditorTexts = oldSessions.history.editor.map(entry => entry.text);
+    const newEditorTexts = newSessions.history.editor.map(entry => entry.text);
+
+    if (oldEditorTexts[-1] || "" !== newEditorTexts[-1] || "" || newEditorTexts.length == 0) {
+        throw new Error("No new editor text found.");
     }
 
-    return newEditorTexts[0];
+    return newEditorTexts[-1];
 }
 
 function getDBPath(context: vscode.ExtensionContext): string {
@@ -96,6 +95,33 @@ export class VSCodeReader implements StateReader {
         this.inlineStartInfo = inlineStartInfo;
     }
 
+    private async getNewPrompt(){
+        const oldInteractiveSessions: any = this.interactiveSessions;
+        //console.log("Getting new prompt");
+
+        const maxAttempts = 12; // 24 seconds total (12 * 5 seconds)
+        let attempts = 0;
+        let newChat: any | undefined;
+        while (attempts < maxAttempts) {
+            const newInteractiveSessions: any = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
+            try {
+                newChat = getSingleNewEditorText(oldInteractiveSessions, newInteractiveSessions);
+            } catch (error) {
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds
+                attempts++;
+                continue;
+            }
+            if (newChat) {
+                break; // Exit the loop if we found a new chat
+            }
+        }
+
+        if (!newChat) {
+            console.log("Assuming same chat used.")
+        }
+        return newChat;
+    }
+
     /**
      * Processes the editor content during inline chat acceptance.
      */
@@ -109,21 +135,14 @@ export class VSCodeReader implements StateReader {
         const lastInline = this.inlineStartInfo;
         this.inlineStartInfo = null;
 
-        await vscode.commands.executeCommand('inlineChat.acceptChanges');
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const newInteractiveSessions: any = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
-        const prompt = getSingleNewEditorText(oldInteractiveSessions, newInteractiveSessions);
-        if (!isValidInteractiveSession(newInteractiveSessions)) {
-            throw new Error('New interactive sessions are invalid or not found.');
-        }
+        const prompt = await this.getNewPrompt();
         let inlineChatInfoObj: Inline.InlineChatInfo;
         if (lastInline && Inline.isInlineStartInfo(lastInline)) {
             inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, newContent, prompt);
         } else {
             throw new Error('No inlineChatInfo found.');
         }
-
+        vscode.window.showInformationMessage(`Recorded Inline Chat - ${prompt}`);
         Inline.writeInlineChat(inlineChatInfoObj);
         this.interactiveSessions = null;
     }

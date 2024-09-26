@@ -4,6 +4,7 @@ import * as Diff from 'diff';
 import * as path from 'path';
 import { CommitData } from './panelgit';
 import { getRelativePath } from './utils';
+import { getInlineParent } from './stashedState';
 
 export async function createHoverContent(markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, CommitData> | undefined): Promise<vscode.MarkdownString> {
     const { prompt, timestamp, parent_inline_chat_id } = inlineChat;
@@ -50,14 +51,10 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     });
 
     // Find all lines that match `matchedLines`
-    let surroundingLines: Diff.Change[] = diffs.filter(diff => diff.added || diff.removed).map(diff => ({...diff, value: diff.value.trim()}));
+    let surroundingLines: Diff.Change[] = lineBasedDiffs.filter(diff => diff.added || diff.removed).map(diff => ({...diff, value: diff.value.trim()}));
 
     // Ensure that there are lines to display
     if (surroundingLines.length > 0) {
-        // Remove duplicates (in case some surrounding lines are overlapping)
-        surroundingLines = surroundingLines.filter((line, index, self) =>
-            index === self.findIndex((d) => d.value === line.value)
-        );
         const diffText = surroundingLines.map(change => {
             if (change.added) {return `+ ${change.value}`;}
             if (change.removed) {return `- ${change.value}`;}
@@ -90,14 +87,16 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     }))}`);
         markdown.appendMarkdown(` | [Continue This Inline Chat Annotation](${continueCommand})`);
     }
-    // if (parent_inline_chat_id) {
-    //     // Load the parent inline chat
-    //     const baseName = vscode.workspace.asRelativePath(document.uri);
-    //     const fileChats = StashedState.(baseName);
-    //     const parentInlineChat = fileChats.inlineChats[parent_inline_chat_id];
-    //     markdown.appendMarkdown('\n\n---\n\n**Parent Chat:**\n\n');
-    //     createHoverContent(markdown, parentInlineChat, document, null, idToCommitInfo);
-    // }
+    if (parent_inline_chat_id) {
+        // Load the parent inline chat
+        const parentInlineChat = getInlineParent(parent_inline_chat_id);
+        if (!parentInlineChat) {
+            console.error(`Parent inline chat not found for ID: ${parent_inline_chat_id}`);
+        } else {
+            markdown.appendMarkdown('\n\n---\n\n**Parent Chat:**\n\n');
+            createHoverContent(markdown, parentInlineChat, document, null, idToCommitInfo);
+        }
+    }
     return markdown;
 }
 

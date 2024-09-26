@@ -14,21 +14,38 @@ const SCHEMA_VERSION = '1.0';
 type CursorInlines  = {
     text: string;
     commandType: number
-}[]
+}
 
 /**
  * Retrieves a single new editor text from the sessions.
  */
-function getSingleNewEditorText(oldSessions: CursorInlines, newSessions: CursorInlines): CursorInlines {
-    const oldEditorTexts = new Set(oldSessions.map(entry => entry.text));
-    const newEditorTexts = newSessions
-        .filter(entry => entry.text && !oldEditorTexts.has(entry.text));
+function getSingleNewEditorText(oldSessions: CursorInlines[], newSessions: CursorInlines[]): CursorInlines {
+    const list1Count: { [key: string]: number } = {};
+    const newElements: CursorInlines[] = [];
 
-    if (newEditorTexts.length !== 1) {
-        throw new Error(newEditorTexts.length === 0 ? "No new editor text found." : "Multiple new editor texts found.");
+    function inlineToKey(item: CursorInlines): string {
+        return item.text + item.commandType;
     }
 
-    return newEditorTexts;
+    // Count occurrences of each string in list1
+    oldSessions.forEach((item) => {
+        list1Count[inlineToKey(item)] = (list1Count[inlineToKey(item)] || 0) + 1;
+    });
+
+    // Compare each string in list2 with list1
+    newSessions.forEach((item) => {
+        if (list1Count[inlineToKey(item)]) {
+            list1Count[inlineToKey(item)]--;
+        } else {
+            newElements.push(item);
+        }
+    });
+
+    if (newElements.length !== 1) {
+        throw new Error(newElements.length === 0 ? "No new editor text found." : "Multiple new editor texts found.");
+    }
+
+    return newElements[0];
 }
 
 
@@ -141,15 +158,12 @@ export class CursorReader implements StateReader {
 
         const maxAttempts = 12; // 60 seconds total (12 * 5 seconds)
         let attempts = 0;
-        let newChat: {
-            text: string;
-            commandType: number
-        } | undefined;
+        let newChat: CursorInlines | undefined;
         while (attempts < maxAttempts) {
             newInlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
             //console.log("New inline chats: ", newInlineChats.length);
             try {
-                newChat = getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4))[0];
+                newChat = getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4));
             } catch (error) {
                 await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 5 seconds
                 attempts++;
@@ -161,7 +175,7 @@ export class CursorReader implements StateReader {
         }
 
         if (!newChat) {
-            throw new Error('No new chat found after 60 seconds');
+            throw new Error('No new chat found after 24 seconds');
         }
         return newChat;
     }
@@ -184,6 +198,7 @@ export class CursorReader implements StateReader {
 
             Inline.writeInlineChat(inlineChatInfoObj);
             this.inlineChats = null;
+            vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat}`);
         } else if (newChat.commandType === 4 && file_diffs) {
             inlineChatInfoObj  = {
                 inline_chat_id: uuidv4(),
@@ -195,9 +210,12 @@ export class CursorReader implements StateReader {
             };
             Inline.writeInlineChat(inlineChatInfoObj);
             this.inlineChats = null;
+            vscode.window.showInformationMessage(`Recorded Composer Request - ${newChat}`);
         } else {
             vscode.window.showInformationMessage('No inline chat info found.');
+            return
         }
+
     }
 
     /**

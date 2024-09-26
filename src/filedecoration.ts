@@ -221,7 +221,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
     const rangesToInline: Inline.InlineMatchedRange[] = [];
     for (const chat of Object.values(inlineChats)) {
         for (const diff of chat.file_diff) {
-            if (diff.file_path === baseName) {
+            if (diff.file_path !== baseName) {
                 continue;
             }
             const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs);
