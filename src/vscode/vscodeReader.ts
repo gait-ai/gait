@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import * as Diff from 'diff';
 import * as Inline from '../inline';
 import { readVSCodeState } from '../tools/dbReader';
-import { Context, MessageEntry, PanelChat, StashedState, StateReader } from '../types';
+import { Context, MessageEntry, PanelChat, StashedState, StateReader, TimedFileDiffs } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import { FileDiff, InlineChatInfo } from '../inline';
 
 function fnv1aHash(str: string): number {
     let hash = 2166136261; // FNV offset basis
@@ -54,17 +55,12 @@ function isValidInteractiveSession(obj: any): obj is InteractiveSession {
 /**
  * Retrieves a single new editor text from the sessions.
  */
-function getSingleNewEditorText(oldSessions: InteractiveSession, newSessions: InteractiveSession): string {
+function getSingleNewEditorText(oldSessions: InteractiveSession, newSessions: InteractiveSession): string[] {
+
     const oldEditorTexts = new Set(oldSessions.history.editor.map(entry => entry.text));
-    const newEditorTexts = newSessions.history.editor
-        .filter(entry => entry.text && !oldEditorTexts.has(entry.text))
-        .map(entry => entry.text);
+    const newEditorTexts = newSessions.history.editor.map(entry => entry.text).filter(text => !oldEditorTexts.has(text)); 
 
-    if (newEditorTexts.length !== 1) {
-        throw new Error(newEditorTexts.length === 0 ? "No new editor text found." : "Multiple new editor texts found.");
-    }
-
-    return newEditorTexts[0];
+    return newEditorTexts;
 }
 
 function getDBPath(context: vscode.ExtensionContext): string {
@@ -81,11 +77,56 @@ export class VSCodeReader implements StateReader {
     private context: vscode.ExtensionContext;
     private interactiveSessions: InteractiveSession | null = null;
     private inlineStartInfo: Inline.InlineStartInfo | null = null;
+    private timedFileDiffs: TimedFileDiffs[] = []
+
+    public pushFileDiffs(file_diffs: FileDiff[]): void {
+        this.timedFileDiffs.push({
+            timestamp: new Date().toISOString(),
+            file_diffs: file_diffs
+        });
+    }
+
+    public async matchPromptsToDiff(): Promise<void> {
+        if (this.interactiveSessions === null) {
+            const inlineChats = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
+            this.interactiveSessions= inlineChats;
+            return;
+        }
+        const oldInlineChats = this.interactiveSessions;
+        const newInlineChats =  await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
+
+        this.interactiveSessions = newInlineChats;
+        const newChats =  getSingleNewEditorText(oldInlineChats, newInlineChats);
+        if (newChats.length === 0) {
+            const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+            while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
+                this.timedFileDiffs.shift();
+            }
+            return
+        }
+        for (const newChat of newChats) {
+            const matchedDiff = this.timedFileDiffs.pop()
+            if (!matchedDiff) {
+                console.error("error no file diffs");
+                vscode.window.showErrorMessage('No file diffs found for new prompts!');
+                return
+            }
+            const inlineChatInfoObj: InlineChatInfo = {
+                inline_chat_id: uuidv4(),
+                file_diff: matchedDiff.file_diffs,
+                selection: null,
+                timestamp: new Date().toISOString(),
+                prompt: newChat,
+                parent_inline_chat_id: null,
+            };
+            Inline.writeInlineChat(inlineChatInfoObj);
+            vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat}`);
+        }
+    }
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
     }
-
 
     /**
      * Initializes the extension by reading interactive sessions.
@@ -94,38 +135,6 @@ export class VSCodeReader implements StateReader {
         const interactiveSessions = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
         this.interactiveSessions= interactiveSessions;
         this.inlineStartInfo = inlineStartInfo;
-    }
-
-    /**
-     * Processes the editor content during inline chat acceptance.
-     */
-    public async acceptInline(editor: vscode.TextEditor, file_diffs: Inline.FileDiff[] | null) {
-        const oldInteractiveSessions: any = this.interactiveSessions;
-        if (!isValidInteractiveSession(oldInteractiveSessions)) {
-            throw new Error('Old interactive sessions are invalid or not found.');
-        }
-
-        const newContent = editor.document.getText();
-        const lastInline = this.inlineStartInfo;
-        this.inlineStartInfo = null;
-
-        await vscode.commands.executeCommand('inlineChat.acceptChanges');
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const newInteractiveSessions: any = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
-        const prompt = getSingleNewEditorText(oldInteractiveSessions, newInteractiveSessions);
-        if (!isValidInteractiveSession(newInteractiveSessions)) {
-            throw new Error('New interactive sessions are invalid or not found.');
-        }
-        let inlineChatInfoObj: Inline.InlineChatInfo;
-        if (lastInline && Inline.isInlineStartInfo(lastInline)) {
-            inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, newContent, prompt);
-        } else {
-            throw new Error('No inlineChatInfo found.');
-        }
-
-        Inline.writeInlineChat(inlineChatInfoObj);
-        this.interactiveSessions = null;
     }
 
     private parseContext(request: any): Context[] {

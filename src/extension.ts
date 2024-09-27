@@ -63,6 +63,20 @@ function getFileContent(file_path: string): string {
 async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateReader: StateReader, context: vscode.ExtensionContext) {
     const changes = event.contentChanges;
     const editor = vscode.window.activeTextEditor;
+    // Check if the file is in the workspace directory
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder found. Extension failed.');
+        return; // No workspace folder open
+    }
+
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+    const filePath = event.document.uri.fsPath;
+
+    if (!filePath.startsWith(workspacePath)) {
+        console.log(`File ${filePath} is not in the workspace directory`);
+        return; // File is not in the workspace directory
+    }
     if (!event.document.fileName || event.reason || !editor || changes.length === 0 || event.document.fileName.includes(path.join(GAIT_FOLDER_NAME)) || event.document.fileName.includes("rendererLog")){
         return;
     }
@@ -85,18 +99,14 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateRead
             timestamp,
             document_content: getFileContent(event.document.uri.fsPath),
         });
-        //console.log("Detected AI change");
-    } else {
-        const file_path: string = getRelativePath(event.document);
-
-        fileState[file_path] = event.document.getText();
     }
+    const file_path: string = getRelativePath(event.document);
+    fileState[file_path] = event.document.getText();
 }
 
 function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContext) {
     // Check if there are changes in the queue
     if (changeQueue.length > 0) {
-        vscode.window.showInformationMessage("Trigger ai accept on " + changeQueue[changeQueue.length - 1].document_uri);
         const lastChange = changeQueue[changeQueue.length - 1];
         const currentTime = Date.now();
         
@@ -165,16 +175,8 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                 });
             });
 
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                //console.log("Accepting inline AI change");
-                stateReader.acceptInline(editor, fileDiffs).catch(error => {
-                    vscode.window.showErrorMessage(`Failed to process editor content: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                });
-    
-                debouncedRedecorate(context);
-            }            
-            // Clear the change queue
+            console.log("Accepting inline AI change");
+            stateReader.pushFileDiffs(fileDiffs);
         }
     }
 }
@@ -229,7 +231,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Set panelChatMode in extension workspaceStorage
     context.workspaceState.update('panelChatMode', panelChatMode);
     //console.log(`PanelChatMode set to: ${panelChatMode}`);
-
+    vscode.window.showInformationMessage(`PanelChatMode set to: ${panelChatMode}`);
     generateKeybindings(context, tool);
 
     const startInlineCommand = tool === "Cursor" ? "aipopup.action.modal.generate" : "inlineChat.start";
@@ -240,8 +242,11 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No workspace folder found. Extension activation failed.');
         return;
     }
-
-    createGaitFolderIfNotExists(workspaceFolder);
+    try {
+        createGaitFolderIfNotExists(workspaceFolder);
+    } catch (error) {
+        console.log("Error creating .gait folder", error);
+    }
 
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
@@ -433,7 +438,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register command to convert PanelChats to markdown and open in a new file
     const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (args) => {
         try {
-            const markdownContent = panelChatsToMarkdown(args.chats);
+            const markdownContent = panelChatsToMarkdown(args.chats, true);
             const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'context_gait.md');
             fs.writeFileSync(filePath, markdownContent, 'utf8');
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
@@ -504,8 +509,13 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Set up an interval to trigger accept every second
-    const acceptInterval = setInterval(() => {
-        triggerAccept(stateReader, context);
+    const acceptInterval = setInterval(async () => {
+        try {
+            triggerAccept(stateReader, context);
+            await stateReader.matchPromptsToDiff();
+        } catch (error) {
+            console.log("Error in accept interval", error);
+        }
     }, 1000);
 
     // Make sure to clear the interval when the extension is deactivated

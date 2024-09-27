@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import * as Diff from 'diff';
 import * as Inline from '../inline';
 import { readVSCodeState } from '../tools/dbReader';
-import { Context, MessageEntry, PanelChat, StashedState, StateReader } from '../types';
+import { Context, MessageEntry, PanelChat, StashedState, StateReader, TimedFileDiffs } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import { FileDiff, InlineChatInfo } from '../inline';
 const SCHEMA_VERSION = '1.0';
 
 
@@ -14,21 +15,33 @@ const SCHEMA_VERSION = '1.0';
 type CursorInlines  = {
     text: string;
     commandType: number
-}[]
+}
 
 /**
  * Retrieves a single new editor text from the sessions.
  */
-function getSingleNewEditorText(oldSessions: CursorInlines, newSessions: CursorInlines): CursorInlines {
-    const oldEditorTexts = new Set(oldSessions.map(entry => entry.text));
-    const newEditorTexts = newSessions
-        .filter(entry => entry.text && !oldEditorTexts.has(entry.text));
+function getSingleNewEditorText(oldSessions: CursorInlines[], newSessions: CursorInlines[]): CursorInlines[] {
+    const list1Count: { [key: string]: number } = {};
+    const newElements: CursorInlines[] = [];
 
-    if (newEditorTexts.length !== 1) {
-        throw new Error(newEditorTexts.length === 0 ? "No new editor text found." : "Multiple new editor texts found.");
+    function inlineToKey(item: CursorInlines): string {
+        return item.text + item.commandType;
     }
 
-    return newEditorTexts;
+    // Count occurrences of each string in list1
+    oldSessions.forEach((item) => {
+        list1Count[inlineToKey(item)] = (list1Count[inlineToKey(item)] || 0) + 1;
+    });
+
+    // Compare each string in list2 with list1
+    newSessions.forEach((item) => {
+        if (list1Count[inlineToKey(item)]) {
+            list1Count[inlineToKey(item)]--;
+        } else {
+            newElements.push(item);
+        }
+    });
+    return newElements;
 }
 
 
@@ -44,8 +57,58 @@ function getDBPath(context: vscode.ExtensionContext): string {
 
 export class CursorReader implements StateReader {
     private context: vscode.ExtensionContext;
-    private inlineChats: CursorInlines | null = null;
+    private inlineChats: CursorInlines[] | null = null;
     private inlineStartInfo: Inline.InlineStartInfo | null = null;
+    private timedFileDiffs: TimedFileDiffs[] = []
+
+    public pushFileDiffs(file_diffs: FileDiff[]): void {
+        this.timedFileDiffs.push({
+            timestamp: new Date().toISOString(),
+            file_diffs: file_diffs
+        });
+    }
+
+    public async matchPromptsToDiff(): Promise<void> {
+        if (this.inlineChats === null) {
+            const inlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
+            this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
+            return;
+        }
+        const oldInlineChats = this.inlineChats;
+        const newInlineChats =  await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
+        const newChats =  getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4));
+        this.inlineChats = newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
+        if (newChats.length === 0) {
+            const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+            while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
+                this.timedFileDiffs.shift();
+            }
+            return
+        }
+        // console.log("newChats found: ", newChats);
+        for (const newChat of newChats) {
+            const matchedDiff = this.timedFileDiffs.pop()
+            if (!matchedDiff) {
+                vscode.window.showErrorMessage('No file diffs found for new prompts!');
+                return;
+            }
+            const inlineChatInfoObj: InlineChatInfo = {
+                inline_chat_id: uuidv4(),
+                file_diff: matchedDiff.file_diffs,
+                selection: null,
+                timestamp: new Date().toISOString(),
+                prompt: newChat.text,
+                parent_inline_chat_id: null,
+            };
+            Inline.writeInlineChat(inlineChatInfoObj);
+            if (newChat.commandType === 1 ) {
+                vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat.text}`);
+                
+            } else if (newChat.commandType === 4) {
+                vscode.window.showInformationMessage(`Recorded Composer Request - ${newChat.text}`);
+            }
+        }
+    }
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
@@ -132,72 +195,6 @@ export class CursorReader implements StateReader {
             });
         }
         return context;
-    }
-
-    private async getNewPrompt(){
-        const oldInlineChats: any = this.inlineChats;
-        let newInlineChats: any;
-        //console.log("Getting new prompt");
-
-        const maxAttempts = 12; // 60 seconds total (12 * 5 seconds)
-        let attempts = 0;
-        let newChat: {
-            text: string;
-            commandType: number
-        } | undefined;
-        while (attempts < maxAttempts) {
-            newInlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
-            //console.log("New inline chats: ", newInlineChats.length);
-            try {
-                newChat = getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4))[0];
-            } catch (error) {
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 5 seconds
-                attempts++;
-                continue;
-            }
-            if (newChat) {
-                break; // Exit the loop if we found a new chat
-            }
-        }
-
-        if (!newChat) {
-            throw new Error('No new chat found after 60 seconds');
-        }
-        return newChat;
-    }
-    /**
-     * Processes the editor content during inline chat acceptance.
-     * 
-     * Should be called very quickly after detection so we can capture the prompt.
-     */
-    public async acceptInline(editor: vscode.TextEditor, file_diffs: Inline.FileDiff[] | null) {
-        const inlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
-        this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
-        const newContent = editor.document.getText();
-        const lastInline = this.inlineStartInfo;
-        this.inlineStartInfo = null;
-        let inlineChatInfoObj: Inline.InlineChatInfo;
-        const newChat = await this.getNewPrompt();
-        //console.log("New chat: ", JSON.stringify(newChat));
-        if (Inline.isInlineStartInfo(lastInline) && newChat.commandType === 1) {
-            inlineChatInfoObj = Inline.InlineStartToInlineChatInfo(lastInline, newContent, newChat.text);
-
-            Inline.writeInlineChat(inlineChatInfoObj);
-            this.inlineChats = null;
-        } else if (newChat.commandType === 4 && file_diffs) {
-            inlineChatInfoObj  = {
-                inline_chat_id: uuidv4(),
-                file_diff: file_diffs,
-                selection: null,
-                timestamp: new Date().toISOString(),
-                prompt: newChat.text,
-                parent_inline_chat_id: null,
-            };
-            Inline.writeInlineChat(inlineChatInfoObj);
-            this.inlineChats = null;
-        } else {
-            vscode.window.showInformationMessage('No inline chat info found.');
-        }
     }
 
     /**

@@ -8,6 +8,7 @@ import { associateFileWithMessage } from './panelChats';
 import { PanelChat, PanelMatchedRange, StashedState } from './types';
 import { readStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
+import { readStashedState } from './stashedState';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
 const colorHueMap: Record<ColorType, number> = {
@@ -102,7 +103,7 @@ export function matchDiffToCurrentFile(
         range.start.line !== range.end.line
     );
 
-    return ranges;
+    return multiLineRanges;
 }
 
 
@@ -122,7 +123,11 @@ export function decorateActive(context: vscode.ExtensionContext) {
 
     const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
     const stashedState: StashedState = readStashedState();
-    const inlineChats = stashedState.inlineChats || [];
+    const inlineChats = stashedState.inlineChats;
+    if (inlineChats === undefined) {
+        vscode.window.showErrorMessage('No inline chats found');
+        return;
+    }
 
     const currentPanelChats = [
         ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []),
@@ -222,7 +227,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
     const rangesToInline: Inline.InlineMatchedRange[] = [];
     for (const chat of Object.values(inlineChats)) {
         for (const diff of chat.file_diff) {
-            if (diff.file_path === baseName) {
+            if (diff.file_path !== baseName) {
                 continue;
             }
             const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs);
