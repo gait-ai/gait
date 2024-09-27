@@ -77,7 +77,7 @@ export class VSCodeReader implements StateReader {
     private context: vscode.ExtensionContext;
     private interactiveSessions: InteractiveSession | null = null;
     private inlineStartInfo: Inline.InlineStartInfo | null = null;
-    private timedFileDiffs: TimedFileDiffs[] = []
+    private timedFileDiffs: TimedFileDiffs[] = [];
 
     public pushFileDiffs(file_diffs: FileDiff[]): void {
         this.timedFileDiffs.push({
@@ -102,14 +102,14 @@ export class VSCodeReader implements StateReader {
             while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
                 this.timedFileDiffs.shift();
             }
-            return
+            return;
         }
         for (const newChat of newChats) {
-            const matchedDiff = this.timedFileDiffs.pop()
+            const matchedDiff = this.timedFileDiffs.pop();
             if (!matchedDiff) {
                 console.error("error no file diffs");
                 vscode.window.showErrorMessage('No file diffs found for new prompts!');
-                return
+                return;
             }
             const inlineChatInfoObj: InlineChatInfo = {
                 inline_chat_id: uuidv4(),

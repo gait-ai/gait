@@ -161,8 +161,8 @@ function processCommit(
 
         for (const messageEntry of panelChat.messages) {
             const messageId = messageEntry.id;
-            console.log("Message ID: ", messageId);
-            console.log("Seen Message IDs: ", seenMessageIds);
+            //console.log("Message ID: ", messageId);
+            //console.log("Seen Message IDs: ", seenMessageIds);
 
             // Only include active and unseen messages
             if (currentMessageIds.has(messageId) && !seenMessageIds.has(messageId)) {

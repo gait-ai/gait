@@ -44,7 +44,7 @@ function contextToText(context: Context, seenFilenames: Set<string> = new Set<st
                 }
                 return out;
             }
-            return `Folder relative path - ${relativePath}` + readFolder(relativePath)
+            return `Folder relative path - ${relativePath}` + readFolder(relativePath);
         }
     } catch (error) {
         vscode.window.showErrorMessage(`Error reading context: ${error instanceof Error ? error.message : 'Unknown error'}`);
