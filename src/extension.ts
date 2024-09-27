@@ -438,7 +438,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register command to convert PanelChats to markdown and open in a new file
     const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (args) => {
         try {
-            const markdownContent = panelChatsToMarkdown(args.chats);
+            const markdownContent = panelChatsToMarkdown(args.chats, true);
             const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'context_gait.md');
             fs.writeFileSync(filePath, markdownContent, 'utf8');
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
