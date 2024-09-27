@@ -175,11 +175,8 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                 });
             });
 
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                // console.log("Accepting inline AI change");
-                stateReader.pushFileDiffs(fileDiffs);
-            }            
+            console.log("Accepting inline AI change");
+            stateReader.pushFileDiffs(fileDiffs);
         }
     }
 }
@@ -234,7 +231,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Set panelChatMode in extension workspaceStorage
     context.workspaceState.update('panelChatMode', panelChatMode);
     //console.log(`PanelChatMode set to: ${panelChatMode}`);
-
+    vscode.window.showInformationMessage(`PanelChatMode set to: ${panelChatMode}`);
     generateKeybindings(context, tool);
 
     const startInlineCommand = tool === "Cursor" ? "aipopup.action.modal.generate" : "inlineChat.start";
@@ -245,8 +242,11 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No workspace folder found. Extension activation failed.');
         return;
     }
-
-    createGaitFolderIfNotExists(workspaceFolder);
+    try {
+        createGaitFolderIfNotExists(workspaceFolder);
+    } catch (error) {
+        console.log("Error creating .gait folder", error);
+    }
 
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
@@ -510,8 +510,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Set up an interval to trigger accept every second
     const acceptInterval = setInterval(async () => {
-        triggerAccept(stateReader, context);
-        await stateReader.matchPromptsToDiff();
+        try {
+            triggerAccept(stateReader, context);
+            await stateReader.matchPromptsToDiff();
+        } catch (error) {
+            console.log("Error in accept interval", error);
+        }
     }, 1000);
 
     // Make sure to clear the interval when the extension is deactivated

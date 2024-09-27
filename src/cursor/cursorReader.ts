@@ -85,11 +85,12 @@ export class CursorReader implements StateReader {
             }
             return
         }
+        // console.log("newChats found: ", newChats);
         for (const newChat of newChats) {
             const matchedDiff = this.timedFileDiffs.pop()
             if (!matchedDiff) {
                 vscode.window.showErrorMessage('No file diffs found for new prompts!');
-                return
+                return;
             }
             const inlineChatInfoObj: InlineChatInfo = {
                 inline_chat_id: uuidv4(),

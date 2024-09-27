@@ -102,7 +102,7 @@ export function matchDiffToCurrentFile(
         range.start.line !== range.end.line
     );
 
-    return ranges;
+    return multiLineRanges;
 }
 
 
@@ -122,7 +122,11 @@ export function decorateActive(context: vscode.ExtensionContext) {
 
     const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
     const stashedState: StashedState = readStashedState();
-    const inlineChats = stashedState.inlineChats || [];
+    const inlineChats = stashedState.inlineChats;
+    if (inlineChats === undefined) {
+        vscode.window.showErrorMessage('No inline chats found');
+        return;
+    }
 
     const currentPanelChats = [
         ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []),

@@ -69,13 +69,12 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
 
       // Parse the current panelChats
       const incomingPanelChats = sanitizePanelChats(await stateReader.parsePanelChatAsync());
-
+      let change = false;
       for (const incomingPanelChat of incomingPanelChats) {
         const panelChatId = incomingPanelChat.id;
 
         // Find if this PanelChat already exists in existingStashedState
         const existingPanelChat = existingStashedState.panelChats.find(pc => pc.id === panelChatId);
-
         if (existingPanelChat) {
           // PanelChat exists, append only new messages whose IDs don't already exist
           const existingMessageIds = new Set(existingPanelChat.messages.map(msg => msg.id));
@@ -83,12 +82,14 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
 
           if (newMessages.length > 0) {
             existingPanelChat.messages.push(...newMessages);
+            change = true;
             //console.log(`monitorPanelChatAsync: Appended ${newMessages.length} new messages to existing PanelChat ${panelChatId}.`);
           }
         } else {
           // PanelChat does not exist, add it to panelChats
           if (panelChatMode === 'AddAllChats') {
             existingStashedState.panelChats.push(incomingPanelChat);
+            change = true;
             //console.log(`monitorPanelChatAsync: Added new PanelChat ${panelChatId} with ${incomingPanelChat.messages.length} messages.`);
           } 
           currentPanelChats.push(incomingPanelChat);
@@ -97,7 +98,9 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       context.workspaceState.update('currentPanelChats', currentPanelChats);
 
       // Write back to stashedPanelChats.json
-      await writeStashedState(existingStashedState);
+      if (change) {
+        await writeStashedState(existingStashedState);
+      }
     } catch (error) {
       console.error(`Error monitoring and saving state:`, error);
       vscode.window.showErrorMessage(`Error monitoring and saving state: ${error instanceof Error ? error.message : 'Unknown error'}`);
