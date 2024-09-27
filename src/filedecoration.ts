@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as InlineHover from './inlinehover';
 import { associateFileWithMessage } from './panelChats';
 import { PanelChat, PanelMatchedRange, StashedState } from './types';
+import { readStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
 import { readStashedState } from './stashedState';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
