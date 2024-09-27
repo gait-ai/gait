@@ -123,7 +123,6 @@ export async function associateFileWithMessage(context: vscode.ExtensionContext,
         throw new Error('No workspace folder found');
     }
 
-    const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
     let stashedState = readStashedState(context);
 
     let messageFound = false;

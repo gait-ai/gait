@@ -1,12 +1,10 @@
 import * as vscode from 'vscode';
 import * as Inline from './inline';
 import * as Diff from 'diff';
-import * as levenshtein from 'fast-levenshtein';
 import * as path from 'path';
 import * as InlineHover from './inlinehover';
 import { associateFileWithMessage } from './panelChats';
 import { PanelChat, PanelMatchedRange, StashedState } from './types';
-import { readStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 

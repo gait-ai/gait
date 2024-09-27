@@ -100,8 +100,8 @@ function mergeStashedStates(ourVersion: string, theirVersion: string): string | 
         }
 
         const mergedState: StashedState = {
-            panelChats: [...ourState.panelChats, ...theirState.panelChats],
-            inlineChats: [...ourState.inlineChats, ...theirState.inlineChats],
+            panelChats: [...new Map([...ourState.panelChats, ...theirState.panelChats].map(chat => [chat.id, chat])).values()],
+            inlineChats: [...new Map([...ourState.inlineChats, ...theirState.inlineChats].map(chat => [chat.inline_chat_id, chat])).values()],
             schemaVersion: ourState.schemaVersion,
             deletedChats: {
                 deletedMessageIDs: [...new Set([...ourState.deletedChats.deletedMessageIDs, ...theirState.deletedChats.deletedMessageIDs])],

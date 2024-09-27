@@ -2,14 +2,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import simpleGit, { SimpleGit } from 'simple-git';
-import { MessageEntry, StashedState, PanelChat, isStashedState } from './types';
 import { CommitData, UncommittedData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile } from './panelgit';
 import { readStashedState, writeStashedState, writeStashedStateToFile } from './stashedState';
 import { panelChatsToMarkdown } from './markdown'; // Added import
-
-const SCHEMA_VERSION = '1.0';
-
 export class PanelViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'gait-copilot.panelView';
 
