@@ -110,3 +110,95 @@ export function InlineStartToInlineChatInfo(inlineStartInfo: InlineStartInfo, af
         parent_inline_chat_id: inlineStartInfo.parent_inline_chat_id
     };
 }
+
+function isVscodePosition(obj: any): obj is vscode.Position {
+    return (
+        obj !== null &&
+        typeof obj === 'object' &&
+        typeof obj.line === 'number' &&
+        typeof obj.character === 'number'
+    );
+}
+
+// Type Guard for vscode.Range
+function isVscodeRange(obj: any): obj is vscode.Range {
+    return (
+        obj !== null &&
+        typeof obj === 'object' &&
+        isVscodePosition(obj.start) &&
+        isVscodePosition(obj.end)
+    );
+}
+
+// Type Guard for Diff.Change
+function isDiffChange(obj: any): obj is Diff.Change {
+    return (
+        obj !== null &&
+        typeof obj === 'object' &&
+        typeof obj.value === 'string' &&
+        (typeof obj.added === 'undefined' || typeof obj.added === 'boolean') &&
+        (typeof obj.removed === 'undefined' || typeof obj.removed === 'boolean')
+    );
+}
+
+// Type Guard for FileDiff
+function isFileDiff(obj: any): obj is FileDiff {
+    return (
+        obj !== null &&
+        typeof obj === 'object' &&
+        typeof obj.file_path === 'string' &&
+        typeof obj.before_content === 'string' &&
+        typeof obj.after_content === 'string' &&
+        Array.isArray(obj.diffs) &&
+        obj.diffs.every(isDiffChange)
+    );
+}
+
+// Interface for selection property
+interface Selection {
+    file_path: string;
+    startSelection: vscode.Position;
+    endSelection: vscode.Position;
+    selectionContent: string;
+}
+
+// Type Guard for Selection
+function isSelection(obj: any): obj is Selection {
+    return (
+        obj === null ||
+        (
+            obj !== null &&
+            typeof obj === 'object' &&
+            typeof obj.file_path === 'string' &&
+            isVscodePosition(obj.startSelection) &&
+            isVscodePosition(obj.endSelection) &&
+            typeof obj.selectionContent === 'string'
+        )
+    );
+}
+
+export function isInlineChatInfo(obj: any): obj is InlineChatInfo {
+    return (
+        obj !== null &&
+        typeof obj === 'object' &&
+        
+        // Validate inline_chat_id
+        typeof obj.inline_chat_id === 'string' &&
+        
+        // Validate file_diff
+        Array.isArray(obj.file_diff) &&
+        obj.file_diff.every(isFileDiff) &&
+        
+        // Validate selection
+        isSelection(obj.selection) &&
+        
+        // Validate timestamp
+        typeof obj.timestamp === 'string' &&
+        
+        // Validate prompt
+        typeof obj.prompt === 'string' &&
+        
+        // Validate parent_inline_chat_id
+        (typeof obj.parent_inline_chat_id === 'string' || obj.parent_inline_chat_id === null)
+    );
+}

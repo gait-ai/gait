@@ -132,8 +132,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async handleDeletePanelChat(panelChatId: string) {
-        // Existing deletePanelChat implementation...
-        // (Code omitted for brevity; refer to your original file)
+        const stashedState = readStashedState();
+        stashedState.deletedChats.deletedPanelChatIDs.push(panelChatId);
+        writeStashedState(stashedState);
     }
 
     public resolveWebviewView(
@@ -161,7 +162,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     this.handleDeletePanelChat(message.id);
                     break;
                 case 'refresh':
-                    this.updateContent();
+                    if (this._isFilteredView) {
+                        const editor = vscode.window.activeTextEditor;
+                        if (editor) {
+                            const document = editor.document;
+                            const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
+                            this.updateContent(filePath);
+                        }
+                    } else {
+                        this.updateContent();
+                    }
                     break;
                 case 'switchView':
                     this.handleSwitchView(message.view);
@@ -187,8 +197,14 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      */
     private async handleSwitchView(view: string) {
         if (view === 'filtered') {
-            // Existing handleSwitchView implementation...
-            // (Code omitted for brevity; refer to your original file)
+            this._isFilteredView = true;
+            const editor = vscode.window.activeTextEditor;
+            if (editor) {
+                const document = editor.document;
+                const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
+                await this.updateContent(filePath);
+            }
+            //await this.updateContent();
         } else {
             // Default view
             this._isFilteredView = false;
@@ -201,8 +217,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * @param messageId - The ID of the message to delete.
      */
     private async handleDeleteMessage(messageId: string) {
-        // Existing handleDeleteMessage implementation...
-        // (Code omitted for brevity; refer to your original file)
+        const stashedState = readStashedState();
+        stashedState.deletedChats.deletedMessageIDs.push(messageId);
+        writeStashedState(stashedState);
     }
 
     /**
