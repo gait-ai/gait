@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { InlineChatInfo, InlineStartInfo, FileDiff } from './inline';
+import { InlineChatInfo, InlineStartInfo, FileDiff, isInlineChatInfo } from './inline';
 
 export interface Context {
 	context_type: string
@@ -66,7 +66,8 @@ export interface StashedState {
 export function isStashedState(obj: any): obj is StashedState {
   return (
     Array.isArray(obj.panelChats) && obj.panelChats.every(isPanelChat) &&
-    typeof obj.schemaVersion === 'string'
+    typeof obj.schemaVersion === 'string' && Array.isArray(obj.inlineChats) && obj.inlineChats.every(isInlineChatInfo)
+    && isDeletedChats(obj.deletedChats) && typeof obj.kv_store === 'object' 
   );
 }
 
@@ -75,16 +76,13 @@ export interface DeletedChats {
   deletedPanelChatIDs: string[];
 }
 
-export interface LastAppended {
-  order: string[]; // Ordered list of PanelChat UUIDs
-  lastAppendedMap: { [panelChatId: string]: number };
-}
-
-export function isLastAppended(obj: any): obj is LastAppended {
+export function isDeletedChats(obj: any): obj is DeletedChats {
   return (
-    Array.isArray(obj.order) && obj.order.every((id: any) => typeof id === 'string') &&
-    typeof obj.lastAppendedMap === 'object' && obj.lastAppendedMap !== null &&
-    Object.values(obj.lastAppendedMap).every((value: any) => typeof value === 'number')
+    obj &&
+    Array.isArray(obj.deletedMessageIDs) &&
+    obj.deletedMessageIDs.every((id: any) => typeof id === 'string') &&
+    Array.isArray(obj.deletedPanelChatIDs) &&
+    obj.deletedPanelChatIDs.every((id: any) => typeof id === 'string')
   );
 }
 
