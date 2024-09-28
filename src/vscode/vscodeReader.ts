@@ -104,6 +104,7 @@ export class VSCodeReader implements StateReader {
             }
             return;
         }
+        const context = this.context;
         for (const newChat of newChats) {
             const matchedDiff = this.timedFileDiffs.pop();
             if (!matchedDiff) {
@@ -119,7 +120,7 @@ export class VSCodeReader implements StateReader {
                 prompt: newChat,
                 parent_inline_chat_id: null,
             };
-            Inline.writeInlineChat(inlineChatInfoObj);
+            Inline.writeInlineChat(context, inlineChatInfoObj);
             vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat}`);
         }
     }

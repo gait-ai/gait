@@ -15,6 +15,7 @@ import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
 import { getRelativePath } from './utils';
+import { readStashedStateFromFile, writeStashedState, readStashedState, writeStashedStateToFile } from './stashedState';
 
 const GAIT_FOLDER_NAME = '.gait';
 
@@ -227,9 +228,12 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
  */
 export function activate(context: vscode.ExtensionContext) {
     const tool: TOOL = checkTool();
-    const panelChatMode: PanelChatMode = 'AddAllChats';
+    const panelChatMode: PanelChatMode = 'OnlyMatchedChats';
     // Set panelChatMode in extension workspaceStorage
     context.workspaceState.update('panelChatMode', panelChatMode);
+
+    writeStashedState(context, readStashedStateFromFile());
+    context.workspaceState.update('fileStashedState', readStashedStateFromFile());
     //console.log(`PanelChatMode set to: ${panelChatMode}`);
     vscode.window.showInformationMessage(`PanelChatMode set to: ${panelChatMode}`);
     generateKeybindings(context, tool);
@@ -370,7 +374,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register the deleteInlineChat command
     const deleteInlineChatCommand = vscode.commands.registerCommand('gait-copilot.removeInlineChat', (args) => {
         //console.log("Removing inline chat", args);
-        Inline.removeInlineChat(args.inline_chat_id);
+        Inline.removeInlineChat(context, args.inline_chat_id);
         debouncedRedecorate(context);
     });
 

@@ -6,7 +6,7 @@ import * as path from 'path';
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
 import { PanelChat, PanelChatMode, StashedState, StateReader } from './types';
-import { readStashedState, writeStashedState } from './stashedState';
+import { readStashedState, writeStashedState, writeStashedStateToFile } from './stashedState';
 
 
 function sanitizePanelChats(panelChats: PanelChat[]): PanelChat[] {
@@ -64,7 +64,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       }
 
       // Read the existing stashedPanelChats.json as existingStashedState
-      let existingStashedState = readStashedState();
+      let existingStashedState = readStashedState(context);
       let currentPanelChats = [];
 
       // Parse the current panelChats
@@ -99,7 +99,8 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
 
       // Write back to stashedPanelChats.json
       if (change) {
-        await writeStashedState(existingStashedState);
+        await writeStashedState(context, existingStashedState);
+        await writeStashedStateToFile(existingStashedState);
       }
     } catch (error) {
       console.error(`Error monitoring and saving state:`, error);
@@ -116,14 +117,14 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
  * @param messageId The ID of the message to associate with the file.
  * @param filePath The path of the file to associate.
  */
-export async function associateFileWithMessage(messageId: string, filePath: string, newPanelChat: PanelChat): Promise<void> {
+export async function associateFileWithMessage(context: vscode.ExtensionContext, messageId: string, filePath: string, newPanelChat: PanelChat): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         throw new Error('No workspace folder found');
     }
 
     const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-    let stashedState = readStashedState();
+    let stashedState = readStashedState(context);
 
     let messageFound = false;
     for (const panelChat of stashedState.panelChats) {
@@ -156,11 +157,11 @@ export async function associateFileWithMessage(messageId: string, filePath: stri
           throw new Error(`Message with ID ${messageId} not found in the new panel chat.`);
         }
         stashedState.panelChats.push(newPanelChat);
-        await writeStashedState(stashedState);
+        await writeStashedState(context, stashedState);
         return;
     }
     vscode.window.showInformationMessage(`Associated file with message: ${messageId}`);
 
-    await writeStashedState(stashedState);
+    await writeStashedState(context, stashedState);
 }
 
