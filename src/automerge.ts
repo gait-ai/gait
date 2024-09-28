@@ -41,7 +41,7 @@ async function resolveMergeConflicts(document: vscode.TextDocument) {
     if (version1 && version2) {
         let mergedContent: string | null = null;
         
-        if (document.fileName.endsWith('stashedPanelChats.json')) {
+        if (document.fileName.endsWith('stashedPanelChats.json.gz')) {
             mergedContent = mergeStashedStates(version1, version2);
         } 
         if (mergedContent) {
@@ -113,6 +113,17 @@ function mergeStashedStates(ourVersion: string, theirVersion: string): string | 
         return JSON.stringify(mergedState, null, 2);
     } catch (error) {
         console.error('Error merging stashed states:', error);
+        return null;
+    }
+}
+
+async function mergeGzipFiles(version1: string, version2: string): Promise<string | null> {
+    try {
+        // Merge the JSON content directly (it's already decompressed)
+        const mergedContent = mergeStashedStates(version1, version2);
+        return mergedContent;
+    } catch (error) {
+        console.error('Error merging gzip files:', error);
         return null;
     }
 }
