@@ -5,7 +5,7 @@ import * as path from 'path';
 import simpleGit, { SimpleGit } from 'simple-git';
 import { MessageEntry, StashedState, PanelChat, isStashedState } from './types';
 import { CommitData, UncommittedData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile } from './panelgit';
-import { readStashedState, writeStashedState } from './stashedState';
+import { readStashedState, writeStashedState, writeStashedStateToFile } from './stashedState';
 import { panelChatsToMarkdown } from './markdown'; // Added import
 
 const SCHEMA_VERSION = '1.0';
@@ -34,7 +34,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
         try {
             if (this._isFilteredView && additionalFilePath) {
-                const gitHistory: GitHistoryData = await getGitHistoryThatTouchesFile(context, repoPath, filePath, additionalFilePath);
+                const gitHistory: GitHistoryData = await getGitHistoryThatTouchesFile(this._context, repoPath, filePath, additionalFilePath);
 
                 // Map CommitData from getGitHistoryThatTouchesFile to the class's commit structure
                 this._commits = gitHistory.commits.map(commit => ({
@@ -59,7 +59,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
                 }
             } else {
-                const gitHistory: GitHistoryData = await getGitHistory(context, repoPath, filePath);
+                const gitHistory: GitHistoryData = await getGitHistory(this._context, repoPath, filePath);
 
                 // Map CommitData from getGitHistory to the class's commit structure
                 this._commits = gitHistory.commits.map(commit => ({
@@ -132,8 +132,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async handleDeletePanelChat(panelChatId: string) {
-        // Existing deletePanelChat implementation...
-        // (Code omitted for brevity; refer to your original file)
+        const stashedState = readStashedState(this._context);
+        stashedState.deletedChats.deletedPanelChatIDs.push(panelChatId);
+        writeStashedState(this._context, stashedState);
+        writeStashedStateToFile(stashedState);
     }
 
     public resolveWebviewView(
@@ -161,7 +163,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     this.handleDeletePanelChat(message.id);
                     break;
                 case 'refresh':
-                    this.updateContent();
+                    if (this._isFilteredView) {
+                        const editor = vscode.window.activeTextEditor;
+                        if (editor) {
+                            const document = editor.document;
+                            const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
+                            this.updateContent(filePath);
+                        }
+                    } else {
+                        this.updateContent();
+                    }
                     break;
                 case 'switchView':
                     this.handleSwitchView(message.view);
@@ -187,8 +198,14 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      */
     private async handleSwitchView(view: string) {
         if (view === 'filtered') {
-            // Existing handleSwitchView implementation...
-            // (Code omitted for brevity; refer to your original file)
+            this._isFilteredView = true;
+            const editor = vscode.window.activeTextEditor;
+            if (editor) {
+                const document = editor.document;
+                const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
+                await this.updateContent(filePath);
+            }
+            //await this.updateContent();
         } else {
             // Default view
             this._isFilteredView = false;
@@ -201,8 +218,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * @param messageId - The ID of the message to delete.
      */
     private async handleDeleteMessage(messageId: string) {
-        // Existing handleDeleteMessage implementation...
-        // (Code omitted for brevity; refer to your original file)
+        const stashedState = readStashedState(this._context);
+        stashedState.deletedChats.deletedMessageIDs.push(messageId);
+        writeStashedState(this._context, stashedState);
+        writeStashedStateToFile(stashedState);
     }
 
     /**
