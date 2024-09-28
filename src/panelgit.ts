@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 
 import simpleGit, { SimpleGit } from 'simple-git';
 import { StashedState, PanelChat, isStashedState } from './types';
@@ -186,7 +187,7 @@ function processCommit(
  * @param filePath - The relative path to the target file within the repository.
  * @returns A Promise resolving to GitHistoryData containing commit history and uncommitted changes.
  */
-export async function getGitHistory(repoPath: string, filePath: string): Promise<GitHistoryData> {
+export async function getGitHistory(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<GitHistoryData> {
     const git: SimpleGit = simpleGit(repoPath);
 
     log("Starting getGitHistory", LogLevel.INFO);
@@ -203,7 +204,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
     const currentPanelChatIds: Set<string> = new Set();
 
     try {
-        parsedCurrent = readStashedState(); // This now handles gzip decompression
+        parsedCurrent = readStashedState(context); // This now handles gzip decompression
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure.');
         }
@@ -352,7 +353,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
         log("stashedPanelChats.json.gz is modified", LogLevel.INFO);
         let currentUncommittedContent: StashedState;
         try {
-            currentUncommittedContent = readStashedState(); // Use the updated readStashedState
+            currentUncommittedContent = readStashedState(context); // Use the updated readStashedState
             log(`Successfully read uncommitted stashedPanelChats.json.gz.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to read current file content: ${(error as Error).message}`, LogLevel.WARN);
@@ -429,7 +430,7 @@ export async function getGitHistory(repoPath: string, filePath: string): Promise
 }
 
 
-export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: string, targetFilePath: string): Promise<GitHistoryData> {
+export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionContext, repoPath: string, filePath: string, targetFilePath: string): Promise<GitHistoryData> {
     const git: SimpleGit = simpleGit(repoPath);
 
     //console.log("Starting getGitHistoryThatTouchesFile");
@@ -450,7 +451,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
     const currentPanelChatIds: Set<string> = new Set();
 
     try {
-        parsedCurrent = readStashedState(); // This now handles gzip decompression
+        parsedCurrent = readStashedState(context); // This now handles gzip decompression
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure.');
         }
@@ -626,7 +627,7 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
         //console.log("stashedPanelChats.json.gz is modified");
         let currentUncommittedContent: StashedState;
         try {
-            currentUncommittedContent = readStashedState(); // Use the updated readStashedState
+            currentUncommittedContent = readStashedState(context); // Use the updated readStashedState
             //console.log(`Successfully read uncommitted stashedPanelChats.json.gz.`);
         } catch (error) {
             console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
@@ -708,8 +709,8 @@ export async function getGitHistoryThatTouchesFile(repoPath: string, filePath: s
  * @param filePath - The relative path to the target file within the repository.
  * @returns A Promise resolving to a Map where keys are IDs and values are CommitData.
  */
-export async function getIdToCommitInfo(repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
-    const gitHistory  = await getGitHistory(repoPath, filePath);
+export async function getIdToCommitInfo(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
+    const gitHistory  = await getGitHistory(context, repoPath, filePath);
     const idToCommitInfo = new Map<string, CommitData>();
     for (const commit of gitHistory.commits) {
       for (const panelChat of commit.panelChats) { // Updated to iterate through panelChats
@@ -727,8 +728,8 @@ export async function getIdToCommitInfo(repoPath: string, filePath: string): Pro
  * @param filePath - The relative path to the target file within the repository.
  * @returns A Promise resolving to a Map where keys are inline chat IDs and values are CommitData.
  */
-export async function getInlineChatIdToCommitInfo(repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
-    const gitHistory  = await getGitHistory(repoPath, filePath);
+export async function getInlineChatIdToCommitInfo(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
+    const gitHistory  = await getGitHistory(context, repoPath, filePath);
     const idToCommitInfo = new Map<string, CommitData>();
     for (const commit of gitHistory.commits) {
       for (const inlineChat of commit.inlineChats) { // Updated to iterate through inlineChats

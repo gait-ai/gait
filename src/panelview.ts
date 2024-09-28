@@ -34,7 +34,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
         try {
             if (this._isFilteredView && additionalFilePath) {
-                const gitHistory: GitHistoryData = await getGitHistoryThatTouchesFile(repoPath, filePath, additionalFilePath);
+                const gitHistory: GitHistoryData = await getGitHistoryThatTouchesFile(context, repoPath, filePath, additionalFilePath);
 
                 // Map CommitData from getGitHistoryThatTouchesFile to the class's commit structure
                 this._commits = gitHistory.commits.map(commit => ({
@@ -59,7 +59,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
                 }
             } else {
-                const gitHistory: GitHistoryData = await getGitHistory(repoPath, filePath);
+                const gitHistory: GitHistoryData = await getGitHistory(context, repoPath, filePath);
 
                 // Map CommitData from getGitHistory to the class's commit structure
                 this._commits = gitHistory.commits.map(commit => ({

@@ -55,17 +55,17 @@ export function addInlineChatInfo(inlineChatInfo: InlineChatInfo, stashedState: 
     return stashedState;
 }
 
-export function writeInlineChat(inlineChatInfo: InlineChatInfo){
-    const stashedState = readStashedState();
+export function writeInlineChat(context: vscode.ExtensionContext, inlineChatInfo: InlineChatInfo){
+    const stashedState = readStashedState(context);
     const updatedFileChats = addInlineChatInfo(inlineChatInfo, stashedState);
-    writeStashedState(updatedFileChats);
+    writeStashedState(context, updatedFileChats);
 }
 
 
-export function removeInlineChat(inline_chat_id: string){
-    const stashedState = readStashedState();
+export function removeInlineChat(context: vscode.ExtensionContext, inline_chat_id: string){
+    const stashedState = readStashedState(context);
     const updatedFileChats = removeInlineChatInfo(inline_chat_id, stashedState);
-    writeStashedState(updatedFileChats);
+    writeStashedState(context, updatedFileChats);
 }
 
 export function isInlineStartInfo(obj: unknown): obj is InlineStartInfo {

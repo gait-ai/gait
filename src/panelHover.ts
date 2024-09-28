@@ -8,7 +8,7 @@ import { getIdToCommitInfo } from './panelgit';
  * @param document The VSCode text document.
  * @returns A promise that resolves to a VSCode Hover object.
  */
-export async function createPanelHover(matchedRange: PanelMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
+export async function createPanelHover(context: vscode.ExtensionContext, matchedRange: PanelMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
     let markdown = new vscode.MarkdownString();
     let idToCommitInfo = undefined;
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -18,7 +18,7 @@ export async function createPanelHover(matchedRange: PanelMatchedRange, document
         try {
             const repoPath = workspaceFolder.uri.fsPath;
             const filePath = '.gait/stashedPanelChats.json.gz'; // Replace with your actual file path relative to repo
-            idToCommitInfo = await getIdToCommitInfo(repoPath, filePath);
+            idToCommitInfo = await getIdToCommitInfo(context, repoPath, filePath);
         } catch (error) {
             console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
         }

@@ -6,7 +6,7 @@ import { CommitData } from './panelgit';
 import { getRelativePath } from './utils';
 import { getInlineParent } from './stashedState';
 
-export async function createHoverContent(markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, CommitData> | undefined): Promise<vscode.MarkdownString> {
+export async function createHoverContent(context: vscode.ExtensionContext, markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, CommitData> | undefined): Promise<vscode.MarkdownString> {
     const { prompt, timestamp, parent_inline_chat_id } = inlineChat;
 
     // Find the diff that matches the current document's file path
@@ -89,18 +89,18 @@ export async function createHoverContent(markdown: vscode.MarkdownString, inline
     }
     if (parent_inline_chat_id) {
         // Load the parent inline chat
-        const parentInlineChat = getInlineParent(parent_inline_chat_id);
+        const parentInlineChat = getInlineParent(context, parent_inline_chat_id);
         if (!parentInlineChat) {
             console.error(`Parent inline chat not found for ID: ${parent_inline_chat_id}`);
         } else {
             markdown.appendMarkdown('\n\n---\n\n**Parent Chat:**\n\n');
-            createHoverContent(markdown, parentInlineChat, document, null, idToCommitInfo);
+            createHoverContent(context, markdown, parentInlineChat, document, null, idToCommitInfo);
         }
     }
     return markdown;
 }
 
-export async function createHover(matchedRange: Inline.InlineMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
+export async function createHover(context: vscode.ExtensionContext, matchedRange: Inline.InlineMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
     let markdown = new vscode.MarkdownString();
     let idToCommitInfo = undefined;
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -113,6 +113,6 @@ export async function createHover(matchedRange: Inline.InlineMatchedRange, docum
             console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
         }
     }
-    markdown = await createHoverContent(markdown, matchedRange.inlineChat, document, matchedRange, idToCommitInfo);
+    markdown = await createHoverContent(context, markdown, matchedRange.inlineChat, document, matchedRange, idToCommitInfo);
     return new vscode.Hover(markdown);
 }

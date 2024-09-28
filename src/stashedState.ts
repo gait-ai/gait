@@ -5,6 +5,7 @@ import vscode from 'vscode';
 import zlib from 'zlib'; // Import the zlib library for Gzip compression
 import { InlineChatInfo } from './inline';
 
+
 /**
  * Returns the file path for the stashed state with a .gz extension.
  */
@@ -19,10 +20,30 @@ function stashedStateFilePath(): string {
     return path.join(repoPath, '.gait', 'stashedPanelChats.json.gz'); // Updated extension to .gz
 }
 
+
+
+export function readStashedState( context: vscode.ExtensionContext): StashedState {
+    const stashedState = context.workspaceState.get<StashedState>('stashedState');
+    if (!stashedState) {
+        return {
+            panelChats: [],
+            inlineChats: [],
+            schemaVersion: "1.0",
+            deletedChats: {
+                deletedMessageIDs: [],
+                deletedPanelChatIDs: []
+            },
+            kv_store: {}
+        };
+    }
+    return stashedState;
+}
+
+
 /**
  * Reads and decompresses the stashed state from the compressed .gz file.
  */
-export function readStashedState(): StashedState {
+export function readStashedStateFromFile(): StashedState {
     const filePath = stashedStateFilePath();
     try {
         if (!fs.existsSync(filePath)) {
@@ -38,7 +59,7 @@ export function readStashedState(): StashedState {
                 kv_store: {}
             };
 
-            writeStashedState(emptyStashedState);
+            writeStashedStateToFile(emptyStashedState);
         }
 
         // Read the compressed file content as a buffer
@@ -62,10 +83,15 @@ export function readStashedState(): StashedState {
     }
 }
 
+export function writeStashedState( context: vscode.ExtensionContext, stashedState: StashedState): void {
+    context.workspaceState.update('stashedState', stashedState);
+    return;
+}
+
 /**
  * Compresses and writes the stashed state to the .gz file.
  */
-export function writeStashedState(stashedState: StashedState): void {
+export function writeStashedStateToFile(stashedState: StashedState): void {
     const filePath = stashedStateFilePath();
     try {
         // Convert the stashed state to a JSON string with indentation
@@ -82,8 +108,8 @@ export function writeStashedState(stashedState: StashedState): void {
     }
 }
 
-export function getInlineParent(id: string): InlineChatInfo | undefined {
-    const stashedState = readStashedState();
+export function getInlineParent(context: vscode.ExtensionContext, id: string): InlineChatInfo | undefined {
+    const stashedState = readStashedState(context);
     const parent = stashedState.inlineChats.find((parent) => parent.inline_chat_id === id);
     if (!parent) {
         return undefined;
