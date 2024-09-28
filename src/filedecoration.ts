@@ -8,7 +8,6 @@ import { associateFileWithMessage } from './panelChats';
 import { PanelChat, PanelMatchedRange, StashedState } from './types';
 import { readStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
-import { readStashedState } from './stashedState';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
 const colorHueMap: Record<ColorType, number> = {
@@ -122,7 +121,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
     }
 
     const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
-    const stashedState: StashedState = readStashedState();
+    const stashedState: StashedState = readStashedState(context);
     const inlineChats = stashedState.inlineChats;
     if (inlineChats === undefined) {
         vscode.window.showErrorMessage('No inline chats found');
@@ -159,7 +158,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
         const timeB = b.created_on;
         return new Date(timeA).getTime() - new Date(timeB).getTime();
     });
-    
+    console.log(JSON.stringify(currentPanelChats, null, 2));
 
     for (const panelChat of currentPanelChats) {
         for (const message of panelChat.messages) {
@@ -172,7 +171,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
                 const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
                 if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
                     // If more than half of the code lines match, associate the file with the message
-                    associateFileWithMessage(message.id, baseName, panelChat).catch(error => {
+                    associateFileWithMessage(context, message.id, baseName, panelChat).catch(error => {
                         console.error(`Failed to associate file with message: ${error}`);
                     });
                 }
@@ -265,14 +264,14 @@ export function decorateActive(context: vscode.ExtensionContext) {
                 const oldestRange = panelRanges.reduce((max, current) => 
                     current.panelChat.created_on < max.panelChat.created_on ? current : max
                 );
-                const hover = await PanelHover.createPanelHover(oldestRange, editor.document);
+                const hover = await PanelHover.createPanelHover(context, oldestRange, editor.document);
                 return hover;
             }
             // Find the range with the highest similarity
             const oldestRange = ranges.reduce((max, current) => 
                 current.inlineChat.timestamp < max.inlineChat.timestamp ? current : max
             );
-            const hover = await InlineHover.createHover(oldestRange, editor.document);
+            const hover = await InlineHover.createHover(context, oldestRange, editor.document);
             return hover;
         }
     });
