@@ -190,6 +190,7 @@ function processCommit(
 export async function getGitHistory(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<GitHistoryData> {
     const git: SimpleGit = simpleGit(repoPath);
 
+
     log("Starting getGitHistory", LogLevel.INFO);
 
     // Ensure the file exists in the repository
@@ -343,7 +344,6 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     }
 
     let uncommitted: UncommittedData | null = null;
-    log("Checking uncommitted changes", LogLevel.INFO);
     if (
         status.modified.includes(filePath) ||
         status.not_added.includes(filePath) ||
@@ -433,8 +433,6 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
 export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionContext, repoPath: string, filePath: string, targetFilePath: string): Promise<GitHistoryData> {
     const git: SimpleGit = simpleGit(repoPath);
 
-    //console.log("Starting getGitHistoryThatTouchesFile");
-
     // Ensure both files exist in the repository
     const absoluteFilePath = path.resolve(repoPath, filePath);
     const absoluteTargetFilePath = path.resolve(repoPath, targetFilePath);
@@ -467,24 +465,6 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
             kv_store: {}
         };
         log(`Initialized default stashedPanelChats.json.gz structure due to parsing failure.`, LogLevel.INFO);
-    }
-
-    // Ensure deletedChats exists
-    if (!parsedCurrent.deletedChats) {
-        parsedCurrent.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
-        log(`'deletedChats' was undefined. Initialized with empty arrays.`, LogLevel.WARN);
-    }
-
-    // Ensure deletedPanelChatIDs exists and is an array
-    if (!Array.isArray(parsedCurrent.deletedChats.deletedPanelChatIDs)) {
-        parsedCurrent.deletedChats.deletedPanelChatIDs = [];
-        log(`'deletedPanelChatIDs' was undefined or not an array. Initialized as empty array.`, LogLevel.WARN);
-    }
-
-    // Ensure deletedMessageIDs exists and is an array
-    if (!Array.isArray(parsedCurrent.deletedChats.deletedMessageIDs)) {
-        parsedCurrent.deletedChats.deletedMessageIDs = [];
-        log(`'deletedMessageIDs' was undefined or not an array. Initialized as empty array.`, LogLevel.WARN);
     }
 
     const deletedPanelChatIds = new Set(parsedCurrent.deletedChats.deletedPanelChatIDs);
@@ -540,9 +520,9 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
             const files = filesChanged.split('\n').map(f => f.trim());
             if (files.includes(targetFilePath)) {
                 modifiesTargetFile = true;
-                //console.log(`Commit ${commitHash} modifies target file ${targetFilePath}.`);
+                console.log(`Commit ${commitHash} modifies target file ${targetFilePath}.`);
             } else {
-                //console.log(`Commit ${commitHash} does not modify target file ${targetFilePath}. Skipping.`);
+                console.log(`Commit ${commitHash} does not modify target file ${targetFilePath}. Skipping.`);
             }
         } catch (error) {
             console.warn(`Warning: Failed to retrieve files changed in commit ${commitHash}: ${(error as Error).message}`);
@@ -550,7 +530,9 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
         }
 
         if (!modifiesTargetFile) {
-            continue; // Already logged above
+            // parsedContent.panelChats.forEach(pc => pc.messages.forEach(
+            //     msg => seenMessageIds.add(msg.id)));
+            continue; 
         }
 
         // Get the file content at this commit
@@ -605,7 +587,6 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
 
     // **New Addition:** Filter out commits with empty panelChats
     allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
-    //console.log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`);
 
     // Step 3: Check for uncommitted changes
     let status;
@@ -619,9 +600,9 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
     let uncommitted: UncommittedData | null = null;
     //console.log("Checking uncommitted changes");
     if (
-        status.modified.includes(filePath) ||
-        status.not_added.includes(filePath) ||
-        status.created.includes(filePath)
+        status.modified.includes(targetFilePath) ||
+        status.not_added.includes(targetFilePath) ||
+        status.created.includes(targetFilePath)
     ) {
         // Get the current (uncommitted) file content
         //console.log("stashedPanelChats.json.gz is modified");
@@ -667,7 +648,7 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
             !uncommittedDeletedPanelChatIds.has(pc.id)
         ).map(pc => {
             const filteredMessages = pc.messages.filter(msg =>
-                !uncommittedDeletedMessageIds.has(msg.id) && currentMessageIds.has(msg.id)
+                !uncommittedDeletedMessageIds.has(msg.id) && currentMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
             );
             return {
                 ...pc,
@@ -690,13 +671,6 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
         }
     }
 
-    //console.log("Returning commits and uncommitted data.");
-    //console.log(`Total Commits: ${allCommits.length}`);
-    if (uncommitted) {
-        //console.log(`Uncommitted PanelChats: ${uncommitted.panelChats.length}`);
-    } else {
-        //console.log(`No uncommitted changes.`);
-    }
     return {
         commits: allCommits,
         uncommitted,
