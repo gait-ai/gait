@@ -7,7 +7,7 @@ const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
 
 import { MessageEntry, PanelChat, PanelChatMode, StashedState, StateReader } from './types';
-import { readStashedState, writeStashedState, writeStashedStateToFile } from './stashedState';
+import { readStashedState, writeStashedState, writeChatToStashedState } from './stashedState';
 
 
 
