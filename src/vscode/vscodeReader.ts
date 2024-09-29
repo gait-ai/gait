@@ -98,7 +98,7 @@ export class VSCodeReader implements StateReader {
         this.interactiveSessions = newInlineChats;
         const newChats =  getSingleNewEditorText(oldInlineChats, newInlineChats);
         if (newChats.length === 0) {
-            const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+            const oneMinuteAgo = new Date(Date.now() - 15000).toISOString();
             while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
                 this.timedFileDiffs.shift();
             }
