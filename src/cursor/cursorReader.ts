@@ -212,39 +212,40 @@ export class CursorReader implements StateReader {
                 vscode.window.showErrorMessage('Invalid internal chat data structure.');
                 return [];
             }
+            let panelChats: PanelChat[] = [];
+            raw_data.tabs.forEach((tab: any) => {
+                if (tab.bubbles.length >= 2) {
+                    const panelChat: PanelChat = {
+                        ai_editor: "cursor",
+                        customTitle: tab.chatTitle || '',
+                        id: tab.tabId,
+                        parent_id: null,
+                        created_on: new Date(tab.lastSendTime).toISOString(),
+                        messages: [],
+                        kv_store: {}
+                    };
 
-            const panelChats = raw_data.tabs.map((tab: any) => {
-                const panelChat: PanelChat = {
-                    ai_editor: "cursor",
-                    customTitle: tab.chatTitle || '',
-                    id: tab.tabId,
-                    parent_id: null,
-                    created_on: new Date(tab.lastSendTime).toISOString(),
-                    messages: [],
-                    kv_store: {}
-                };
-                // Filter out bubbles with empty text
+                    // Group bubbles into pairs (user message and AI response)
+                    for (let i = 0; i < tab.bubbles.length; i += 2) {
+                        const userBubble = tab.bubbles[i];
+                        const aiBubble = tab.bubbles[i + 1];
 
-                // Group bubbles into pairs (user message and AI response)
-                for (let i = 0; i < tab.bubbles.length; i += 2) {
-                    const userBubble = tab.bubbles[i];
-                    const aiBubble = tab.bubbles[i + 1];
-
-                    if (userBubble && userBubble.type === 'user' && aiBubble && aiBubble.type === 'ai') {
-                        
-                        const messageEntry: MessageEntry = {
-                            id: userBubble.id,
-                            messageText: userBubble.text || '',
-                            responseText: aiBubble.text || '',
-                            model: aiBubble.modelType || 'Unknown',
-                            timestamp: new Date(tab.lastSendTime).toISOString(),
-                            context: this.parseContext(userBubble), // Extract context if needed,
-                            kv_store: {}
-                        };
-                        panelChat.messages.push(messageEntry);
+                        if (userBubble && userBubble.type === 'user' && aiBubble && aiBubble.type === 'ai') {
+                            
+                            const messageEntry: MessageEntry = {
+                                id: userBubble.id,
+                                messageText: userBubble.text || '',
+                                responseText: aiBubble.text || '',
+                                model: aiBubble.modelType || 'Unknown',
+                                timestamp: new Date(tab.lastSendTime).toISOString(),
+                                context: this.parseContext(userBubble), // Extract context if needed,
+                                kv_store: {}
+                            };
+                            panelChat.messages.push(messageEntry);
+                        }
                     }
+                    panelChats.push(panelChat);
                 }
-                return panelChat;
             });
             // Filter out empty panelChats
             const nonEmptyPanelChats = panelChats.filter((chat: PanelChat) => chat.messages.length > 0);
