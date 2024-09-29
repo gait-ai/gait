@@ -1080,13 +1080,20 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                     messageContainer.appendChild(messageDetails);
 
                                     // Optionally, display context if needed
-                                    if (messageEntry.context && messageEntry.context.length > 0) {
+                                    console.log('Message Entry Context:', messageEntry.context);
+                                    if (messageEntry.context && Array.isArray(messageEntry.context) && messageEntry.context.length > 0) {
                                         const contextDiv = document.createElement('div');
                                         contextDiv.className = 'context';
                                         contextDiv.style.fontSize = '0.8em';
                                         contextDiv.style.color = 'var(--vscode-descriptionForeground)';
-                                        contextDiv.innerHTML = \`<strong>Context:</strong> \${escapeHtml(JSON.stringify(messageEntry.context))}\`;
-                                        messageContainer.appendChild(contextDiv);
+                                        const humanReadableContext = messageEntry.context
+                                            .filter(item => item && typeof item === 'object' && item.value && typeof item.value === 'object' && typeof item.value.human_readable === 'string')
+                                            .map(item => item.value.human_readable)
+                                            .join(', ');
+                                        if (humanReadableContext) {
+                                            contextDiv.innerHTML = \`<strong>Context:</strong> \${escapeHtml(humanReadableContext)}\`;
+                                            messageContainer.appendChild(contextDiv);
+                                        }
                                     }
 
                                     panelChatDiv.appendChild(messageContainer);
