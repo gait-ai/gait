@@ -2,13 +2,10 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import simpleGit, { SimpleGit } from 'simple-git';
-import { MessageEntry, StashedState, PanelChat, isStashedState } from './types';
-import { CommitData, UncommittedData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile } from './panelgit';
-import { readStashedState, writeStashedState } from './stashedState';
+import { CommitData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile } from './panelgit';
+import { PanelChat } from './types';
+import { readStashedState, writeStashedState, removeMessageFromStashedState, removePanelChatFromStashedState, writeChatToStashedState } from './stashedState';
 import { panelChatsToMarkdown } from './markdown'; // Added import
-
-const SCHEMA_VERSION = '1.0';
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'gait-copilot.panelView';
@@ -120,14 +117,25 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     /**
      * Updates the webview content by loading commits and integrating uncommitted changes.
      */
-    public async updateContent(additionalFilePath?: string) {
-        await this.loadCommitsAndChats(additionalFilePath);
+    public async updateContent() {
+        if (this._isFilteredView) {
+            const editor = vscode.window.activeTextEditor;
+            if (editor) {
+                const document = editor.document;
+                const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
+                await this.loadCommitsAndChats(filePath);
+
+            }
+        } else {
+            await this.loadCommitsAndChats();
+        }
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'update',
                 commits: this._commits
             });
         }
+
     }
 
     constructor(private readonly _context: vscode.ExtensionContext) {
@@ -141,6 +149,70 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         const stashedState = readStashedState(this._context);
         stashedState.deletedChats.deletedPanelChatIDs.push(panelChatId);
         writeStashedState(this._context, stashedState);
+    }
+
+    private async handleRemovePanelChatFromStashedState(panelChatId: string) {
+        console.log(`Removing panelChat with ID ${panelChatId} from stashed state.`);
+        removePanelChatFromStashedState(this._context, panelChatId);
+    }
+
+    private async handleRemoveMessageFromStashedState(messageId: string) {
+        console.log(`Removing message with ID ${messageId} from stashed state.`);
+        removeMessageFromStashedState(this._context, messageId);
+    }
+
+    private async handleWriteChatToStashedState(panelChatId?: string, messageId?: string) {
+        if ((panelChatId && messageId) || (!panelChatId && !messageId)) {
+            vscode.window.showErrorMessage('Invalid parameters: Provide either panelChatId or messageId, but not both.');
+            if (panelChatId && messageId) {
+                vscode.window.showErrorMessage('Both panelChatId and messageId provided. Please provide only one.');
+            }
+            else {
+                vscode.window.showErrorMessage('No panelChatId or messageId provided. Please provide one.');
+            }
+            return;
+        }
+
+        try {
+            if (panelChatId) {
+                // Find the PanelChat with the given panelChatId
+                    const panelChat = this._commits[0].panelChats.find(pc => pc.id === panelChatId);
+                    if (panelChat) {
+                        // Write the entire PanelChat to stashed state
+                        await writeChatToStashedState(this._context, panelChat);
+                        vscode.window.showInformationMessage(`PanelChat with ID ${panelChatId} has been stashed.`);
+                        return;
+                    }
+                
+                vscode.window.showErrorMessage(`PanelChat with ID ${panelChatId} not found.`);
+            } else if (messageId) {
+                // Find the MessageEntry with the given messageId
+                    for (const panelChat of this._commits[0].panelChats) {
+                        const message = panelChat.messages.find(msg => msg.id === messageId);
+                        if (message) {
+                            // Construct a new PanelChat containing only this message
+                            const newPanelChat: PanelChat = {
+                                ai_editor: panelChat.ai_editor,
+                                id: panelChat.id,
+                                customTitle: `Stashed Message ${message.id}`,
+                                parent_id: null,
+                                created_on: new Date().toISOString(),
+                                messages: [message],
+                                kv_store: {}
+                            };
+                            // Write the new PanelChat to stashed state
+                            await writeChatToStashedState(this._context, newPanelChat);
+                            vscode.window.showInformationMessage(`Message with ID ${messageId} has been stashed.`);
+                            return;
+                        }
+                    
+                }
+                vscode.window.showErrorMessage(`Message with ID ${messageId} not found.`);
+            }
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to write chat to stashed state: ${error.message}`);
+            console.error(`Error in handleWriteChatToStashedState: ${error.stack}`);
+        }
     }
 
     public resolveWebviewView(
@@ -163,27 +235,32 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'deleteMessage':
                     this.handleDeleteMessage(message.id);
+                    this.updateContent();
                     break;
                 case 'deletePanelChat':
                     this.handleDeletePanelChat(message.id);
+                    this.updateContent();
                     break;
                 case 'refresh':
-                    if (this._isFilteredView) {
-                        const editor = vscode.window.activeTextEditor;
-                        if (editor) {
-                            const document = editor.document;
-                            const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
-                            this.updateContent(filePath);
-                        }
-                    } else {
-                        this.updateContent();
-                    }
+                    this.updateContent();
                     break;
                 case 'switchView':
                     this.handleSwitchView(message.view);
                     break;
                 case 'appendContext': // New case for appending context
                     this.handleAppendContext(message.commitHash, message.panelChatId);
+                    break;
+                case 'writeChatToStashedState': // New case for writing chat to stashed state
+                    this.handleWriteChatToStashedState(message.panelChatId, message.messageId);
+                    this.updateContent();
+                    break;                
+                case 'removePanelChatFromStashedState': // New case for removing panelChat from stashed state
+                    this.handleRemovePanelChatFromStashedState(message.panelChatId);
+                    this.updateContent();
+                    break;
+                case 'removeMessageFromStashedState': // New case for removing message from stashed state
+                    this.handleRemoveMessageFromStashedState(message.messageId);
+                    this.updateContent();
                     break;
                 default:
                     break;
@@ -204,18 +281,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     private async handleSwitchView(view: string) {
         if (view === 'filtered') {
             this._isFilteredView = true;
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                const document = editor.document;
-                const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
-                await this.updateContent(filePath);
-            }
             //await this.updateContent();
         } else {
             // Default view
             this._isFilteredView = false;
-            await this.updateContent();
         }
+        await this.updateContent();
     }
 
     /**
@@ -429,6 +500,30 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         }
         .append-context-button:hover {
             color: darkblue;
+        }
+        .write-chat-button {
+            background: transparent;
+            border: none;
+            color: green;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 16px;
+        }
+        .write-chat-button:hover {
+            color: darkgreen;
+        }
+        .remove-chat-button {
+            background: transparent;
+            border: none;
+            color: orange;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 16px;
+        }
+        .remove-chat-button:hover {
+            color: darkorange;
         }
         .message, .response {
             padding: 10px;
@@ -670,9 +765,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         }
 
         /**
-         * Attaches click listeners to delete buttons to initiate message or panel chat deletion.
+         * Attaches click listeners to delete, write, and remove buttons to handle respective actions.
          */
-        function attachDeleteButtonListeners() {
+        function attachButtonListeners() {
             // Existing Delete Message Buttons
             const deleteMessageButtons = document.querySelectorAll('.delete-button');
             deleteMessageButtons.forEach(button => {
@@ -716,6 +811,53 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         });
                     } else {
                         console.warn('Append Context button clicked without valid commitHash or PanelChat ID.');
+                    }
+                });
+            });
+
+            // New Write Chat Buttons for Unadded Changes
+            const writeChatButtons = document.querySelectorAll('.write-chat-button');
+            writeChatButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const panelChatId = button.getAttribute('data-panel-chat-id');
+                    const messageId = button.getAttribute('data-message-id');
+
+                    if (panelChatId) {
+                        vscode.postMessage({
+                            command: 'writeChatToStashedState',
+                            panelChatId: panelChatId
+                        });
+                    } else if (messageId) {
+                        vscode.postMessage({
+                            command: 'writeChatToStashedState',
+                            messageId: messageId
+                        });
+                    } else {
+                        console.warn('Write Chat button clicked without valid data.');
+                    }
+                });
+            });
+
+            // New Remove Chat Buttons for Added Changes
+            const removeChatButtons = document.querySelectorAll('.remove-chat-button');
+            removeChatButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const panelChatId = button.getAttribute('data-panel-chat-id');
+                    const messageId = button.getAttribute('data-message-id');
+                    if (panelChatId) {
+                        vscode.postMessage({
+                            command: 'removePanelChatFromStashedState',
+                            panelChatId: panelChatId
+                        });
+                    } else if (messageId) {
+                        vscode.postMessage({
+                            command: 'removeMessageFromStashedState',
+                            messageId: messageId
+                        });
+                    } else {
+                        console.warn('Remove Chat button clicked without valid data.');
                     }
                 });
             });
@@ -836,6 +978,34 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         📄
                                     </button>
                                 \`;
+
+                                // Determine if the commit is an uncommitted change
+                                const isUnadded = commit.commitHash === 'uncommitted';
+
+                                if (isUnadded) {
+                                    // Add Write Chat Button for Uncommitted Changes
+                                    panelChatHeader.innerHTML += \`
+                                        <button 
+                                            class="write-chat-button" 
+                                            data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
+                                            title="Write PanelChat to Stashed State"
+                                        >
+                                            ➕
+                                        </button>
+                                    \`;
+                                } else if (commit.commitHash === 'added') {
+                                    // Add Remove Chat Button for Added Changes
+                                    panelChatHeader.innerHTML += \`
+                                        <button 
+                                            class="remove-chat-button" 
+                                            data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
+                                            title="Remove PanelChat from Stashed State"
+                                        >
+                                            ➖
+                                        </button>
+                                    \`;
+                                }
+
                                 panelChatDiv.appendChild(panelChatHeader);
 
                                 // PanelChat info (customTitle, ai_editor, etc.)
@@ -861,6 +1031,28 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                     deleteBtn.title = 'Delete Message';
                                     deleteBtn.textContent = '×';
                                     messageContainer.appendChild(deleteBtn);
+
+                                    // Determine if the commit is an uncommitted change
+                                    const isUnaddedMessage = commit.commitHash === 'uncommitted';
+
+                                    // Conditionally add Write or Remove Chat Buttons
+                                    if (isUnaddedMessage) {
+                                        // Add Write Chat Button for Messages
+                                        const writeBtn = document.createElement('button');
+                                        writeBtn.className = 'write-chat-button';
+                                        writeBtn.setAttribute('data-message-id', messageEntry.id); // Changed to 'data-message-id'
+                                        writeBtn.title = 'Write Message to Stashed State';
+                                        writeBtn.textContent = '➕';
+                                        messageContainer.appendChild(writeBtn);
+                                    } else if (commit.commitHash === 'added') {
+                                        // Add Remove Chat Button for Messages
+                                        const removeBtn = document.createElement('button');
+                                        removeBtn.className = 'remove-chat-button';
+                                        removeBtn.setAttribute('data-message-id', messageEntry.id); // Changed to 'data-message-id'
+                                        removeBtn.title = 'Remove Message from Stashed State';
+                                        removeBtn.textContent = '➖';
+                                        messageContainer.appendChild(removeBtn);
+                                    }
 
                                     // Message Text
                                     const messageDiv = document.createElement('div');
@@ -914,8 +1106,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     // Attach event listeners for collapsible commits
                     attachCommitToggleListeners();
 
-                    // Attach event listeners for delete and append buttons
-                    attachDeleteButtonListeners();
+                    // Attach event listeners for delete, write, and remove buttons
+                    attachButtonListeners();
                 } else {
                     const noCommits = document.createElement('div');
                     noCommits.className = 'no-commits';

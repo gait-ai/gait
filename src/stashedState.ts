@@ -104,6 +104,24 @@ export function writeChatToStashedState(context: vscode.ExtensionContext, newCha
     writeStashedState(context, currentState);
 }
 
+export function removeMessageFromStashedState(context: vscode.ExtensionContext, message_id: string): void {
+    const currentState = readStashedState(context);
+    const chatIndex = currentState.panelChats.findIndex((chat) => chat.messages.some((message) => message.id === message_id));
+    if (chatIndex === -1) {
+        return;
+    }
+    const chat = currentState.panelChats[chatIndex];
+    chat.messages = chat.messages.filter((message) => message.id !== message_id);
+    currentState.panelChats[chatIndex] = chat;
+    writeStashedState(context, currentState);
+}
+
+export function removePanelChatFromStashedState(context: vscode.ExtensionContext, panel_chat_id: string): void {
+    const currentState = readStashedState(context);
+    currentState.panelChats = currentState.panelChats.filter((chat) => chat.id !== panel_chat_id);
+    writeStashedState(context, currentState);
+}
+
 /**
  * Compresses and writes the stashed state to the .gz file.
  */
