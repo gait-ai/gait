@@ -441,10 +441,11 @@ export function activate(context: vscode.ExtensionContext) {
     const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (args) => {
         try {
             const markdownContent = panelChatsToMarkdown(args.chats, true);
-            const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'context_gait.md');
+            const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
             fs.writeFileSync(filePath, markdownContent, 'utf8');
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
             vscode.window.showInformationMessage('Panel chats exported to context.gait successfully.');
+            await vscode.commands.executeCommand('aichat.newchataction');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
