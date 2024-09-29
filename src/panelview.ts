@@ -312,7 +312,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         }
 
         const repoPath = workspaceFolder.uri.fsPath;
-        const filePath = path.join(repoPath, 'gaitContext.md'); // Path to gaitContext.md
+        const filePath = path.join(repoPath, 'gait_context.md');
 
         try {
             // Ensure the file exists; if not, create it with a header
@@ -339,8 +339,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
             // Append the markdown content to gaitContext.md
             fs.appendFileSync(filePath, markdownContent + '\n\n', 'utf-8');
+            vscode.window.showInformationMessage(`PanelChat with ID ${panelChatId} from commit ${commitHash} has been appended to gait_context.md.`);
+            await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
+            await vscode.commands.executeCommand('aichat.newchataction');
 
-            vscode.window.showInformationMessage(`PanelChat with ID ${panelChatId} from commit ${commitHash} has been appended to gaitContext.md.`);
         } catch (error: any) {
             vscode.window.showErrorMessage(`Failed to append context: ${error.message}`);
             console.error(`Error appending context: ${error.stack}`);
@@ -973,7 +975,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         class="append-context-button" 
                                         data-commit="\${escapeHtml(commit.commitHash)}" 
                                         data-id="\${escapeHtml(panelChat.id)}" 
-                                        title="Append to gaitContext.md"
+                                        title="Append to context"
                                     >
                                         📄
                                     </button>
