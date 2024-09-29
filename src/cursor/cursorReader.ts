@@ -59,7 +59,7 @@ export class CursorReader implements StateReader {
     private context: vscode.ExtensionContext;
     private inlineChats: CursorInlines[] | null = null;
     private inlineStartInfo: Inline.InlineStartInfo | null = null;
-    private timedFileDiffs: TimedFileDiffs[] = []
+    private timedFileDiffs: TimedFileDiffs[] = [];
 
     public pushFileDiffs(file_diffs: FileDiff[]): void {
         this.timedFileDiffs.push({
@@ -83,11 +83,11 @@ export class CursorReader implements StateReader {
             while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
                 this.timedFileDiffs.shift();
             }
-            return
+            return;
         }
         // console.log("newChats found: ", newChats);
         for (const newChat of newChats) {
-            const matchedDiff = this.timedFileDiffs.pop()
+            const matchedDiff = this.timedFileDiffs.pop();
             if (!matchedDiff) {
                 vscode.window.showErrorMessage('No file diffs found for new prompts!');
                 return;
@@ -100,7 +100,7 @@ export class CursorReader implements StateReader {
                 prompt: newChat.text,
                 parent_inline_chat_id: null,
             };
-            Inline.writeInlineChat(inlineChatInfoObj);
+            Inline.writeInlineChat(this.context, inlineChatInfoObj);
             if (newChat.commandType === 1 ) {
                 vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat.text}`);
                 
