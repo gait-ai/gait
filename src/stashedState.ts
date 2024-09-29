@@ -9,7 +9,7 @@ import { InlineChatInfo } from './inline';
 /**
  * Returns the file path for the stashed state with a .gz extension.
  */
-function stashedStateFilePath(): string {
+export function stashedStateFilePath(): string {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('No workspace folder found.');

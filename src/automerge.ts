@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { readStashedStateFromFile, stashedStateFilePath, writeStashedStateToFile } from './stashedState';
 import { StashedState, isStashedState } from './types';
 
 export async function handleMerge(context: vscode.ExtensionContext) {
@@ -9,92 +10,63 @@ export async function handleMerge(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No workspace folder found.');
         return;
     }
-
-    const gaitFolder = path.join(workspaceFolder.uri.fsPath, '.gait');
-    if (!fs.existsSync(gaitFolder)) {
-        vscode.window.showInformationMessage('No .gait folder found. No merge conflicts to resolve.');
-        return;
-    }
-
-    const files = fs.readdirSync(gaitFolder);
-    for (const file of files) {
-        if (path.extname(file) === '.json') {
-            const filePath = path.join(gaitFolder, file);
-            const document = await vscode.workspace.openTextDocument(filePath);
-            const hasMergeConflicts = checkForMergeConflicts(document);
-            if (hasMergeConflicts) {
-                await resolveMergeConflicts(document);
-            }
-        }
+    const filepath = stashedStateFilePath();
+    const hasMergeConflicts = checkForMergeConflicts(filepath);
+    if (hasMergeConflicts) {
+        await resolveMergeConflicts(filepath);
     }
 }
 
-function checkForMergeConflicts(document: vscode.TextDocument): boolean {
-    const diagnostics = vscode.languages.getDiagnostics(document.uri);
+function checkForMergeConflicts(filepath: string): boolean {
+    const diagnostics = vscode.languages.getDiagnostics(vscode.Uri.file(filepath));
     return diagnostics.some(diagnostic => diagnostic.message.includes('Merge conflict'));
 }
 
-async function resolveMergeConflicts(document: vscode.TextDocument) {
-    const text = document.getText();
-    const { version1, version2 } = extractConflictingVersions(text);
+async function resolveMergeConflicts(filepath: string) {
+    // Run git checkout --ours on the filepath
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execAsync = util.promisify(exec);
 
-    if (version1 && version2) {
-        let mergedContent: string | null = null;
-        
-        if (document.fileName.endsWith('stashedPanelChats.json')) {
-            mergedContent = mergeStashedStates(version1, version2);
-        } 
-        if (mergedContent) {
-            const edit = new vscode.WorkspaceEdit();
-            edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), mergedContent);
-            await vscode.workspace.applyEdit(edit);
-            await document.save();
-            vscode.window.showInformationMessage(`Merge conflicts in ${path.basename(document.fileName)} automatically resolved.`);
-        }
-    }
-}
-
-function extractConflictingVersions(content: string): { version1: string, version2: string } {
-    const version1Parts: string[] = [];
-    const version2Parts: string[] = [];
-
-    const lines = content.split('\n');
-    let inVersion1 = false;
-    let inVersion2 = false;
-
-    for (let line of lines) {
-        if (line.startsWith('<<<<<<<')) {
-            // Start of the first version (Version 1)
-            inVersion1 = true;
-            inVersion2 = false;
-        } else if (line.startsWith('=======')) {
-            // Switch to the second version (Version 2)
-            inVersion1 = false;
-            inVersion2 = true;
-        } else if (line.startsWith('>>>>>>>')) {
-            // End of conflict
-            inVersion1 = false;
-            inVersion2 = false;
-        } else if (inVersion1) {
-            // Collect Version 1 lines
-            version1Parts.push(line);
-        } else if (inVersion2) {
-            // Collect Version 2 lines
-            version2Parts.push(line);
-        }
-    }
-
-    return {
-        version1: version1Parts.join('\n'),
-        version2: version2Parts.join('\n')
-    };
-}
-
-function mergeStashedStates(ourVersion: string, theirVersion: string): string | null {
     try {
-        const ourState: StashedState = JSON.parse(ourVersion);
-        const theirState: StashedState = JSON.parse(theirVersion);
+        // Checkout our version
+        await execAsync(`git checkout --ours "${filepath}"`);
+        
+        const ourState: StashedState = readStashedStateFromFile();
 
+        // Checkout their version
+        await execAsync(`git checkout --theirs "${filepath}"`);
+        
+        const theirState: StashedState = readStashedStateFromFile();;
+
+        const mergedState = mergeStashedStates(ourState, theirState);
+
+        if (mergedState) {
+            // Write the merged state back to the file
+            writeStashedStateToFile(mergedState);
+
+            // Stage the merged file
+            await execAsync(`git add "${filepath}"`);
+
+            vscode.window.showInformationMessage('Merge conflicts resolved successfully.');
+        } else {
+            vscode.window.showErrorMessage('Failed to merge stashed states.');
+        }
+    } catch (error: unknown) {
+        console.error('Error resolving merge conflicts:', error);
+        if (error instanceof Error) {
+            vscode.window.showErrorMessage(`Error resolving merge conflicts: ${error.message}`);
+        } else {
+            vscode.window.showErrorMessage('An unknown error occurred while resolving merge conflicts.');
+        }
+    }
+
+    const text = fs.readFileSync(filepath, 'utf8');
+}
+
+
+function mergeStashedStates(ourState: StashedState, theirState: StashedState): StashedState | null {
+    try {
         if (!isStashedState(ourState) || !isStashedState(theirState)) {
             throw new Error('Invalid StashedState format');
         }
