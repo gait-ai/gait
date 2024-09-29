@@ -106,7 +106,7 @@ export function matchDiffToCurrentFile(
 }
 
 
-export function decorateActive(context: vscode.ExtensionContext) {
+export function decorateActive(context: vscode.ExtensionContext, decorations_active: boolean) {
     const editor = vscode.window.activeTextEditor;
     
     if (!editor) {
@@ -137,6 +137,9 @@ export function decorateActive(context: vscode.ExtensionContext) {
 
     const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
     function addDecorationType(color: string, range: vscode.Range) {
+        if (!decorations_active) {
+            return;
+        }
         const decorationType = vscode.window.createTextEditorDecorationType({
             backgroundColor: color,
             overviewRulerColor: color,
@@ -171,7 +174,7 @@ export function decorateActive(context: vscode.ExtensionContext) {
                 const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
                 if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
                     // If more than half of the code lines match, associate the file with the message
-                    associateFileWithMessage(context, message.id, baseName, panelChat).catch(error => {
+                    associateFileWithMessage(context, message, baseName, panelChat).catch(error => {
                         console.error(`Failed to associate file with message: ${error}`);
                     });
                 }
@@ -247,11 +250,13 @@ export function decorateActive(context: vscode.ExtensionContext) {
     }
 
     // Apply all decoration types
-    decorationsMap.forEach((decorationOptions, decorationType) => {
-        editor.setDecorations(decorationType, decorationOptions);
-        // Ensure decorationType is disposed when no longer needed
-        context.subscriptions.push(decorationType);
-    });
+    if (decorations_active) {
+        decorationsMap.forEach((decorationOptions, decorationType) => {
+            editor.setDecorations(decorationType, decorationOptions);
+            // Ensure decorationType is disposed when no longer needed
+            context.subscriptions.push(decorationType);
+        });
+    }
 
     const hoverProvider = vscode.languages.registerHoverProvider('*', {
         async provideHover(document, position, token) {
@@ -277,7 +282,9 @@ export function decorateActive(context: vscode.ExtensionContext) {
     });
 
     // Add the new hover provider to the subscriptions
-    context.subscriptions.push(hoverProvider);
+    if (decorations_active) {
+        context.subscriptions.push(hoverProvider);
+    }
 
     return {
         decorationTypes: Array.from(decorationsMap.keys()),
