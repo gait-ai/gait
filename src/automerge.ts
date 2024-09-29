@@ -116,14 +116,3 @@ function mergeStashedStates(ourVersion: string, theirVersion: string): string | 
         return null;
     }
 }
-
-async function mergeGzipFiles(version1: string, version2: string): Promise<string | null> {
-    try {
-        // Merge the JSON content directly (it's already decompressed)
-        const mergedContent = mergeStashedStates(version1, version2);
-        return mergedContent;
-    } catch (error) {
-        console.error('Error merging gzip files:', error);
-        return null;
-    }
-}

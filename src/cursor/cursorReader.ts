@@ -100,7 +100,7 @@ export class CursorReader implements StateReader {
                 prompt: newChat.text,
                 parent_inline_chat_id: null,
             };
-            Inline.writeInlineChat(inlineChatInfoObj);
+            Inline.writeInlineChat(this.context, inlineChatInfoObj);
             if (newChat.commandType === 1 ) {
                 vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat.text}`);
                 

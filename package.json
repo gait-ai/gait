@@ -101,9 +101,39 @@
         ],
         "keybindings": [
             {
+                "key": "cmd+e",
+                "command": "aipopup.action.modal.generate",
+                "when": "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
+            },
+            {
+                "key": "cmd+k",
+                "command": "-aipopup.action.modal.generate",
+                "when": "editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible"
+            },
+            {
+                "key": "cmd+e",
+                "command": "composer.startComposerPrompt",
+                "when": "composerIsEnabled"
+            },
+            {
+                "key": "cmd+k",
+                "command": "-composer.startComposerPrompt",
+                "when": "composerIsEnabled"
+            },
+            {
                 "command": "gait-copilot.startInlineChat",
-                "key": "cmd+i",
-                "when": "editorFocus && inlineChatHasProvider && !editorReadonly"
+                "key": "cmd+k",
+                "when": "editorFocus"
+            },
+            {
+                "key": "cmd+a cmd+s",
+                "command": "editor.action.inlineDiffs.acceptAll",
+                "when": "editorTextFocus && (arbitrary function)"
+            },
+            {
+                "key": "cmd+enter",
+                "command": "-editor.action.inlineDiffs.acceptAll",
+                "when": "editorTextFocus && (arbitrary function)"
             },
             {
                 "key": "cmd+shift+g",

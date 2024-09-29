@@ -6,6 +6,7 @@ import * as InlineHover from './inlinehover';
 import { associateFileWithMessage } from './panelChats';
 import { PanelChat, PanelMatchedRange, StashedState } from './types';
 import * as PanelHover from './panelHover';
+import { readStashedState } from './stashedState';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
 const colorHueMap: Record<ColorType, number> = {
@@ -118,7 +119,6 @@ export function decorateActive(context: vscode.ExtensionContext) {
         return;
     }
 
-    const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
     const stashedState: StashedState = readStashedState(context);
     const inlineChats = stashedState.inlineChats;
     if (inlineChats === undefined) {
