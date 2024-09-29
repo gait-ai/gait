@@ -15,7 +15,7 @@ import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
 import { getRelativePath } from './utils';
-import { readStashedStateFromFile, writeStashedState, readStashedState, writeStashedStateToFile } from './stashedState';
+import { readStashedStateFromFile, writeStashedState, readStashedState } from './stashedState';
 
 const GAIT_FOLDER_NAME = '.gait';
 
@@ -228,8 +228,8 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
  */
 export function activate(context: vscode.ExtensionContext) {
     const tool: TOOL = checkTool();
-    const panelChatMode: PanelChatMode = 'OnlyMatchedChats';
     // Set panelChatMode in extension workspaceStorage
+    const panelChatMode = "OnlyMatchedChats";
     context.workspaceState.update('panelChatMode', panelChatMode);
 
     writeStashedState(context, readStashedStateFromFile());

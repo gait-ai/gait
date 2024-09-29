@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 import simpleGit, { SimpleGit } from 'simple-git';
-import { StashedState, PanelChat, isStashedState } from './types';
+import { StashedState, PanelChat, isStashedState, isPanelChat } from './types';
 import { InlineChatInfo } from './inline';
 import { readStashedState } from './stashedState'; // Ensure this uses gzip
 import { execFile } from 'child_process';
@@ -27,6 +27,7 @@ export type UncommittedData = {
 
 export type GitHistoryData = {
     commits: CommitData[];
+    added: UncommittedData | null;
     uncommitted: UncommittedData | null;
 };
 
@@ -207,7 +208,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     try {
         parsedCurrent = readStashedState(context); // This now handles gzip decompression
         if (!isStashedState(parsedCurrent)) {
-            throw new Error('Parsed content does not match StashedState structure.');
+            throw new Error('Parsed content does not match StashedState structure 1.');
         }
         log(`Parsed current stashedPanelChats.json.gz successfully.`, LogLevel.INFO);
     } catch (error) {
@@ -300,7 +301,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             const jsonString = decompressedBuffer.toString('utf-8');
             parsedContent = JSON.parse(jsonString);
             if (!isStashedState(parsedContent)) {
-                throw new Error('Parsed content does not match StashedState structure.');
+                throw new Error('Parsed content does not match StashedState structure 2.');
             }
             log(`Parsed stashedPanelChats.json.gz for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
@@ -334,6 +335,32 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     // **New Addition:** Filter out commits with empty panelChats
     allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
     log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
+
+
+    let currentAddedContent = readStashedState(context);
+
+    // Aggregate all panelChats from uncommitted changes, excluding deleted ones
+    const allAddedPanelChats: PanelChat[] = currentAddedContent.panelChats.filter(pc =>
+        !deletedPanelChatIds.has(pc.id)
+    ).map(pc => {
+        const filteredMessages = pc.messages.filter(msg =>
+            !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
+        );
+        // Add all messages to seenMessageIds
+        pc.messages.forEach(msg => seenMessageIds.add(msg.id));
+        return {
+            ...pc,
+            messages: filteredMessages
+        };
+    }).filter(pc => pc.messages.length > 0);
+
+    const added = {
+        panelChats: allAddedPanelChats,
+        inlineChats: []
+    };
+
+
+
     // Step 3: Check for uncommitted changes
     let status;
     try {
@@ -344,87 +371,51 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     }
 
     let uncommitted: UncommittedData | null = null;
-    if (
-        status.modified.includes(filePath) ||
-        status.not_added.includes(filePath) ||
-        status.created.includes(filePath)
-    ) {
-        // Get the current (uncommitted) file content
-        log("stashedPanelChats.json.gz is modified", LogLevel.INFO);
-        let currentUncommittedContent: StashedState;
-        try {
-            currentUncommittedContent = readStashedState(context); // Use the updated readStashedState
-            log(`Successfully read uncommitted stashedPanelChats.json.gz.`, LogLevel.INFO);
-        } catch (error) {
-            log(`Warning: Failed to read current file content: ${(error as Error).message}`, LogLevel.WARN);
-            currentUncommittedContent = {
-                panelChats: [],
-                inlineChats: [],
-                schemaVersion: SCHEMA_VERSION,
-                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
-                kv_store: {}
-            }; // Default to empty StashedState
-            log(`Initialized default uncommitted stashedPanelChats.json.gz structure due to reading failure.`, LogLevel.INFO);
-        }
-
-        // Ensure deletedChats exists
-        if (!currentUncommittedContent.deletedChats) {
-            currentUncommittedContent.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
-            log(`'deletedChats' was undefined in uncommitted changes. Initialized with empty arrays.`, LogLevel.WARN);
-        }
-
-        // Ensure deletedPanelChatIDs exists and is an array
-        if (!Array.isArray(currentUncommittedContent.deletedChats.deletedPanelChatIDs)) {
-            currentUncommittedContent.deletedChats.deletedPanelChatIDs = [];
-            log(`'deletedPanelChatIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`, LogLevel.WARN);
-        }
-
-        // Ensure deletedMessageIDs exists and is an array
-        if (!Array.isArray(currentUncommittedContent.deletedChats.deletedMessageIDs)) {
-            currentUncommittedContent.deletedChats.deletedMessageIDs = [];
-            log(`'deletedMessageIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`, LogLevel.WARN);
-        }
-
-        const uncommittedDeletedPanelChatIds = new Set(currentUncommittedContent.deletedChats.deletedPanelChatIDs);
-        const uncommittedDeletedMessageIds = new Set(currentUncommittedContent.deletedChats.deletedMessageIDs);
-
-        // Aggregate all panelChats from uncommitted changes, excluding deleted ones
-        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.panelChats.filter(pc =>
-            !uncommittedDeletedPanelChatIds.has(pc.id)
-        ).map(pc => {
-            const filteredMessages = pc.messages.filter(msg =>
-                !uncommittedDeletedMessageIds.has(msg.id) && currentMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
-            );
-            return {
-                ...pc,
-                messages: filteredMessages
-            };
-        }).filter(pc => pc.messages.length > 0);
-
-        const allCurrentInlineChats: InlineChatInfo[] = currentUncommittedContent.inlineChats;
-
-        log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`, LogLevel.INFO);
-
-        if (allCurrentPanelChats.length > 0) {
-            uncommitted = {
-                panelChats: allCurrentPanelChats,
-                inlineChats: allCurrentInlineChats
-            };
-            log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`, LogLevel.INFO);
-        } else {
-            log("No uncommitted new panelChats found.", LogLevel.INFO);
-        }
+    let currentUncommittedContent: PanelChat[];
+    try {
+        currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
+    } catch (error) {
+        console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
+        currentUncommittedContent = []; 
     }
 
-    log("Returning commits and uncommitted data.", LogLevel.INFO);
-    log(`Total Commits: ${allCommits.length}`, LogLevel.INFO);
-    if (uncommitted) {
-        log(`Uncommitted PanelChats: ${uncommitted.panelChats.length}`, LogLevel.INFO);
+    if (!Array.isArray(currentUncommittedContent)) {
+        throw new Error('Parsed content does not match PanelChat structure.');
+    }
+     
+    // If every element of currentUncommittedContent is a PanelChat, then we can proceed
+    if (! currentUncommittedContent.every(isPanelChat)) {
+        throw new Error('Parsed content does not match PanelChat structure.');
+    }
+
+    // Aggregate all panelChats from uncommitted changes, excluding deleted ones
+    const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.filter(pc =>
+        !deletedPanelChatIds.has(pc.id)
+    ).map(pc => {
+        const filteredMessages = pc.messages.filter(msg =>
+            !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
+        );
+        return {
+            ...pc,
+            messages: filteredMessages
+        };
+    }).filter(pc => pc.messages.length > 0);
+
+    console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
+
+    if (allCurrentPanelChats.length > 0) {
+        uncommitted = {
+            panelChats: allCurrentPanelChats,
+            inlineChats: []
+        };
+        console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
     } else {
-        log(`No uncommitted changes.`, LogLevel.INFO);
+        console.log("No uncommitted new panelChats found.");
     }
+    
     return {
         commits: allCommits,
+        added,
         uncommitted,
     };
 }
@@ -598,57 +589,61 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
     }
 
     let uncommitted: UncommittedData | null = null;
+    let added: UncommittedData | null = null;
     //console.log("Checking uncommitted changes");
     if (
         status.modified.includes(targetFilePath) ||
         status.not_added.includes(targetFilePath) ||
         status.created.includes(targetFilePath)
     ) {
-        // Get the current (uncommitted) file content
-        //console.log("stashedPanelChats.json.gz is modified");
-        let currentUncommittedContent: StashedState;
-        try {
-            currentUncommittedContent = readStashedState(context); // Use the updated readStashedState
-            //console.log(`Successfully read uncommitted stashedPanelChats.json.gz.`);
-        } catch (error) {
-            console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
-            currentUncommittedContent = {
-                panelChats: [],
-                inlineChats: [],
-                schemaVersion: SCHEMA_VERSION,
-                deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
-                kv_store: {}
-            }; // Default to empty StashedState
-            //console.log(`Initialized default uncommitted stashedPanelChats.json.gz structure due to reading failure.`);
-        }
+        console.log("File is modified");
 
-        // Ensure deletedChats exists
-        if (!currentUncommittedContent.deletedChats) {
-            currentUncommittedContent.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
-            log(`'deletedChats' was undefined in uncommitted changes. Initialized with empty arrays.`, LogLevel.WARN);
-        }
-
-        // Ensure deletedPanelChatIDs exists and is an array
-        if (!Array.isArray(currentUncommittedContent.deletedChats.deletedPanelChatIDs)) {
-            currentUncommittedContent.deletedChats.deletedPanelChatIDs = [];
-            log(`'deletedPanelChatIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`, LogLevel.WARN);
-        }
-
-        // Ensure deletedMessageIDs exists and is an array
-        if (!Array.isArray(currentUncommittedContent.deletedChats.deletedMessageIDs)) {
-            currentUncommittedContent.deletedChats.deletedMessageIDs = [];
-            log(`'deletedMessageIDs' was undefined or not an array in uncommitted changes. Initialized as empty array.`, LogLevel.WARN);
-        }
-
-        const uncommittedDeletedPanelChatIds = new Set(currentUncommittedContent.deletedChats.deletedPanelChatIDs);
-        const uncommittedDeletedMessageIds = new Set(currentUncommittedContent.deletedChats.deletedMessageIDs);
+        let currentAddedContent = readStashedState(context);
 
         // Aggregate all panelChats from uncommitted changes, excluding deleted ones
-        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.panelChats.filter(pc =>
-            !uncommittedDeletedPanelChatIds.has(pc.id)
+        const allAddedPanelChats: PanelChat[] = currentAddedContent.panelChats.filter(pc =>
+            !deletedPanelChatIds.has(pc.id)
         ).map(pc => {
             const filteredMessages = pc.messages.filter(msg =>
-                !uncommittedDeletedMessageIds.has(msg.id) && currentMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
+                !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
+            );
+            // Add all messages to seenMessageIds
+            pc.messages.forEach(msg => seenMessageIds.add(msg.id));
+            return {
+                ...pc,
+                messages: filteredMessages
+            };
+        }).filter(pc => pc.messages.length > 0);
+
+        console.log(`Aggregated ${allAddedPanelChats.length} uncommitted PanelChats.`);
+
+        added = {
+            panelChats: allAddedPanelChats,
+            inlineChats: []
+        };
+        let currentUncommittedContent: PanelChat[];
+        try {
+            currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
+        } catch (error) {
+            console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
+            currentUncommittedContent = []; 
+        }
+    
+        if (!Array.isArray(currentUncommittedContent)) {
+            throw new Error('Parsed content does not match PanelChat structure.');
+        }
+         
+        // If every element of currentUncommittedContent is a PanelChat, then we can proceed
+        if (! currentUncommittedContent.every(isPanelChat)) {
+            throw new Error('Parsed content does not match PanelChat structure.');
+        }
+
+        // Aggregate all panelChats from uncommitted changes, excluding deleted ones
+        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.filter(pc =>
+            !deletedPanelChatIds.has(pc.id)
+        ).map(pc => {
+            const filteredMessages = pc.messages.filter(msg =>
+                !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
             );
             return {
                 ...pc,
@@ -656,23 +651,22 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
             };
         }).filter(pc => pc.messages.length > 0);
 
-        const allCurrentInlineChats: InlineChatInfo[] = currentUncommittedContent.inlineChats;
-
         //console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
 
         if (allCurrentPanelChats.length > 0) {
             uncommitted = {
                 panelChats: allCurrentPanelChats,
-                inlineChats: allCurrentInlineChats
+                inlineChats: []
             };
-            //console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
+            console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
         } else {
-            //console.log("No uncommitted new panelChats found.");
+            console.log("No uncommitted new panelChats found.");
         }
     }
 
     return {
         commits: allCommits,
+        added,
         uncommitted,
     };
 }

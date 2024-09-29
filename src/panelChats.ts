@@ -6,7 +6,7 @@ import * as path from 'path';
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
 import { PanelChat, PanelChatMode, StashedState, StateReader } from './types';
-import { readStashedState, writeStashedState, writeStashedStateToFile } from './stashedState';
+import { readStashedState, writeStashedState, writeChatToStashedState} from './stashedState';
 
 
 function sanitizePanelChats(panelChats: PanelChat[]): PanelChat[] {
@@ -63,45 +63,10 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
         //console.log(`Created directory: ${gaitDir}`);
       }
 
-      // Read the existing stashedPanelChats.json as existingStashedState
-      let existingStashedState = readStashedState(context);
-      let currentPanelChats = [];
-
       // Parse the current panelChats
       const incomingPanelChats = sanitizePanelChats(await stateReader.parsePanelChatAsync());
-      let change = false;
-      for (const incomingPanelChat of incomingPanelChats) {
-        const panelChatId = incomingPanelChat.id;
+      context.workspaceState.update('currentPanelChats', incomingPanelChats);
 
-        // Find if this PanelChat already exists in existingStashedState
-        const existingPanelChat = existingStashedState.panelChats.find(pc => pc.id === panelChatId);
-        if (existingPanelChat) {
-          // PanelChat exists, append only new messages whose IDs don't already exist
-          const existingMessageIds = new Set(existingPanelChat.messages.map(msg => msg.id));
-          const newMessages = incomingPanelChat.messages.filter(msg => !existingMessageIds.has(msg.id));
-
-          if (newMessages.length > 0) {
-            existingPanelChat.messages.push(...newMessages);
-            change = true;
-            //console.log(`monitorPanelChatAsync: Appended ${newMessages.length} new messages to existing PanelChat ${panelChatId}.`);
-          }
-        } else {
-          // PanelChat does not exist, add it to panelChats
-          if (panelChatMode === 'AddAllChats') {
-            existingStashedState.panelChats.push(incomingPanelChat);
-            change = true;
-            //console.log(`monitorPanelChatAsync: Added new PanelChat ${panelChatId} with ${incomingPanelChat.messages.length} messages.`);
-          } 
-          currentPanelChats.push(incomingPanelChat);
-        }
-      }
-      context.workspaceState.update('currentPanelChats', currentPanelChats);
-
-      // Write back to stashedPanelChats.json
-      if (change) {
-        await writeStashedState(context, existingStashedState);
-        await writeStashedStateToFile(existingStashedState);
-      }
     } catch (error) {
       console.error(`Error monitoring and saving state:`, error);
       vscode.window.showErrorMessage(`Error monitoring and saving state: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -118,12 +83,6 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
  * @param filePath The path of the file to associate.
  */
 export async function associateFileWithMessage(context: vscode.ExtensionContext, messageId: string, filePath: string, newPanelChat: PanelChat): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-        throw new Error('No workspace folder found');
-    }
-
-    const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
     let stashedState = readStashedState(context);
 
     let messageFound = false;
@@ -156,12 +115,11 @@ export async function associateFileWithMessage(context: vscode.ExtensionContext,
         } else {
           throw new Error(`Message with ID ${messageId} not found in the new panel chat.`);
         }
-        stashedState.panelChats.push(newPanelChat);
-        await writeStashedState(context, stashedState);
+        writeChatToStashedState(context, newPanelChat);
         return;
     }
     vscode.window.showInformationMessage(`Associated file with message: ${messageId}`);
 
-    await writeStashedState(context, stashedState);
+    writeChatToStashedState(context, newPanelChat);
 }
 

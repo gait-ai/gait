@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { isStashedState, StashedState } from './types';
+import { isStashedState, PanelChat, StashedState } from './types';
 import vscode from 'vscode';
 import zlib from 'zlib'; // Import the zlib library for Gzip compression
 import { InlineChatInfo } from './inline';
@@ -85,13 +85,29 @@ export function readStashedStateFromFile(): StashedState {
 
 export function writeStashedState( context: vscode.ExtensionContext, stashedState: StashedState): void {
     context.workspaceState.update('stashedState', stashedState);
+    writeStashedStateToFile(stashedState);
     return;
+}
+
+export function writeChatToStashedState(context: vscode.ExtensionContext, newChat: PanelChat): void {
+    const currentState = readStashedState(context);
+    const existingChatIndex = currentState.panelChats.findIndex((chat) => chat.id === newChat.id);
+    if (existingChatIndex !== -1) {
+        const existingChat = currentState.panelChats[existingChatIndex];
+        const newMessages = newChat.messages.filter((message) => !existingChat.messages.some((existingMessage) => existingMessage.id === message.id));
+        existingChat.messages.push(...newMessages);
+        currentState.panelChats[existingChatIndex] = existingChat;
+    }
+    else{
+        currentState.panelChats.push(newChat);
+    }
+    writeStashedState(context, currentState);
 }
 
 /**
  * Compresses and writes the stashed state to the .gz file.
  */
-export function writeStashedStateToFile(stashedState: StashedState): void {
+function writeStashedStateToFile(stashedState: StashedState): void {
     const filePath = stashedStateFilePath();
     try {
         // Convert the stashed state to a JSON string with indentation

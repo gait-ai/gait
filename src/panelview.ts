@@ -5,7 +5,7 @@ import * as path from 'path';
 import simpleGit, { SimpleGit } from 'simple-git';
 import { MessageEntry, StashedState, PanelChat, isStashedState } from './types';
 import { CommitData, UncommittedData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile } from './panelgit';
-import { readStashedState, writeStashedState, writeStashedStateToFile } from './stashedState';
+import { readStashedState, writeStashedState } from './stashedState';
 import { panelChatsToMarkdown } from './markdown'; // Added import
 
 const SCHEMA_VERSION = '1.0';
@@ -46,12 +46,27 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     inlineChats: commit.inlineChats
                 })).sort((a, b) => b.date.getTime() - a.date.getTime());
 
+                if (gitHistory.added) {
+                    const uncommittedCommit: CommitData = {
+                        commitHash: 'added',
+                        author: 'You',
+                        commitMessage: 'Added Changes',
+                        date: new Date(), // Current date and time
+                        panelChats: gitHistory.added.panelChats, // Updated to use panelChats
+                        inlineChats: gitHistory.added.inlineChats
+                    };
+                    this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
+                }
+                else{
+                    console.log("No added changes");
+                }
+
                 // Handle uncommitted changes by appending them to the commits array
                 if (gitHistory.uncommitted) {
                     const uncommittedCommit: CommitData = {
                         commitHash: 'uncommitted',
                         author: 'You',
-                        commitMessage: 'Uncommitted Changes',
+                        commitMessage: 'Unadded Changes',
                         date: new Date(), // Current date and time
                         panelChats: gitHistory.uncommitted.panelChats, // Updated to use panelChats
                         inlineChats: gitHistory.uncommitted.inlineChats
@@ -71,38 +86,29 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     inlineChats: commit.inlineChats
                 })).sort((a, b) => b.date.getTime() - a.date.getTime());
 
+                if (gitHistory.added) {
+                    const uncommittedCommit: CommitData = {
+                        commitHash: 'added',
+                        author: 'You',
+                        commitMessage: 'Added Changes',
+                        date: new Date(), // Current date and time
+                        panelChats: gitHistory.added.panelChats, // Updated to use panelChats
+                        inlineChats: gitHistory.added.inlineChats
+                    };
+                    this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
+                }
+
                 // Handle uncommitted changes by appending them to the commits array
                 if (gitHistory.uncommitted) {
                     const uncommittedCommit: CommitData = {
                         commitHash: 'uncommitted',
                         author: 'You',
-                        commitMessage: 'Added Chats',
+                        commitMessage: 'Unadded Changes',
                         date: new Date(), // Current date and time
                         panelChats: gitHistory.uncommitted.panelChats,
                         inlineChats: gitHistory.uncommitted.inlineChats
                     };
                     this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
-                }
-                const currentPanelChats = context.workspaceState.get('currentPanelChats');
-                if (currentPanelChats && Array.isArray(currentPanelChats)) {
-                    let filteredCurrentPanelChats = currentPanelChats;
-                    if (gitHistory.uncommitted) {
-                        // Filter out panelChats from currentPanelChats that are already in uncommitted
-                        const uncommittedPanelChatIds = new Set(gitHistory.uncommitted.panelChats.map(pc => pc.id));
-                        filteredCurrentPanelChats = currentPanelChats.filter((pc: { id: string }) => !uncommittedPanelChatIds.has(pc.id));
-                    }
-                    // If there are any remaining filtered panelChats, add them to the uncommitted commit
-                    if (filteredCurrentPanelChats.length > 0) {
-                        const unaddedCommit: CommitData = {
-                            commitHash: 'unadded',
-                            author: 'You',
-                            commitMessage: 'Unadded Chats',
-                            date: new Date(), // Current date and time
-                            panelChats: filteredCurrentPanelChats, // Updated to use panelChats
-                            inlineChats: []
-                        };
-                        this._commits.unshift(unaddedCommit); // Add to the beginning for visibility
-                    }
                 }
             }
         } catch (error: any) {
@@ -135,7 +141,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         const stashedState = readStashedState(this._context);
         stashedState.deletedChats.deletedPanelChatIDs.push(panelChatId);
         writeStashedState(this._context, stashedState);
-        writeStashedStateToFile(stashedState);
     }
 
     public resolveWebviewView(
@@ -221,7 +226,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         const stashedState = readStashedState(this._context);
         stashedState.deletedChats.deletedMessageIDs.push(messageId);
         writeStashedState(this._context, stashedState);
-        writeStashedStateToFile(stashedState);
     }
 
     /**
