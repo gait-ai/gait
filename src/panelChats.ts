@@ -5,7 +5,7 @@ import * as path from 'path';
 
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
-import { PanelChat, PanelChatMode, StashedState, StateReader } from './types';
+import { MessageEntry, PanelChat, PanelChatMode, StashedState, StateReader } from './types';
 import { readStashedState, writeStashedState, writeStashedStateToFile } from './stashedState';
 
 
@@ -117,13 +117,13 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
  * @param messageId The ID of the message to associate with the file.
  * @param filePath The path of the file to associate.
  */
-export async function associateFileWithMessage(context: vscode.ExtensionContext, messageId: string, filePath: string, newPanelChat: PanelChat): Promise<void> {
+export async function associateFileWithMessage(context: vscode.ExtensionContext, message: MessageEntry, filePath: string, newPanelChat: PanelChat): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const messageId = message.id;
     if (!workspaceFolder) {
         throw new Error('No workspace folder found');
     }
 
-    const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
     let stashedState = readStashedState(context);
 
     let messageFound = false;
@@ -144,7 +144,11 @@ export async function associateFileWithMessage(context: vscode.ExtensionContext,
     }
 
     if (!messageFound) {
-        vscode.window.showInformationMessage(`Adding associated panel chat to stashed state`);
+        let truncatedMessage = message.messageText.substring(0, 50);
+        if (message.messageText.length > 50) {
+            truncatedMessage += '...';
+        }
+        vscode.window.showInformationMessage(`Match prompt "${truncatedMessage}" to ${filePath} - adding to stashed state.`);
         // Find the message in newPanelChat with the matching messageId
         const targetMessage = newPanelChat.messages.find(message => message.id === messageId);
         if (targetMessage) {

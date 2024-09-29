@@ -194,9 +194,7 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
         disposibleDecorations.hoverProvider.dispose();
     }
 
-    if (decorationsActive) {
-        disposibleDecorations = InlineDecoration.decorateActive(context);
-    }
+    disposibleDecorations = InlineDecoration.decorateActive(context, decorationsActive);
 
     isRedecorating = false;
 }, 300); // 300ms debounce time
@@ -510,6 +508,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Add a new event listener for text changes
     vscode.workspace.onDidChangeTextDocument((event) => {
         handleFileChange(event, stateReader, context);
+        debouncedRedecorate(context);
     });
 
     // Set up an interval to trigger accept every second
