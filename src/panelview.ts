@@ -969,7 +969,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                 const panelChatHeader = document.createElement('div');
                                 panelChatHeader.className = 'panel-chat-header';
                                 panelChatHeader.innerHTML = \`
-                                    PanelChat ID: \${escapeHtml(panelChat.id)}
+                                    Title: \${escapeHtml(panelChat.customTitle)}
                                     <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete PanelChat">🗑️</button>
                                     <button 
                                         class="append-context-button" 
@@ -1014,7 +1014,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                 const panelChatInfo = document.createElement('div');
                                 panelChatInfo.className = 'panel-chat-info';
                                 panelChatInfo.innerHTML = \`
-                                    <strong>Title:</strong> \${escapeHtml(panelChat.customTitle)}<br>
+                                    <strong>ID:</strong> \${escapeHtml(panelChat.id)}<br>
                                     <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
                                     <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
                                     <strong>Parent ID:</strong> \${panelChat.parent_id ? escapeHtml(panelChat.parent_id) : 'N/A'}
