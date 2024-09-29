@@ -5,7 +5,7 @@ import * as levenshtein from 'fast-levenshtein';
 import * as path from 'path';
 import * as InlineHover from './inlinehover';
 import { associateFileWithMessage } from './panelChats';
-import { PanelChat, PanelMatchedRange, StashedState } from './types';
+import { MessageEntry, PanelChat, PanelMatchedRange, StashedState } from './types';
 import { readStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
@@ -127,12 +127,6 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
         vscode.window.showErrorMessage('No inline chats found');
         return;
     }
-
-    const currentPanelChats = [
-        ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []),
-        ...stashedState.panelChats
-    ];
-
     const rangesToPanel: PanelMatchedRange[] = [];
 
     const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
@@ -155,73 +149,88 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
     }
 
     let decorationIndex = 0;
+
+
+    const currentPanelChats = [...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []), ...stashedState.panelChats];
+
     // Sort currentPanelChats by time in ascending order (latest first)
     currentPanelChats.sort((a, b) => {
         const timeA = a.created_on;
         const timeB = b.created_on;
         return new Date(timeA).getTime() - new Date(timeB).getTime();
     });
-    console.log(JSON.stringify(currentPanelChats, null, 2));
 
-    for (const panelChat of currentPanelChats) {
-        for (const message of panelChat.messages) {
-            if (message.kv_store && 'file_paths' in message.kv_store && !message.kv_store.file_paths.includes(baseName)) {
-                continue;
+    const currentMessages = currentPanelChats.reduce((acc, panelChat) => {
+        panelChat.messages.forEach(message => {
+            if (!acc.some(item => item.message.id === message.id)) {
+                acc.push({ message, panelChat });
             }
-            const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
-            const codeBlocks = extractCodeBlocks(message.responseText);
-            for (const code of codeBlocks) {
-                const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
-                if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
-                    // If more than half of the code lines match, associate the file with the message
-                    associateFileWithMessage(context, message, baseName, panelChat).catch(error => {
-                        console.error(`Failed to associate file with message: ${error}`);
-                    });
-                }
-                
-                if (currentRanges.length > 0) {
-                    const color = generateColors(decorationIndex);
-                    decorationIndex += 1;
+        });
+        return acc;
+    }, [] as { message: MessageEntry, panelChat: PanelChat }[]);
 
-                    function lineInRangesToPanel(line: number) {
-                        return rangesToPanel.some(range => 
-                            range.range.start.line <= line && 
-                            range.range.end.line >= line
+
+
+    for (const {message, panelChat} of currentMessages) {
+        if (message.kv_store && 'file_paths' in message.kv_store && !message.kv_store.file_paths.includes(baseName)) {
+            continue;
+        }
+        const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
+        if (already_associated) {
+            console.log("Already associated");
+        }
+        const codeBlocks = extractCodeBlocks(message.responseText);
+        for (const code of codeBlocks) {
+            const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
+            if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
+                // If more than half of the code lines match, associate the file with the message
+                associateFileWithMessage(context, message, baseName, panelChat).catch(error => {
+                    console.error(`Failed to associate file with message: ${error}`);
+                });
+            }
+            
+            if (currentRanges.length > 0) {
+                const color = generateColors(decorationIndex);
+                decorationIndex += 1;
+
+                function lineInRangesToPanel(line: number) {
+                    return rangesToPanel.some(range => 
+                        range.range.start.line <= line && 
+                        range.range.end.line >= line
+                    );
+                }
+                function addRange(range: vscode.Range) {
+                    rangesToPanel.push({
+                        range: range,
+                        panelChat: panelChat,
+                        message_id: message.id,
+                    });
+                    addDecorationType(color, range);
+                }
+
+                currentRanges.forEach(range => {
+                    let currentStart = range.start.line;
+                    let currentEnd = currentStart;
+
+                    for (let i = range.start.line; i <= range.end.line; i++) {
+                        if (lineInRangesToPanel(i)) {
+                            if (currentStart !== currentEnd) {
+                                addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
+                                );
+                            }
+                            currentStart = i + 1;
+                            currentEnd = i + 1;
+                        } else {
+                            currentEnd = i;
+                        }
+                    }
+
+                    if (currentStart <= range.end.line) {
+                        addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
+            
                         );
                     }
-                    function addRange(range: vscode.Range) {
-                        rangesToPanel.push({
-                            range: range,
-                            panelChat: panelChat,
-                            message_id: message.id,
-                        });
-                        addDecorationType(color, range);
-                    }
-
-                    currentRanges.forEach(range => {
-                        let currentStart = range.start.line;
-                        let currentEnd = currentStart;
-
-                        for (let i = range.start.line; i <= range.end.line; i++) {
-                            if (lineInRangesToPanel(i)) {
-                                if (currentStart !== currentEnd) {
-                                    addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
-                                    );
-                                }
-                                currentStart = i + 1;
-                                currentEnd = i + 1;
-                            } else {
-                                currentEnd = i;
-                            }
-                        }
-
-                        if (currentStart <= range.end.line) {
-                            addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
-                
-                            );
-                        }
-                    });
-                }
+                });
             }
         }
     }
