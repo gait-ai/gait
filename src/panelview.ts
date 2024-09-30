@@ -21,7 +21,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     private async loadCommitsAndChats(additionalFilePath?: string) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            vscode.window.showErrorMessage('No workspace folder found.');
+            //vscode.window.showErrorMessage('No workspace folder found.');
             return;
         }
         let context = this._context;
@@ -118,13 +118,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * Updates the webview content by loading commits and integrating uncommitted changes.
      */
     public async updateContent() {
+        // Store current scroll position and expanded commits
+        const scrollPosition = this._view?.webview.postMessage({ command: 'getScrollPosition' });
+        const expandedCommits = this._view?.webview.postMessage({ command: 'getExpandedCommits' });
+
         if (this._isFilteredView) {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 const document = editor.document;
                 const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
                 await this.loadCommitsAndChats(filePath);
-
             }
         } else {
             await this.loadCommitsAndChats();
@@ -132,10 +135,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'update',
-                commits: this._commits
+                commits: this._commits,
+                scrollPosition: scrollPosition,
+                expandedCommits: expandedCommits
             });
         }
-
     }
 
     constructor(private readonly _context: vscode.ExtensionContext) {
@@ -262,6 +266,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     this.handleRemoveMessageFromStashedState(message.messageId);
                     this.updateContent();
                     break;
+                case 'openFile':
+                    this.handleOpenFile(message.path);
+                    break;
                 default:
                     break;
             }
@@ -307,7 +314,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     private async handleAppendContext(commitHash: string, panelChatId: string) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            vscode.window.showErrorMessage('No workspace folder found.');
+            //vscode.window.showErrorMessage('No workspace folder found.');
             return;
         }
 
@@ -350,6 +357,27 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     }
 
     /**
+     * Handles opening a file in the editor.
+     * @param filePath - The path of the file to open.
+     */
+    private async handleOpenFile(filePath: string) {
+        console.log(`Opening file: ${filePath}`);
+        try {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('No workspace folder found.');
+                return;
+            }
+
+            const fullPath = vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, filePath));
+            const document = await vscode.workspace.openTextDocument(fullPath);
+            await vscode.window.showTextDocument(document);
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to open file: ${error.message}`);
+        }
+    }
+
+    /**
      * Generates the HTML content for the webview, including a dropdown for view selection.
      * @param webview - The Webview instance.
      * @returns A string containing the HTML.
@@ -362,6 +390,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         const prismCssUri = webview.asWebviewUri(prismCssPath);
         const prismJsUri = webview.asWebviewUri(prismJsPath);
         const markedJsUri = webview.asWebviewUri(markedJsPath); // URI for Marked.js
+        const workspaceFolderPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
         return `
 <!DOCTYPE html>
@@ -679,7 +708,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
     <script nonce="${nonce}">
 
+        setInterval(() => {
+            vscode.postMessage({ command: 'refresh' });
+        }, 3000);
+
         const vscode = acquireVsCodeApi();
+        const workspaceFolderPath = '${workspaceFolderPath}';
 
         /**
          * Escapes HTML characters to prevent XSS attacks.
@@ -763,6 +797,23 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         }
                     }
                 });
+            });
+        }
+
+        function attachLinkListeners() {
+            const contentElement = document.getElementById('content');
+            contentElement.addEventListener('click', (event) => {
+                const target = event.target;
+                if (target && target.matches('a.context-link')) {
+                    event.preventDefault();
+                    const path = target.dataset.path;
+                    if (path) {
+                        console.log('Context link clicked:', path);
+                        vscode.postMessage({ command: 'openFile', path: path });
+                    } else {
+                        console.warn('Clicked link does not have a data-path attribute.');
+                    }
+                }
             });
         }
 
@@ -930,12 +981,44 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             vscode.postMessage({ command: 'switchView', view: selectedView });
         });
 
+        let scrollPosition = 0;
+        let expandedCommits = new Set();
+
+        function saveScrollPosition() {
+            scrollPosition = document.scrollingElement.scrollTop;
+        }
+
+        function restoreScrollPosition() {
+            document.scrollingElement.scrollTop = scrollPosition;
+        }
+
+        function saveExpandedCommits() {
+            expandedCommits.clear();
+            document.querySelectorAll('.commit-details').forEach((details, index) => {
+                if (details.style.display === 'block') {
+                    expandedCommits.add(index);
+                }
+            });
+        }
+
+        function restoreExpandedCommits() {
+            document.querySelectorAll('.commit-details').forEach((details, index) => {
+                if (expandedCommits.has(index)) {
+                    details.style.display = 'block';
+                }
+            });
+        }
+
         /**
          * Handles incoming messages from the extension backend.
          */
         window.addEventListener('message', event => {
             const message = event.data;
             if (message.type === 'update') {
+                saveScrollPosition();
+                saveExpandedCommits();
+                
+
                 const contentElement = document.getElementById('content');
                 contentElement.innerHTML = ''; // Clear existing content
 
@@ -969,7 +1052,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                 const panelChatHeader = document.createElement('div');
                                 panelChatHeader.className = 'panel-chat-header';
                                 panelChatHeader.innerHTML = \`
-                                    PanelChat ID: \${escapeHtml(panelChat.id)}
+                                    Title: \${escapeHtml(panelChat.customTitle)}
                                     <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete PanelChat">🗑️</button>
                                     <button 
                                         class="append-context-button" 
@@ -1014,7 +1097,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                 const panelChatInfo = document.createElement('div');
                                 panelChatInfo.className = 'panel-chat-info';
                                 panelChatInfo.innerHTML = \`
-                                    <strong>Title:</strong> \${escapeHtml(panelChat.customTitle)}<br>
+                                    <strong>ID:</strong> \${escapeHtml(panelChat.id)}<br>
                                     <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
                                     <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
                                     <strong>Parent ID:</strong> \${panelChat.parent_id ? escapeHtml(panelChat.parent_id) : 'N/A'}
@@ -1080,13 +1163,62 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                     messageContainer.appendChild(messageDetails);
 
                                     // Optionally, display context if needed
-                                    if (messageEntry.context && messageEntry.context.length > 0) {
+                                    console.log('Message Entry Context:', messageEntry.context);
+                                    if (messageEntry.context && Array.isArray(messageEntry.context) && messageEntry.context.length > 0) {
                                         const contextDiv = document.createElement('div');
                                         contextDiv.className = 'context';
                                         contextDiv.style.fontSize = '0.8em';
                                         contextDiv.style.color = 'var(--vscode-descriptionForeground)';
-                                        contextDiv.innerHTML = \`<strong>Context:</strong> \${escapeHtml(JSON.stringify(messageEntry.context))}\`;
-                                        messageContainer.appendChild(contextDiv);
+                                        const humanReadableContext = messageEntry.context
+                                        .filter(item => item && typeof item === 'object' && item.value && typeof item.value === 'object' && typeof item.value.human_readable === 'string')
+                                        .map(item => {
+                                            // Get the relative path
+                                            const fullPath = item.value.human_readable;
+                                            let relativePath = fullPath;
+                                            
+                                            if (workspaceFolderPath && fullPath.startsWith(workspaceFolderPath)) {
+                                                relativePath = fullPath.slice(workspaceFolderPath.length + 1);
+                                            }
+
+                                            const link = document.createElement('a');
+                                            link.href = '#';
+                                            link.textContent = escapeHtml(relativePath);
+                                            link.dataset.path = relativePath;
+                                            link.classList.add('context-link'); 
+                                            return link.outerHTML;
+                                        })
+                                        .join(', ');
+                                        if (humanReadableContext) {
+                                            contextDiv.innerHTML = \`<strong>Context:</strong> \${humanReadableContext}\`;
+                                            messageContainer.appendChild(contextDiv);
+                                        }
+                                    }
+
+                                    if (messageEntry.kv_store && 'file_paths' in messageEntry.kv_store) {
+                                        const contextDiv = document.createElement('div');
+                                        contextDiv.className = 'context';
+                                        contextDiv.style.fontSize = '0.8em';
+                                        contextDiv.style.color = 'var(--vscode-descriptionForeground)';
+                                        const associatedFilePaths = messageEntry.kv_store.file_paths
+                                        .map(filePath => {
+                                            let relativePath = filePath;
+                                            
+                                            if (workspaceFolderPath && filePath.startsWith(workspaceFolderPath)) {
+                                                relativePath = filePath.slice(workspaceFolderPath.length + 1);
+                                            }
+
+                                            const link = document.createElement('a');
+                                            link.href = '#';
+                                            link.textContent = escapeHtml(relativePath);
+                                            link.dataset.path = relativePath;
+                                            link.classList.add('context-link'); 
+                                            return link.outerHTML;
+                                        })
+                                        .join(', ');
+                                        if (associatedFilePaths) {
+                                            contextDiv.innerHTML = \`<strong>Associated Files:</strong> \${associatedFilePaths}\`;
+                                            messageContainer.appendChild(contextDiv);
+                                        }
                                     }
 
                                     panelChatDiv.appendChild(messageContainer);
@@ -1110,12 +1242,26 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
                     // Attach event listeners for delete, write, and remove buttons
                     attachButtonListeners();
+
+                    attachLinkListeners();
                 } else {
                     const noCommits = document.createElement('div');
                     noCommits.className = 'no-commits';
                     noCommits.textContent = 'No commits found.';
                     contentElement.appendChild(noCommits);
                 }
+
+                // After updating the content
+                restoreExpandedCommits();
+                restoreScrollPosition();
+                Prism.highlightAll();
+            } else if (message.command === 'getScrollPosition') {
+                vscode.postMessage({ command: 'scrollPosition', position: document.scrollingElement.scrollTop });
+            } else if (message.command === 'getExpandedCommits') {
+                const expanded = Array.from(document.querySelectorAll('.commit-details'))
+                    .map((details, index) => details.style.display === 'block' ? index : null)
+                    .filter(index => index !== null);
+                vscode.postMessage({ command: 'expandedCommits', commits: expanded });
             }
         });
 

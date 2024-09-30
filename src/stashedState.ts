@@ -12,7 +12,7 @@ import { InlineChatInfo } from './inline';
 function stashedStateFilePath(): string {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('No workspace folder found.');
+        //vscode.window.showErrorMessage('No workspace folder found.');
         throw new Error('No workspace folder found.');
     }
 

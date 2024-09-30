@@ -205,6 +205,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     const currentMessageIds: Set<string> = new Set();
     const currentPanelChatIds: Set<string> = new Set();
 
+
     try {
         parsedCurrent = readStashedState(context); // This now handles gzip decompression
         if (!isStashedState(parsedCurrent)) {
@@ -332,6 +333,12 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     // Convert the map to an array
     let allCommits: CommitData[] = Array.from(allCommitsMap.values());
 
+    // For each panel chat in each commit, filter it out if ti is empty
+    allCommits.forEach(commit => {
+        commit.panelChats = commit.panelChats.filter(pc => pc.messages.length > 0);
+    });
+    
+
     // **New Addition:** Filter out commits with empty panelChats
     allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
     log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
@@ -359,16 +366,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         inlineChats: []
     };
 
-
-
     // Step 3: Check for uncommitted changes
-    let status;
-    try {
-        status = await git.status();
-        log(`Retrieved git status successfully.`, LogLevel.INFO);
-    } catch (error) {
-        throw new Error(`Failed to retrieve git status: ${(error as Error).message}`);
-    }
 
     let uncommitted: UncommittedData | null = null;
     let currentUncommittedContent: PanelChat[];
@@ -403,16 +401,12 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
 
     console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
 
-    if (allCurrentPanelChats.length > 0) {
-        uncommitted = {
-            panelChats: allCurrentPanelChats,
-            inlineChats: []
-        };
-        console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
-    } else {
-        console.log("No uncommitted new panelChats found.");
-    }
-    
+    uncommitted = {
+        panelChats: allCurrentPanelChats,
+        inlineChats: []
+    };
+    console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
+
     return {
         commits: allCommits,
         added,
@@ -576,8 +570,14 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
     // Convert the map to an array
     let allCommits: CommitData[] = Array.from(allCommitsMap.values());
 
+    // For each panel chat in each commit, filter it out if ti is empty
+    allCommits.forEach(commit => {
+        commit.panelChats = commit.panelChats.filter(pc => pc.messages.length > 0);
+    });
+
     // **New Addition:** Filter out commits with empty panelChats
     allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
+
 
     // Step 3: Check for uncommitted changes
     let status;
@@ -588,8 +588,8 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
         throw new Error(`Failed to retrieve git status: ${(error as Error).message}`);
     }
 
-    let uncommitted: UncommittedData | null = null;
-    let added: UncommittedData | null = null;
+    let uncommitted: UncommittedData = {panelChats: [], inlineChats: []};
+    let added: UncommittedData= {panelChats: [], inlineChats: []};
     //console.log("Checking uncommitted changes");
     if (
         status.modified.includes(targetFilePath) ||
