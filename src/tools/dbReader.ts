@@ -24,7 +24,8 @@ export async function readVSCodeState(dbPath: string, key: string): Promise<any>
         return JSON.parse(records[0].value);
     } catch (error) {
         console.error(`Error querying SQLite DB: ${error}`);
-        vscode.window.showErrorMessage(`Error querying SQLite DB: ${error}`);
-        throw error;
+        // vscode.window.showErrorMessage(`Error querying SQLite DB: ${error}`);
+        // throw error;
+        return null;
     }
 }
