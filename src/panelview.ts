@@ -118,13 +118,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * Updates the webview content by loading commits and integrating uncommitted changes.
      */
     public async updateContent() {
+        // Store current scroll position and expanded commits
+        const scrollPosition = this._view?.webview.postMessage({ command: 'getScrollPosition' });
+        const expandedCommits = this._view?.webview.postMessage({ command: 'getExpandedCommits' });
+
         if (this._isFilteredView) {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 const document = editor.document;
                 const filePath = vscode.workspace.asRelativePath(document.uri.fsPath);
                 await this.loadCommitsAndChats(filePath);
-
             }
         } else {
             await this.loadCommitsAndChats();
@@ -132,10 +135,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'update',
-                commits: this._commits
+                commits: this._commits,
+                scrollPosition: scrollPosition,
+                expandedCommits: expandedCommits
             });
         }
-
     }
 
     constructor(private readonly _context: vscode.ExtensionContext) {
@@ -973,12 +977,43 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             vscode.postMessage({ command: 'switchView', view: selectedView });
         });
 
+        let scrollPosition = 0;
+        let expandedCommits = new Set();
+
+        function saveScrollPosition() {
+            scrollPosition = document.scrollingElement.scrollTop;
+        }
+
+        function restoreScrollPosition() {
+            document.scrollingElement.scrollTop = scrollPosition;
+        }
+
+        function saveExpandedCommits() {
+            expandedCommits.clear();
+            document.querySelectorAll('.commit-details').forEach((details, index) => {
+                if (details.style.display === 'block') {
+                    expandedCommits.add(index);
+                }
+            });
+        }
+
+        function restoreExpandedCommits() {
+            document.querySelectorAll('.commit-details').forEach((details, index) => {
+                if (expandedCommits.has(index)) {
+                    details.style.display = 'block';
+                }
+            });
+        }
+
         /**
          * Handles incoming messages from the extension backend.
          */
         window.addEventListener('message', event => {
             const message = event.data;
             if (message.type === 'update') {
+                saveScrollPosition();
+                saveExpandedCommits();
+
                 const contentElement = document.getElementById('content');
                 contentElement.innerHTML = ''; // Clear existing content
 
@@ -1210,6 +1245,17 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     noCommits.textContent = 'No commits found.';
                     contentElement.appendChild(noCommits);
                 }
+
+                // After updating the content
+                restoreExpandedCommits();
+                restoreScrollPosition();
+            } else if (message.command === 'getScrollPosition') {
+                vscode.postMessage({ command: 'scrollPosition', position: document.scrollingElement.scrollTop });
+            } else if (message.command === 'getExpandedCommits') {
+                const expanded = Array.from(document.querySelectorAll('.commit-details'))
+                    .map((details, index) => details.style.display === 'block' ? index : null)
+                    .filter(index => index !== null);
+                vscode.postMessage({ command: 'expandedCommits', commits: expanded });
             }
         });
 
