@@ -708,6 +708,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
     <script nonce="${nonce}">
 
+        setInterval(() => {
+            vscode.postMessage({ command: 'refresh' });
+        }, 3000);
+
         const vscode = acquireVsCodeApi();
         const workspaceFolderPath = '${workspaceFolderPath}';
 
@@ -1013,6 +1017,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             if (message.type === 'update') {
                 saveScrollPosition();
                 saveExpandedCommits();
+                
 
                 const contentElement = document.getElementById('content');
                 contentElement.innerHTML = ''; // Clear existing content
@@ -1249,6 +1254,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 // After updating the content
                 restoreExpandedCommits();
                 restoreScrollPosition();
+                Prism.highlightAll();
             } else if (message.command === 'getScrollPosition') {
                 vscode.postMessage({ command: 'scrollPosition', position: document.scrollingElement.scrollTop });
             } else if (message.command === 'getExpandedCommits') {
