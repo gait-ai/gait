@@ -262,6 +262,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     this.handleRemoveMessageFromStashedState(message.messageId);
                     this.updateContent();
                     break;
+                case 'openFile':
+                    this.handleOpenFile(message.path);
+                    break;
                 default:
                     break;
             }
@@ -350,6 +353,27 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     }
 
     /**
+     * Handles opening a file in the editor.
+     * @param filePath - The path of the file to open.
+     */
+    private async handleOpenFile(filePath: string) {
+        console.log(`Opening file: ${filePath}`);
+        try {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('No workspace folder found.');
+                return;
+            }
+
+            const fullPath = vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, filePath));
+            const document = await vscode.workspace.openTextDocument(fullPath);
+            await vscode.window.showTextDocument(document);
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to open file: ${error.message}`);
+        }
+    }
+
+    /**
      * Generates the HTML content for the webview, including a dropdown for view selection.
      * @param webview - The Webview instance.
      * @returns A string containing the HTML.
@@ -362,6 +386,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         const prismCssUri = webview.asWebviewUri(prismCssPath);
         const prismJsUri = webview.asWebviewUri(prismJsPath);
         const markedJsUri = webview.asWebviewUri(markedJsPath); // URI for Marked.js
+        const workspaceFolderPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
         return `
 <!DOCTYPE html>
@@ -680,6 +705,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     <script nonce="${nonce}">
 
         const vscode = acquireVsCodeApi();
+        const workspaceFolderPath = '${workspaceFolderPath}';
 
         /**
          * Escapes HTML characters to prevent XSS attacks.
@@ -763,6 +789,23 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         }
                     }
                 });
+            });
+        }
+
+        function attachLinkListeners() {
+            const contentElement = document.getElementById('content');
+            contentElement.addEventListener('click', (event) => {
+                const target = event.target;
+                if (target && target.matches('a.context-link')) {
+                    event.preventDefault();
+                    const path = target.dataset.path;
+                    if (path) {
+                        console.log('Context link clicked:', path);
+                        vscode.postMessage({ command: 'openFile', path: path });
+                    } else {
+                        console.warn('Clicked link does not have a data-path attribute.');
+                    }
+                }
             });
         }
 
@@ -1087,11 +1130,26 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         contextDiv.style.fontSize = '0.8em';
                                         contextDiv.style.color = 'var(--vscode-descriptionForeground)';
                                         const humanReadableContext = messageEntry.context
-                                            .filter(item => item && typeof item === 'object' && item.value && typeof item.value === 'object' && typeof item.value.human_readable === 'string')
-                                            .map(item => item.value.human_readable)
-                                            .join(', ');
+                                        .filter(item => item && typeof item === 'object' && item.value && typeof item.value === 'object' && typeof item.value.human_readable === 'string')
+                                        .map(item => {
+                                            // Get the relative path
+                                            const fullPath = item.value.human_readable;
+                                            let relativePath = fullPath;
+                                            
+                                            if (workspaceFolderPath && fullPath.startsWith(workspaceFolderPath)) {
+                                                relativePath = fullPath.slice(workspaceFolderPath.length + 1);
+                                            }
+
+                                            const link = document.createElement('a');
+                                            link.href = '#';
+                                            link.textContent = escapeHtml(relativePath);
+                                            link.dataset.path = relativePath;
+                                            link.classList.add('context-link'); 
+                                            return link.outerHTML;
+                                        })
+                                        .join(', ');
                                         if (humanReadableContext) {
-                                            contextDiv.innerHTML = \`<strong>Context:</strong> \${escapeHtml(humanReadableContext)}\`;
+                                            contextDiv.innerHTML = \`<strong>Context:</strong> \${humanReadableContext}\`;
                                             messageContainer.appendChild(contextDiv);
                                         }
                                     }
@@ -1117,6 +1175,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
                     // Attach event listeners for delete, write, and remove buttons
                     attachButtonListeners();
+
+                    attachLinkListeners();
                 } else {
                     const noCommits = document.createElement('div');
                     noCommits.className = 'no-commits';
