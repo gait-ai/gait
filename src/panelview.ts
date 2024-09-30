@@ -21,7 +21,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     private async loadCommitsAndChats(additionalFilePath?: string) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            vscode.window.showErrorMessage('No workspace folder found.');
+            //vscode.window.showErrorMessage('No workspace folder found.');
             return;
         }
         let context = this._context;
@@ -307,7 +307,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     private async handleAppendContext(commitHash: string, panelChatId: string) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            vscode.window.showErrorMessage('No workspace folder found.');
+            //vscode.window.showErrorMessage('No workspace folder found.');
             return;
         }
 

@@ -6,7 +6,7 @@ import { StashedState, isStashedState } from './types';
 export async function handleMerge(context: vscode.ExtensionContext) {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('No workspace folder found.');
+        //vscode.window.showErrorMessage('No workspace folder found.');
         return;
     }
 
