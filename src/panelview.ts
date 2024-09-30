@@ -1154,6 +1154,33 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         }
                                     }
 
+                                    if (messageEntry.kv_store && 'file_paths' in messageEntry.kv_store) {
+                                        const contextDiv = document.createElement('div');
+                                        contextDiv.className = 'context';
+                                        contextDiv.style.fontSize = '0.8em';
+                                        contextDiv.style.color = 'var(--vscode-descriptionForeground)';
+                                        const associatedFilePaths = messageEntry.kv_store.file_paths
+                                        .map(filePath => {
+                                            let relativePath = filePath;
+                                            
+                                            if (workspaceFolderPath && filePath.startsWith(workspaceFolderPath)) {
+                                                relativePath = filePath.slice(workspaceFolderPath.length + 1);
+                                            }
+
+                                            const link = document.createElement('a');
+                                            link.href = '#';
+                                            link.textContent = escapeHtml(relativePath);
+                                            link.dataset.path = relativePath;
+                                            link.classList.add('context-link'); 
+                                            return link.outerHTML;
+                                        })
+                                        .join(', ');
+                                        if (associatedFilePaths) {
+                                            contextDiv.innerHTML = \`<strong>Associated Files:</strong> \${associatedFilePaths}\`;
+                                            messageContainer.appendChild(contextDiv);
+                                        }
+                                    }
+
                                     panelChatDiv.appendChild(messageContainer);
                                 });
 
