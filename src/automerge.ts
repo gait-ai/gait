@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { StashedState, isStashedState } from './types';
+import { readStashedStateFromFile, stashedStateFilePath, writeStashedState } from './stashedState';
+import { PanelChat, StashedState, isStashedState } from './types';
+import simpleGit, { SimpleGit } from 'simple-git';
 
 export async function handleMerge(context: vscode.ExtensionContext) {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -9,98 +11,84 @@ export async function handleMerge(context: vscode.ExtensionContext) {
         //vscode.window.showErrorMessage('No workspace folder found.');
         return;
     }
+    const repoPath = workspaceFolder.uri.fsPath;
 
-    const gaitFolder = path.join(workspaceFolder.uri.fsPath, '.gait');
-    if (!fs.existsSync(gaitFolder)) {
-        vscode.window.showInformationMessage('No .gait folder found. No merge conflicts to resolve.');
-        return;
-    }
-
-    const files = fs.readdirSync(gaitFolder);
-    for (const file of files) {
-        if (path.extname(file) === '.json') {
-            const filePath = path.join(gaitFolder, file);
-            const document = await vscode.workspace.openTextDocument(filePath);
-            const hasMergeConflicts = checkForMergeConflicts(document);
-            if (hasMergeConflicts) {
-                await resolveMergeConflicts(document);
-            }
-        }
+    const git: SimpleGit = simpleGit(repoPath);
+    const filepath = stashedStateFilePath();
+    const hasMergeConflicts = await checkForMergeConflicts(filepath, repoPath, git);
+    if (hasMergeConflicts) {
+        await resolveMergeConflicts(context, filepath, git);
     }
 }
-
-function checkForMergeConflicts(document: vscode.TextDocument): boolean {
-    const diagnostics = vscode.languages.getDiagnostics(document.uri);
-    return diagnostics.some(diagnostic => diagnostic.message.includes('Merge conflict'));
-}
-
-async function resolveMergeConflicts(document: vscode.TextDocument) {
-    const text = document.getText();
-    const { version1, version2 } = extractConflictingVersions(text);
-
-    if (version1 && version2) {
-        let mergedContent: string | null = null;
-        
-        if (document.fileName.endsWith('stashedPanelChats.json')) {
-            mergedContent = mergeStashedStates(version1, version2);
-        } 
-        if (mergedContent) {
-            const edit = new vscode.WorkspaceEdit();
-            edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), mergedContent);
-            await vscode.workspace.applyEdit(edit);
-            await document.save();
-            vscode.window.showInformationMessage(`Merge conflicts in ${path.basename(document.fileName)} automatically resolved.`);
-        }
-    }
-}
-
-function extractConflictingVersions(content: string): { version1: string, version2: string } {
-    const version1Parts: string[] = [];
-    const version2Parts: string[] = [];
-
-    const lines = content.split('\n');
-    let inVersion1 = false;
-    let inVersion2 = false;
-
-    for (let line of lines) {
-        if (line.startsWith('<<<<<<<')) {
-            // Start of the first version (Version 1)
-            inVersion1 = true;
-            inVersion2 = false;
-        } else if (line.startsWith('=======')) {
-            // Switch to the second version (Version 2)
-            inVersion1 = false;
-            inVersion2 = true;
-        } else if (line.startsWith('>>>>>>>')) {
-            // End of conflict
-            inVersion1 = false;
-            inVersion2 = false;
-        } else if (inVersion1) {
-            // Collect Version 1 lines
-            version1Parts.push(line);
-        } else if (inVersion2) {
-            // Collect Version 2 lines
-            version2Parts.push(line);
-        }
-    }
-
-    return {
-        version1: version1Parts.join('\n'),
-        version2: version2Parts.join('\n')
-    };
-}
-
-function mergeStashedStates(ourVersion: string, theirVersion: string): string | null {
+async function checkForMergeConflicts(filepath: string, repoPath: string, git: SimpleGit): Promise<boolean> {
     try {
-        const ourState: StashedState = JSON.parse(ourVersion);
-        const theirState: StashedState = JSON.parse(theirVersion);
+        const output = await git.diff(['--name-only', '--diff-filter=U', '--relative']);
+        const conflictingFiles = output.trim().split('\n');
+        return conflictingFiles.includes(path.relative(repoPath, filepath));
+    } catch (error) {
+        console.error('Error checking for merge conflicts:', error);
+        return false;
+    }
+}
 
+async function resolveMergeConflicts(context: vscode.ExtensionContext, filepath: string, git: SimpleGit) {
+
+    try {
+        // Checkout our version
+        await git.checkout(['--ours', filepath]);
+        
+        const ourState: StashedState = readStashedStateFromFile();
+
+        // Checkout their version
+        await git.checkout(['--theirs', filepath]);
+        
+        const theirState: StashedState = readStashedStateFromFile();;
+
+        const mergedState = mergeStashedStates(ourState, theirState);
+
+        if (mergedState) {
+            // Write the merged state back to the file
+            writeStashedState(context, mergedState);
+
+            // Stage the merged file
+            await git.add([filepath]);
+
+            vscode.window.showInformationMessage('Merge conflicts resolved successfully.');
+        } else {
+            vscode.window.showErrorMessage('Failed to merge stashed states.');
+        }
+    } catch (error: unknown) {
+        console.error('Error resolving merge conflicts:', error);
+        if (error instanceof Error) {
+            vscode.window.showErrorMessage(`Error resolving merge conflicts: ${error.message}`);
+        } else {
+            vscode.window.showErrorMessage('An unknown error occurred while resolving merge conflicts.');
+        }
+    }
+
+}
+
+
+function mergeStashedStates(ourState: StashedState, theirState: StashedState): StashedState | null {
+    try {
         if (!isStashedState(ourState) || !isStashedState(theirState)) {
             throw new Error('Invalid StashedState format');
         }
 
+        const panelChatMap = new Map<string, PanelChat>();
+
+        ourState.panelChats.forEach(chat => panelChatMap.set(chat.id, chat));
+
+        theirState.panelChats.forEach(chat => {
+            if (panelChatMap.has(chat.id)) {
+                panelChatMap.set(chat.id, mergePanelChats(panelChatMap.get(chat.id)!, chat));
+            } else {
+                panelChatMap.set(chat.id, chat);
+            }
+        });
+
         const mergedState: StashedState = {
-            panelChats: [...ourState.panelChats, ...theirState.panelChats],
+            panelChats: Array.from(panelChatMap.values()),
             inlineChats: [...ourState.inlineChats, ...theirState.inlineChats],
             schemaVersion: ourState.schemaVersion,
             deletedChats: {
@@ -110,9 +98,29 @@ function mergeStashedStates(ourVersion: string, theirVersion: string): string | 
             kv_store: { ...ourState.kv_store, ...theirState.kv_store }
         };
 
-        return JSON.stringify(mergedState, null, 2);
+        return mergedState;
     } catch (error) {
         console.error('Error merging stashed states:', error);
         return null;
     }
 }
+
+function mergePanelChats(ourChat: PanelChat, theirChat: PanelChat): PanelChat {
+    const mergedChat: PanelChat = {
+        ai_editor: ourChat.ai_editor,
+        id: ourChat.id,
+        customTitle: ourChat.customTitle,
+        parent_id: ourChat.parent_id,
+        created_on: ourChat.created_on,
+        messages: [],
+        kv_store: { ...ourChat.kv_store, ...theirChat.kv_store }
+    };
+    // Choose the chat with more messages
+    if (theirChat.messages.length > ourChat.messages.length) {
+        mergedChat.messages = theirChat.messages;
+    } else {
+        mergedChat.messages = ourChat.messages;
+    }
+    return mergedChat;
+}
+
