@@ -231,10 +231,6 @@ export function activate(context: vscode.ExtensionContext) {
     const panelChatMode = "OnlyMatchedChats";
     context.workspaceState.update('panelChatMode', panelChatMode);
 
-    writeStashedState(context, readStashedStateFromFile());
-    context.workspaceState.update('fileStashedState', readStashedStateFromFile());
-    //console.log(`PanelChatMode set to: ${panelChatMode}`);
-    vscode.window.showInformationMessage(`PanelChatMode set to: ${panelChatMode}`);
     generateKeybindings(context, tool);
 
     const startInlineCommand = tool === "Cursor" ? "aipopup.action.modal.generate" : "inlineChat.start";
@@ -253,6 +249,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
+    writeStashedState(context, readStashedStateFromFile());
+    context.workspaceState.update('fileStashedState', readStashedStateFromFile());
     setTimeout(() => {
         monitorPanelChatAsync(stateReader, context);
     }, 3000); // Delay to ensure initial setup
@@ -297,62 +295,6 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand(startInlineCommand);
     });
 
-    const setPanelChatModeCommand = vscode.commands.registerCommand('gait-copilot.setPanelChatMode', async () => {
-        const options: vscode.QuickPickItem[] = [
-            { label: 'Add All Chats', description: 'Save all panel chats' },
-            { label: 'Add Selected Chats', description: 'Only save panel chats that match code ' }
-        ];
-
-        const selectedOption = await vscode.window.showQuickPick(options, {
-            placeHolder: 'Select Panel Chat Mode'
-        });
-
-        if (selectedOption) {
-            const mode: PanelChatMode = selectedOption.label === 'Add All Chats' ? 'AddAllChats' : 'OnlyMatchedChats';
-            context.workspaceState.update('panelChatMode', mode);
-            vscode.window.showInformationMessage(`Panel Chat Mode set to: ${selectedOption.label}`);
-        }
-    });
-
-
-    const inlineChatContinue = vscode.commands.registerCommand('gait-copilot.continueInlineChat', (args) => {
-        try {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                try {
-                    // Create a selection from the start line to the end line
-                    const startPosition = new vscode.Position(args.startLine, 0);
-                    const endPosition = new vscode.Position(args.endLine, editor.document.lineAt(args.endLine).text.length);
-                    const newSelection = new vscode.Selection(startPosition, endPosition);
-
-                    // Set the new selection
-                    editor.selection = newSelection;
-                } catch (error) {
-                    vscode.window.showErrorMessage(`Failed to set selection: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                }
-
-                const document = editor.document;
-                const selection = editor.selection;
-                const inlineStartInfo: Inline.InlineStartInfo = {
-                    fileName: vscode.workspace.asRelativePath(document.uri),
-                    content: document.getText(),
-                    lineCount: document.lineCount,
-                    startTimestamp: new Date().toISOString(),
-                    startSelection: selection.start,
-                    endSelection: selection.end,
-                    selectionContent: document.getText(selection),
-                    parent_inline_chat_id: args.parent_inline_chat_id,
-                };
-                stateReader.startInline(inlineStartInfo).catch((error) => {
-                    vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                });
-                vscode.commands.executeCommand(startInlineCommand);
-            }
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to continue inline chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    });
-
     const openFileWithContentCommand = vscode.commands.registerCommand('gait-copilot.openFileWithContent', async (args) => {
         try {
             // Create a new untitled document
@@ -384,21 +326,9 @@ export function activate(context: vscode.ExtensionContext) {
             const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
             fs.writeFileSync(filePath, markdownContent, 'utf8');
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
-            await vscode.commands.executeCommand('aichat.newchataction');
+            await vscode.commands.executeCommand(startPanelCommand);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    });
-
-    const registerGaitChatParticipantCommand = vscode.commands.registerCommand('gait-copilot.registerGaitChatParticipant', (args) => {
-        //console.log("Registering gait chat participant", args);
-        try {
-            activateGaitParticipant(context, args.contextString);
-            vscode.window.showInformationMessage('Gait chat participant loaded with edit history!');
-            vscode.commands.executeCommand(startPanelCommand);
-        } catch (error) {
-            //console.log("Error registering gait chat participant", error);
-            vscode.window.showErrorMessage(`Failed to register gait chat participant: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     });
 
@@ -552,14 +482,11 @@ exit 0
     context.subscriptions.push(
         updateSidebarCommand, 
         inlineChatStartOverride, 
-        inlineChatContinue, 
         deleteInlineChatCommand, 
         openFileWithContentCommand,
         toggleDecorationsCommand,
-        registerGaitChatParticipantCommand, // Add the new command here
         exportPanelChatsToMarkdownCommand,
         handleMergeCommand,
-        setPanelChatModeCommand
     );
 
     debouncedRedecorate(context);
