@@ -260,6 +260,13 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
 
     log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`, LogLevel.INFO);
 
+    const currentInlineChatIds: Set<string> = new Set();
+    // Collect all current message and panelChat IDs excluding deleted ones
+    for (const inlineChat of parsedCurrent.inlineChats) {
+        currentInlineChatIds.add(inlineChat.inline_chat_id);
+    }
+
+
     // Step 2: Get the commit history for the file with --follow to track renames
     // '--reverse' ensures commits are ordered from oldest to newest
     const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
@@ -327,7 +334,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         }
 
         // Process the commit's panelChats
-        processCommit(parsedContent, currentMessageIds, currentPanelChatIds, seenMessageIds, commitData, commitHash);
+        processCommit(parsedContent, currentMessageIds, currentInlineChatIds, seenMessageIds, commitData, commitHash);
     }
 
     // Convert the map to an array
