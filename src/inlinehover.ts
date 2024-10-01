@@ -51,7 +51,7 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
     });
 
     // Find all lines that match `matchedLines`
-    let surroundingLines: Diff.Change[] = lineBasedDiffs.filter(diff => diff.added || diff.removed).map(diff => ({...diff, value: diff.value.trim()}));
+    let surroundingLines: Diff.Change[] = lineBasedDiffs.filter(diff => diff.added || diff.removed);
 
     // Ensure that there are lines to display
     if (surroundingLines.length > 0) {
