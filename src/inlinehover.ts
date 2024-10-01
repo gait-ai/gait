@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as Inline from './inline';
 import * as Diff from 'diff';
 import * as path from 'path';
-import { CommitData } from './panelgit';
+import { CommitData, getInlineChatIdToCommitInfo } from './panelgit';
 import { getRelativePath } from './utils';
 import { getInlineParent } from './stashedState';
 
@@ -51,7 +51,7 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
     });
 
     // Find all lines that match `matchedLines`
-    let surroundingLines: Diff.Change[] = lineBasedDiffs.filter(diff => diff.added || diff.removed).map(diff => ({...diff, value: diff.value.trim()}));
+    let surroundingLines: Diff.Change[] = lineBasedDiffs.filter(diff => diff.added || diff.removed);
 
     // Ensure that there are lines to display
     if (surroundingLines.length > 0) {
@@ -102,13 +102,16 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
 
 export async function createHover(context: vscode.ExtensionContext, matchedRange: Inline.InlineMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
     let markdown = new vscode.MarkdownString();
+
     let idToCommitInfo = undefined;
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const filePath = '.gait/stashedPanelChats.json.gz'; // Replace with your actual file path relative to repo
+
     if (!workspaceFolder) {
         console.warn('No workspace folder found.');
     } else {
         try {
-            idToCommitInfo = undefined;
+            idToCommitInfo = await getInlineChatIdToCommitInfo(context, workspaceFolder.uri.fsPath, filePath);
         } catch (error) {
             console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
         }

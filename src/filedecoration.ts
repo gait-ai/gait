@@ -12,21 +12,21 @@ type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
 const colorHueMap: Record<ColorType, number> = {
     blue: 210,
-    green: 120,
+    green: 110,
     purple: 270,
-    orange: 30
+    orange: 30,
 };
 
 /**
- * Utility function to generate different shades of a specified color.
- * Ensures colors are distinct by varying the lightness from light to dark.
+ * Utility function to generate different colors with similar lightness.
+ * Ensures colors are distinct by cycling through different hues.
  */
-function generateColors(index: number, colorType: ColorType = 'blue'): string {
-    const hue = colorHueMap[colorType];
-    const saturation = 70; // Fixed saturation at 70%
-    const totalShades = 10; // Total number of distinct shades
-    const lightness = Math.max(30, 90 - (index % totalShades) * 6); // Vary lightness from 90% to 30%
-    return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.5)`; // Different shades of blue, light to dark
+function generateColors(index: number): string {
+    const colorTypes: ColorType[] = ['blue', 'green', 'purple', 'orange'];
+    const hue = colorHueMap[colorTypes[index % colorTypes.length]];
+    const saturation = 30;
+    const lightness = 75;
+    return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.5)`;
 }
 
 /**
@@ -55,7 +55,7 @@ export function matchDiffToCurrentFile(
     const addedLinesSet = new Set(
         diff.filter(change => change.added)
            .flatMap(change => change.value.split('\n').map(line => line.trim()))
-           .filter(line => line.length > 0 && /[a-zA-Z0-9]/.test(line))
+           .filter(line => line.trim().length > 0)
     );
 
     if (addedLinesSet.size === 0) {
@@ -74,33 +74,45 @@ export function matchDiffToCurrentFile(
 
     // Merge consecutive line numbers into ranges
     const ranges: vscode.Range[] = [];
-    let rangeStart = -1;
+    // Filter out ranges that are a single line
+    if (addedLinesSet.size < 3) {
+        return ranges;
+    }
+    let start = -1;
+    let end = -1;
+    const multiLineRanges: vscode.Range[] = [];
 
     for (let i = 0; i < matchingLineNumbers.length; i++) {
-        if (rangeStart === -1) {
-            rangeStart = matchingLineNumbers[i];
-        } else if (matchingLineNumbers[i] !== matchingLineNumbers[i-1] + 1) {
-            // End of a consecutive range
-            ranges.push(new vscode.Range(
-                new vscode.Position(rangeStart, 0),
-                new vscode.Position(matchingLineNumbers[i-1], documentLines[matchingLineNumbers[i-1]].length)
-            ));
-            rangeStart = matchingLineNumbers[i];
+        const currentLine = matchingLineNumbers[i];
+        const nextLine = matchingLineNumbers[i + 1];
+
+        if (start === -1) {
+            start = currentLine;
+        }
+
+        if (nextLine === undefined || nextLine !== currentLine + 1) {
+            end = currentLine;
+
+            // Check if the range is meaningful
+            let meaningfulLines = 0;
+            for (let j = start; j <= end; j++) {
+                const line = documentLines[j].trim();
+                if (/[a-zA-Z0-9]/.test(line)) {
+                    meaningfulLines++;
+                }
+            }
+
+            // If we have at least two meaningful lines, add the range
+            if (meaningfulLines >= 2) {
+                for (let j = start; j <= end; j++) {
+                    multiLineRanges.push(new vscode.Range(j, 0, j, documentLines[j].length));
+                }
+            }
+
+            start = -1;
+            end = -1;
         }
     }
-
-    // Add the last range if there is one
-    if (rangeStart !== -1) {
-        ranges.push(new vscode.Range(
-            new vscode.Position(rangeStart, 0),
-            new vscode.Position(matchingLineNumbers[matchingLineNumbers.length-1], 
-                                documentLines[matchingLineNumbers[matchingLineNumbers.length-1]].length)
-        ));
-    }
-    // Filter out ranges that are a single line
-    const multiLineRanges = ranges.filter(range => 
-        range.start.line !== range.end.line
-    );
 
     return multiLineRanges;
 }
@@ -114,13 +126,15 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
     }
 
     const baseName = vscode.workspace.asRelativePath(editor.document.uri);
+    if (baseName === 'gait_context.md') {
+        return;
+    }
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         console.error('No workspace folder found');
         return;
     }
 
-    const gaitDir = path.join(workspaceFolder.uri.fsPath, '.gait');
     const stashedState: StashedState = readStashedState(context);
     const inlineChats = stashedState.inlineChats;
     if (inlineChats === undefined) {
@@ -128,9 +142,15 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
         return;
     }
     const rangesToPanel: PanelMatchedRange[] = [];
+    interface LineDecoration {
+        timestamp: number;
+        decorationType: vscode.TextEditorDecorationType;
+        decorationOptions: vscode.DecorationOptions[];
+    }
 
-    const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
-    function addDecorationType(color: string, range: vscode.Range) {
+    const lineDecorations: Map<number, LineDecoration> = new Map();
+
+    function addDecorationType(color: string, line: number, timestamp: number) {
         if (!decorations_active) {
             return;
         }
@@ -140,29 +160,26 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
             overviewRulerLane: vscode.OverviewRulerLane.Right,
             // You can add more styling options here if needed
         });
+        const decorationOptions: vscode.DecorationOptions[] = [{
+            range: new vscode.Range(line, 0, line, editor!.document.lineAt(line).text.length),
+        }];
 
-        const decorationOptions: vscode.DecorationOptions[] = decorationsMap.get(decorationType) || [];
-        decorationOptions.push({
-            range: range,
-        });
-        decorationsMap.set(decorationType, decorationOptions);
+        const existingDecoration = lineDecorations.get(line);
+        if (!existingDecoration || timestamp < existingDecoration.timestamp) {
+            lineDecorations.set(line, { timestamp, decorationType, decorationOptions });
+        }
     }
 
+
+    const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
+
     let decorationIndex = 0;
-
-
-    const currentPanelChats = [...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []), ...stashedState.panelChats];
-
-    // Sort currentPanelChats by time in ascending order (latest first)
-    currentPanelChats.sort((a, b) => {
-        const timeA = a.created_on;
-        const timeB = b.created_on;
-        return new Date(timeA).getTime() - new Date(timeB).getTime();
-    });
+    const currentPanelChats = [...stashedState.panelChats, ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || [])];
 
     const currentMessages = currentPanelChats.reduce((acc, panelChat) => {
         panelChat.messages.forEach(message => {
-            if (!acc.some(item => item.message.id === message.id)) {
+            const existingIndex = acc.findIndex(item => item.message.id === message.id);
+            if (existingIndex === -1) {
                 acc.push({ message, panelChat });
             }
         });
@@ -177,7 +194,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
         }
         const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
         if (already_associated) {
-            console.log("Already associated");
+            console.log("Already associated: ", message.id);
         }
         const codeBlocks = extractCodeBlocks(message.responseText);
         for (const code of codeBlocks) {
@@ -188,10 +205,9 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                     console.error(`Failed to associate file with message: ${error}`);
                 });
             }
-            
+            decorationIndex += 1;
             if (currentRanges.length > 0) {
                 const color = generateColors(decorationIndex);
-                decorationIndex += 1;
 
                 function lineInRangesToPanel(line: number) {
                     return rangesToPanel.some(range => 
@@ -205,7 +221,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                         panelChat: panelChat,
                         message_id: message.id,
                     });
-                    addDecorationType(color, range);
+                    addDecorationType(color, range.start.line, new Date(panelChat.created_on).getTime());
                 }
 
                 currentRanges.forEach(range => {
@@ -244,7 +260,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
             const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs);
             if (currentRanges.length > 0) {
                 const color = generateColors(decorationIndex);
-                decorationIndex += 1;
+                // Get content at document in the range
 
                 // Create a new decoration type with the unique color
                 currentRanges.forEach(range => {
@@ -252,18 +268,19 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                         range: range,
                         inlineChat: chat,
                     });
-                    addDecorationType(color, range);
+                    addDecorationType(color, range.start.line, new Date(chat.timestamp).getTime());
                 });
             }
+            decorationIndex += 1;
         }
     }
 
     // Apply all decoration types
     if (decorations_active) {
-        decorationsMap.forEach((decorationOptions, decorationType) => {
-            editor.setDecorations(decorationType, decorationOptions);
+        lineDecorations.forEach((value) => {
+            editor.setDecorations(value.decorationType, value.decorationOptions);
             // Ensure decorationType is disposed when no longer needed
-            context.subscriptions.push(decorationType);
+            context.subscriptions.push(value.decorationType);
         });
     }
 
@@ -281,7 +298,6 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                 const hover = await PanelHover.createPanelHover(context, oldestRange, editor.document);
                 return hover;
             }
-            // Find the range with the highest similarity
             const oldestRange = ranges.reduce((max, current) => 
                 current.inlineChat.timestamp < max.inlineChat.timestamp ? current : max
             );
@@ -296,7 +312,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
     }
 
     return {
-        decorationTypes: Array.from(decorationsMap.keys()),
+        decorationTypes: Array.from(lineDecorations.values()).map((value) => value.decorationType),
         hoverProvider: hoverProvider
     };
 }

@@ -20,7 +20,7 @@ import { readStashedStateFromFile, writeStashedState, readStashedState } from '.
 const GAIT_FOLDER_NAME = '.gait';
 
 let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider: vscode.Disposable } | undefined;
-let decorationsActive = false;
+let decorationsActive = true;
 
 let isRedecorating = false;
 let changeQueue: { cursor_position: vscode.Position, 
