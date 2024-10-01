@@ -171,20 +171,12 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
     const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
 
     let decorationIndex = 0;
-
-
-    const currentPanelChats = [...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || []), ...stashedState.panelChats];
-
-    // Sort currentPanelChats by time in ascending order (latest first)
-    currentPanelChats.sort((a, b) => {
-        const timeA = a.created_on;
-        const timeB = b.created_on;
-        return new Date(timeA).getTime() - new Date(timeB).getTime();
-    });
+    const currentPanelChats = [...stashedState.panelChats, ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || [])];
 
     const currentMessages = currentPanelChats.reduce((acc, panelChat) => {
         panelChat.messages.forEach(message => {
-            if (!acc.some(item => item.message.id === message.id)) {
+            const existingIndex = acc.findIndex(item => item.message.id === message.id);
+            if (existingIndex === -1) {
                 acc.push({ message, panelChat });
             }
         });
@@ -199,7 +191,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
         }
         const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
         if (already_associated) {
-            console.log("Already associated");
+            console.log("Already associated: ", message.id);
         }
         const codeBlocks = extractCodeBlocks(message.responseText);
         for (const code of codeBlocks) {
