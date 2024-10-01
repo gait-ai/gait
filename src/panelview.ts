@@ -118,9 +118,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * Updates the webview content by loading commits and integrating uncommitted changes.
      */
     public async updateContent() {
-        // Store current scroll position and expanded commits
-        const scrollPosition = this._view?.webview.postMessage({ command: 'getScrollPosition' });
-        const expandedCommits = this._view?.webview.postMessage({ command: 'getExpandedCommits' });
 
         if (this._isFilteredView) {
             const editor = vscode.window.activeTextEditor;
@@ -136,8 +133,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 type: 'update',
                 commits: this._commits,
-                scrollPosition: scrollPosition,
-                expandedCommits: expandedCommits
             });
         }
     }
@@ -1253,13 +1248,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 restoreExpandedCommits();
                 restoreScrollPosition();
                 Prism.highlightAll();
-            } else if (message.command === 'getScrollPosition') {
-                vscode.postMessage({ command: 'scrollPosition', position: document.scrollingElement.scrollTop });
-            } else if (message.command === 'getExpandedCommits') {
-                const expanded = Array.from(document.querySelectorAll('.commit-details'))
-                    .map((details, index) => details.style.display === 'block' ? index : null)
-                    .filter(index => index !== null);
-                vscode.postMessage({ command: 'expandedCommits', commits: expanded });
             }
         });
 
