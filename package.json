@@ -126,16 +126,6 @@
                 "when": "editorFocus"
             },
             {
-                "key": "cmd+a cmd+s",
-                "command": "editor.action.inlineDiffs.acceptAll",
-                "when": "editorTextFocus && (arbitrary function)"
-            },
-            {
-                "key": "cmd+enter",
-                "command": "-editor.action.inlineDiffs.acceptAll",
-                "when": "editorTextFocus && (arbitrary function)"
-            },
-            {
                 "key": "cmd+shift+g",
                 "command": "gait-copilot.toggleDecorations"
             }

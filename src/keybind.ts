@@ -41,16 +41,6 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
                 command: "gait-copilot.startInlineChat",
                 key: "cmd+k",
                 when: "editorFocus"
-            },
-            {
-                key: "cmd+a cmd+s",
-                command: "editor.action.inlineDiffs.acceptAll",
-                when: "editorTextFocus && (arbitrary function)"
-            },
-            {
-                key: "cmd+enter",
-                command: "-editor.action.inlineDiffs.acceptAll",
-                when: "editorTextFocus && (arbitrary function)"
             }
         ];
     }
