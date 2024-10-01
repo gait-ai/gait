@@ -478,11 +478,19 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             margin-bottom: 5px;
             display: flex;
             align-items: center;
+            cursor: pointer; /* Make it clickable */
+        }
+        .panel-chat-header:hover {
+            background-color: var(--vscode-editor-selectionBackground);
         }
         .panel-chat-info {
             font-size: 0.9em;
             color: var(--vscode-descriptionForeground);
             margin-bottom: 10px;
+        }
+        .panel-chat-details {
+            display: none; /* Hidden by default */
+            margin-top: 10px;
         }
         .message-container {
             margin-bottom: 15px;
@@ -795,6 +803,30 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             });
         }
 
+        /**
+         * Attaches click listeners to panel chat headers to toggle visibility of panel chat details.
+         */
+        function attachPanelChatToggleListeners() {
+            const panelChatHeaders = document.querySelectorAll('.panel-chat-header');
+            panelChatHeaders.forEach(header => {
+                header.addEventListener('click', () => {
+                    const details = header.nextElementSibling;
+                    if (details) {
+                        if (details.style.display === 'block') {
+                            details.style.display = 'none';
+                        } else {
+                            details.style.display = 'block';
+                            const codeBlocks = details.querySelectorAll('pre code');
+                            console.log('Found code blocks in panel chat:', codeBlocks);
+                            codeBlocks.forEach((block) => {
+                                Prism.highlightElement(block);
+                            });
+                        }
+                    }
+                });
+            });
+        }
+
         function attachLinkListeners() {
             const contentElement = document.getElementById('content');
             contentElement.addEventListener('click', (event) => {
@@ -978,6 +1010,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
         let scrollPosition = 0;
         let expandedCommits = new Set();
+        let expandedPanelChats = new Set(); // New Set to track expanded panel chats
 
         function saveScrollPosition() {
             scrollPosition = document.scrollingElement.scrollTop;
@@ -1005,6 +1038,37 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         }
 
         /**
+         * Saves the expanded state of panel chats.
+         */
+        function saveExpandedPanelChats() {
+            expandedPanelChats.clear();
+            document.querySelectorAll('.panel-chat-details').forEach((details) => {
+                const parentHeader = details.previousElementSibling;
+                if (details.style.display === 'block' && parentHeader) {
+                    const panelChatId = parentHeader.getAttribute('data-panel-chat-id');
+                    if (panelChatId) {
+                        expandedPanelChats.add(panelChatId);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Restores the expanded state of panel chats.
+         */
+        function restoreExpandedPanelChats() {
+            document.querySelectorAll('.panel-chat-details').forEach((details) => {
+                const parentHeader = details.previousElementSibling;
+                if (parentHeader) {
+                    const panelChatId = parentHeader.getAttribute('data-panel-chat-id');
+                    if (panelChatId && expandedPanelChats.has(panelChatId)) {
+                        details.style.display = 'block';
+                    }
+                }
+            });
+        }
+
+        /**
          * Handles incoming messages from the extension backend.
          */
         window.addEventListener('message', event => {
@@ -1012,7 +1076,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             if (message.type === 'update') {
                 saveScrollPosition();
                 saveExpandedCommits();
-                
+                saveExpandedPanelChats(); // Save expanded panel chats
 
                 const contentElement = document.getElementById('content');
                 contentElement.innerHTML = ''; // Clear existing content
@@ -1046,6 +1110,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                 // PanelChat header with delete and append buttons
                                 const panelChatHeader = document.createElement('div');
                                 panelChatHeader.className = 'panel-chat-header';
+                                // When setting the data attribute for panelChat headers
+                                panelChatHeader.setAttribute('data-panel-chat-id', \`\${commit.commitHash}-\${panelChat.id}\`); // Add data attribute for identification
                                 panelChatHeader.innerHTML = \`
                                     Title: \${escapeHtml(panelChat.customTitle)}
                                     <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete PanelChat">🗑️</button>
@@ -1088,6 +1154,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
                                 panelChatDiv.appendChild(panelChatHeader);
 
+                                // Create panel-chat-details container
+                                const panelChatDetails = document.createElement('div');
+                                panelChatDetails.className = 'panel-chat-details';
+
                                 // PanelChat info (customTitle, ai_editor, etc.)
                                 const panelChatInfo = document.createElement('div');
                                 panelChatInfo.className = 'panel-chat-info';
@@ -1095,7 +1165,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                     <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
                                     <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
                                 \`;
-                                panelChatDiv.appendChild(panelChatInfo);
+                                panelChatDetails.appendChild(panelChatInfo);
 
                                 // Messages in panelChat
                                 panelChat.messages.forEach(messageEntry => {
@@ -1214,8 +1284,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         }
                                     }
 
-                                    panelChatDiv.appendChild(messageContainer);
+                                    panelChatDetails.appendChild(messageContainer);
                                 });
+
+                                commitDetails.appendChild(panelChatDetails);
+                                panelChatDiv.appendChild(panelChatDetails);
 
                                 commitDetails.appendChild(panelChatDiv);
                             });
@@ -1233,6 +1306,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     // Attach event listeners for collapsible commits
                     attachCommitToggleListeners();
 
+                    // Attach event listeners for collapsible panel chats
+                    attachPanelChatToggleListeners(); // New function call
+
                     // Attach event listeners for delete, write, and remove buttons
                     attachButtonListeners();
 
@@ -1246,6 +1322,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
                 // After updating the content
                 restoreExpandedCommits();
+                restoreExpandedPanelChats(); // Restore expanded panel chats
                 restoreScrollPosition();
                 Prism.highlightAll();
             }
