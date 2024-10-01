@@ -1090,10 +1090,19 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         // Create commit header
                         const commitHeader = document.createElement('div');
                         commitHeader.className = 'commit-header';
+
+                        const isRegularCommit = commit.commitHash !== 'added' && commit.commitHash !== 'uncommitted';
+
+                        const commitMessage = isRegularCommit
+                        ? \`Commit Message: \${escapeHtml(commit.commitMessage)}\`
+                        : \`\${escapeHtml(commit.commitMessage)}\`;
+
+
                         commitHeader.innerHTML = \`
-                            <h3>\${escapeHtml(commit.commitMessage)}</h3>
+                            <h3>\${escapeHtml(commitMessage)}</h3>
                             <span class="commit-date">\${new Date(commit.date).toLocaleString()}</span>
                         \`;
+
                         commitDiv.appendChild(commitHeader);
 
                         // Create commit details container
