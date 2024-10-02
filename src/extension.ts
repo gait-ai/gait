@@ -17,6 +17,7 @@ import {diffLines} from 'diff';
 import { getRelativePath } from './utils';
 import { readStashedStateFromFile, writeStashedState, readStashedState } from './stashedState';
 import * as child_process from 'child_process';
+import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 
 const GAIT_FOLDER_NAME = '.gait';
 
@@ -470,7 +471,7 @@ exit 0
             gitAttributesContent = fs.readFileSync(gitAttributesPath, 'utf8');
         }
 
-        const mergeDriverAttribute = `${GAIT_FOLDER_NAME}/stashedGaitState2.json merge=custom-stashed-state`;
+        const mergeDriverAttribute = `${GAIT_FOLDER_NAME}/${STASHED_GAIT_STATE_FILE_NAME} merge=custom-stashed-state`;
 
         if (!gitAttributesContent.includes(mergeDriverAttribute)) {
             try {

@@ -3,6 +3,7 @@ import path from 'path';
 import { isStashedState, PanelChat, StashedState } from './types';
 import vscode from 'vscode';
 import { InlineChatInfo } from './inline';
+import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 
 /**
  * Returns the file path for the stashed state.
@@ -14,7 +15,7 @@ export function stashedStateFilePath(): string {
     }
 
     const repoPath = workspaceFolder.uri.fsPath;
-    return path.join(repoPath, '.gait', 'stashedGaitState2.json');
+    return path.join(repoPath, `.gait/${STASHED_GAIT_STATE_FILE_NAME}`);
 }
 
 export function readStashedState(context: vscode.ExtensionContext): StashedState {

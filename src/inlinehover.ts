@@ -5,6 +5,7 @@ import * as path from 'path';
 import { CommitData, getInlineChatIdToCommitInfo } from './panelgit';
 import { getRelativePath } from './utils';
 import { getInlineParent } from './stashedState';
+import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 
 export async function createHoverContent(context: vscode.ExtensionContext, markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, CommitData> | undefined): Promise<vscode.MarkdownString> {
     const { prompt, timestamp, parent_inline_chat_id } = inlineChat;
@@ -96,7 +97,7 @@ export async function createHover(context: vscode.ExtensionContext, matchedRange
 
     let idToCommitInfo = undefined;
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const filePath = '.gait/stashedGaitState2.json'; // Replace with your actual file path relative to repo
+    const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`; // Replace with your actual file path relative to repo
 
     if (!workspaceFolder) {
         console.warn('No workspace folder found.');

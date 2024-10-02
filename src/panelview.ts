@@ -6,6 +6,7 @@ import { CommitData, GitHistoryData, getGitHistory, getGitHistoryThatTouchesFile
 import { PanelChat } from './types';
 import { readStashedState, writeStashedState, removeMessageFromStashedState, removePanelChatFromStashedState, writeChatToStashedState } from './stashedState';
 import { panelChatsToMarkdown } from './markdown'; // Added import
+import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'gait-copilot.panelView';
@@ -27,7 +28,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         let context = this._context;
 
         const repoPath = workspaceFolder.uri.fsPath;
-        const filePath = '.gait/stashedGaitState2.json'; // Replace with your actual file path relative to repo
+        const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`; // Replace with your actual file path relative to repo
 
         try {
             if (this._isFilteredView && additionalFilePath) {

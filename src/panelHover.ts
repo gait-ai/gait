@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { PanelMatchedRange } from './types';
 import { getIdToCommitInfo } from './panelgit';
+import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 
 /**
  * Creates hover content for a matched panel chat range.
@@ -17,7 +18,7 @@ export async function createPanelHover(context: vscode.ExtensionContext, matched
     } else {
         try {
             const repoPath = workspaceFolder.uri.fsPath;
-            const filePath = '.gait/stashedGaitState2.json'; // Replace with your actual file path relative to repo
+            const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`; // Replace with your actual file path relative to repo
             idToCommitInfo = await getIdToCommitInfo(context, repoPath, filePath);
         } catch (error) {
             console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
