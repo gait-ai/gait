@@ -1,4 +1,152 @@
-import * as vscode from 'vscode';
+# Panel Chats
+
+Panel Chat Title: Markdown Formatting Issues in Chat Export
+- **Created On**: 2024-10-02T04:59:44.850Z
+- **Messages**:
+    - **Model**: claude-3.5-sonnet
+    - **Context**: /Users/kylel1/Documents/GitHub/gait-copilot/src/panelHover.ts
+    - **Text**: why is the markdown broken in view in markdwon?
+    - **Response**: The issue with the "View in Markdown" link is likely due to how the JSON data is being encoded in the command URI. Let's fix this by properly encoding the JSON data. Here's how we can update the relevant part of the code:
+
+```typescript:src/panelHover.ts
+// ... existing code ...
+
+    const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]};
+
+    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(JSON.stringify(markdownData))}`);
+    markdown.appendMarkdown(`\n\n[View in Markdown](${exportCommand})`);
+
+// ... existing code ...
+```
+
+The problem is that `JSON.stringify()` might produce a string with characters that are not safe for URIs, even after using `encodeURIComponent()`. To fix this, we should use a more robust encoding method. Here's an improved version:
+
+```typescript:src/panelHover.ts
+// ... existing code ...
+
+    const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]};
+
+    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
+    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodedData}`);
+    markdown.appendMarkdown(`\n\n[View in Markdown](${exportCommand})`);
+
+// ... existing code ...
+```
+
+This change does the following:
+
+1. We convert the `markdownData` object to a JSON string.
+2. We then convert this JSON string to a Base64-encoded string using `Buffer.from().toString('base64')`.
+3. We use this Base64-encoded string directly in the command URI without additional encoding.
+
+This approach ensures that all characters in the data are safely encoded for use in a URI, regardless of their original content. The `exportPanelChatsToMarkdown` command will need to be updated to decode this Base64 string back into JSON on the receiving end.
+
+Make sure to update the command handler for `gait-copilot.exportPanelChatsToMarkdown` to decode the Base64 string before parsing it as JSON.
+ - **Expanded Context** + Whole file in context:
+ import * as vscode from 'vscode';
+import { PanelMatchedRange } from './types';
+import { getIdToCommitInfo } from './panelgit';
+
+/**
+ * Creates hover content for a matched panel chat range.
+ * @param matchedRange The matched range containing the panel chat and message information.
+ * @param document The VSCode text document.
+ * @returns A promise that resolves to a VSCode Hover object.
+ */
+export async function createPanelHover(context: vscode.ExtensionContext, matchedRange: PanelMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
+    let markdown = new vscode.MarkdownString();
+    let idToCommitInfo = undefined;
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        console.warn('No workspace folder found.');
+    } else {
+        try {
+            const repoPath = workspaceFolder.uri.fsPath;
+            const filePath = '.gait/stashedPanelChats.json.gz'; // Replace with your actual file path relative to repo
+            idToCommitInfo = await getIdToCommitInfo(context, repoPath, filePath);
+        } catch (error) {
+            console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
+        }
+    }
+    const { panelChat, message_id } = matchedRange;
+
+    // Find the message that resulted in the matched range
+    const message = panelChat.messages.find(msg => msg.id === message_id);
+    if (!message) {
+        return undefined;
+    }
+
+    const commitInfo = idToCommitInfo?.get(message.id);
+    const author = commitInfo?.author ?? "You";
+    const commitMessage = commitInfo?.commitMessage ?? "Uncommited changes";
+
+    markdown.isTrusted = true;
+
+    // Display the message text and response
+    const messageAuthor = commitInfo?.author ?? "You";
+    markdown.appendMarkdown(`### ${messageAuthor}: ${message.messageText}\n\n`);
+    // Escape backticks and newlines in the response text
+    markdown.appendMarkdown(`**Response**: ${message.responseText}\n\n`);
+
+    // Display the context information in small text
+    if (message.context && message.context.length > 0) {
+        markdown.appendMarkdown(`**Context**: ${message.context[0].value.human_readable}`);
+        if (message.context.length > 1) {
+            markdown.appendMarkdown(` (and ${message.context.length - 1} more)`);
+        }
+        markdown.appendMarkdown(`\n\n`);
+    }
+
+    markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
+    const markdownData = [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}];
+
+    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
+    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(JSON.stringify({data: encodedData}))}`);
+    markdown.appendMarkdown(`\n\n[View in Markdown](${exportCommand}) | ` );
+    markdown.appendMarkdown(`\n\n`);
+    const deleteCommand = vscode.Uri.parse(`command:gait-copilot.removePanelChat?${encodeURIComponent(JSON.stringify({
+        panel_chat_id: panelChat.id,
+        message_id: message.id
+    }))}`);
+    markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);
+
+    return new vscode.Hover(markdown);
+}
+    - **Model**: claude-3.5-sonnet
+    - **Context**: /Users/kylel1/Documents/GitHub/gait-copilot/src/extension.ts
+    - **Text**: how do I modify the exportPanelChatsToMarkdownCommand to decode thsi base64?
+    - **Response**: To modify the `exportPanelChatsToMarkdownCommand` to decode the Base64 encoded data, you'll need to update the command handler. Here's how you can modify the relevant part of the code:
+
+```typescript:src/extension.ts
+// ... existing code ...
+
+const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (encodedArgs) => {
+    try {
+        const decodedArgs = Buffer.from(encodedArgs, 'base64').toString('utf-8');
+        const markdownData = JSON.parse(decodedArgs);
+        const markdownContent = panelChatsToMarkdown(markdownData.chats, true);
+        const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
+        fs.writeFileSync(filePath, markdownContent, 'utf8');
+        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
+        await vscode.commands.executeCommand(startPanelCommand);
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+});
+
+// ... rest of the code ...
+```
+
+This modification does the following:
+
+1. The command now expects a single `encodedArgs` parameter, which is the Base64 encoded string.
+2. It decodes the Base64 string back into a UTF-8 string using `Buffer.from(encodedArgs, 'base64').toString('utf-8')`.
+3. The decoded string is then parsed as JSON to get the `markdownData` object.
+4. The rest of the function remains the same, using `markdownData.chats` to generate the markdown content.
+
+This change ensures that the command can handle the Base64 encoded data that you're now passing from the `panelHover.ts` file. Make sure that the `panelChatsToMarkdown` function is updated to work with the new structure of `markdownData.chats` if necessary.
+ - **Expanded Context** + Whole file in context:
+ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as Inline from './inline';
@@ -16,7 +164,6 @@ import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
 import { getRelativePath } from './utils';
 import { readStashedStateFromFile, writeStashedState, readStashedState } from './stashedState';
-import * as child_process from 'child_process';
 
 const GAIT_FOLDER_NAME = '.gait';
 
@@ -231,10 +378,6 @@ export function activate(context: vscode.ExtensionContext) {
     const panelChatMode = "OnlyMatchedChats";
     context.workspaceState.update('panelChatMode', panelChatMode);
 
-    writeStashedState(context, readStashedStateFromFile());
-    context.workspaceState.update('fileStashedState', readStashedStateFromFile());
-    //console.log(`PanelChatMode set to: ${panelChatMode}`);
-    vscode.window.showInformationMessage(`PanelChatMode set to: ${panelChatMode}`);
     generateKeybindings(context, tool);
 
     const startInlineCommand = tool === "Cursor" ? "aipopup.action.modal.generate" : "inlineChat.start";
@@ -253,6 +396,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
+    writeStashedState(context, readStashedStateFromFile());
+    context.workspaceState.update('fileStashedState', readStashedStateFromFile());
     setTimeout(() => {
         monitorPanelChatAsync(stateReader, context);
     }, 3000); // Delay to ensure initial setup
@@ -297,62 +442,6 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand(startInlineCommand);
     });
 
-    const setPanelChatModeCommand = vscode.commands.registerCommand('gait-copilot.setPanelChatMode', async () => {
-        const options: vscode.QuickPickItem[] = [
-            { label: 'Add All Chats', description: 'Save all panel chats' },
-            { label: 'Add Selected Chats', description: 'Only save panel chats that match code ' }
-        ];
-
-        const selectedOption = await vscode.window.showQuickPick(options, {
-            placeHolder: 'Select Panel Chat Mode'
-        });
-
-        if (selectedOption) {
-            const mode: PanelChatMode = selectedOption.label === 'Add All Chats' ? 'AddAllChats' : 'OnlyMatchedChats';
-            context.workspaceState.update('panelChatMode', mode);
-            vscode.window.showInformationMessage(`Panel Chat Mode set to: ${selectedOption.label}`);
-        }
-    });
-
-
-    const inlineChatContinue = vscode.commands.registerCommand('gait-copilot.continueInlineChat', (args) => {
-        try {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                try {
-                    // Create a selection from the start line to the end line
-                    const startPosition = new vscode.Position(args.startLine, 0);
-                    const endPosition = new vscode.Position(args.endLine, editor.document.lineAt(args.endLine).text.length);
-                    const newSelection = new vscode.Selection(startPosition, endPosition);
-
-                    // Set the new selection
-                    editor.selection = newSelection;
-                } catch (error) {
-                    vscode.window.showErrorMessage(`Failed to set selection: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                }
-
-                const document = editor.document;
-                const selection = editor.selection;
-                const inlineStartInfo: Inline.InlineStartInfo = {
-                    fileName: vscode.workspace.asRelativePath(document.uri),
-                    content: document.getText(),
-                    lineCount: document.lineCount,
-                    startTimestamp: new Date().toISOString(),
-                    startSelection: selection.start,
-                    endSelection: selection.end,
-                    selectionContent: document.getText(selection),
-                    parent_inline_chat_id: args.parent_inline_chat_id,
-                };
-                stateReader.startInline(inlineStartInfo).catch((error) => {
-                    vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                });
-                vscode.commands.executeCommand(startInlineCommand);
-            }
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to continue inline chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    });
-
     const openFileWithContentCommand = vscode.commands.registerCommand('gait-copilot.openFileWithContent', async (args) => {
         try {
             // Create a new untitled document
@@ -377,29 +466,81 @@ export function activate(context: vscode.ExtensionContext) {
         debouncedRedecorate(context);
     });
 
-    // Register command to convert PanelChats to markdown and open in a new file
-    const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (args) => {
+    // Register the deletePanelChat command
+    const deletePanelChatCommand = vscode.commands.registerCommand('gait-copilot.deletePanelChat', async () => {
         try {
-            const markdownContent = panelChatsToMarkdown(args.chats, true);
-            const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
-            fs.writeFileSync(filePath, markdownContent, 'utf8');
-            await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
-            vscode.window.showInformationMessage('Panel chats exported to context.gait successfully.');
-            await vscode.commands.executeCommand('aichat.newchataction');
+            if (!workspaceFolder) {
+                throw new Error('No workspace folder found');
+            }
+
+            const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
+            const stashedPath = path.join(gaitDir, 'stashedPanelChats.json.gz');
+
+            if (!fs.existsSync(stashedPath)) {
+                vscode.window.showErrorMessage('stashedPanelChats.json does not exist.');
+                return;
+            }
+
+            // Read existing chats
+            const fileContent = fs.readFileSync(stashedPath, 'utf-8');
+            const chats: { messageText: string; responseText: string }[] = JSON.parse(fileContent);
+
+            if (chats.length === 0) {
+                vscode.window.showInformationMessage('No chats to delete.');
+                return;
+            }
+
+            // Prompt user to select which chat to delete
+            const items = chats.map((chat, index) => ({
+                label: `Chat ${index + 1}`,
+                description: `Message: ${chat.messageText.substring(0, 50)}..., Response: ${chat.responseText.substring(0, 50)}...`,
+                index: index
+            }));
+
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: 'Select a chat to delete'
+            });
+
+            if (!selected) {
+                return; // User cancelled the selection
+            }
+
+            // Confirm deletion
+            const confirm = await vscode.window.showWarningMessage(
+                `Are you sure you want to delete ${selected.label}?`,
+                { modal: true },
+                'Yes'
+            );
+
+            if (confirm !== 'Yes') {
+                return;
+            }
+
+            // Remove the selected chat
+            chats.splice(selected.index, 1);
+
+            // Write back the updated chats
+            fs.writeFileSync(stashedPath, JSON.stringify(chats, null, 2));
+            vscode.window.showInformationMessage(`Deleted ${selected.label} successfully.`);
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            vscode.window.showErrorMessage(`Failed to delete chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     });
 
-    const registerGaitChatParticipantCommand = vscode.commands.registerCommand('gait-copilot.registerGaitChatParticipant', (args) => {
-        //console.log("Registering gait chat participant", args);
+    // Register command to convert PanelChats to markdown and open in a new file
+    const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (args) => {
         try {
-            activateGaitParticipant(context, args.contextString);
-            vscode.window.showInformationMessage('Gait chat participant loaded with edit history!');
-            vscode.commands.executeCommand(startPanelCommand);
+            const decodedArgs = Buffer.from(args.data, 'base64').toString('utf-8');
+            const markdownData = JSON.parse(decodedArgs);
+            const markdownContent = panelChatsToMarkdown(markdownData, true);
+            const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
+            fs.writeFileSync(filePath, markdownContent, 'utf8');
+            await vscode.workspace.openTextDocument(filePath);
+            await vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(filePath));
+            await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup');
+            await vscode.commands.executeCommand(startPanelCommand);
         } catch (error) {
-            //console.log("Error registering gait chat participant", error);
-            vscode.window.showErrorMessage(`Failed to register gait chat participant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     });
 
@@ -422,145 +563,16 @@ export function activate(context: vscode.ExtensionContext) {
         handleMerge(context);
     });
 
-    try {
-        const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-
-        // Define the custom merge driver script content
-        const customMergeDriverScript = `#!/bin/bash
-
-# custom-merge-driver.sh
-
-# Git passes these parameters to the merge driver
-BASE="$1"    # %O - Ancestor's version (common base)
-CURRENT="$2" # %A - Current version (ours)
-OTHER="$3"   # %B - Other branch's version (theirs)
-
-# Temporary file to store the merged result
-MERGED="$CURRENT.merged"
-
-# Check if jq is installed
-if ! command -v jq &> /dev/null
-then
-    echo "jq command could not be found. Please install jq to use this merge driver."
-    exit 1
-fi
-
-# Perform the merge using jq
-jq -n \\
-    --argfile ourState "$CURRENT" \\
-    --argfile theirState "$OTHER" \\
-    '
-    def mergePanelChats(ourChats; theirChats):
-        (ourChats + theirChats) | 
-        group_by(.id) | 
-        map(
-            if length == 1 then .[0]
-            else
-                ourChat = .[0];
-                theirChat = .[1];
-                {
-                    ai_editor: ourChat.ai_editor,
-                    id: ourChat.id,
-                    customTitle: ourChat.customTitle,
-                    parent_id: ourChat.parent_id,
-                    created_on: ourChat.created_on,
-                    messages: if (theirChat.messages | length) > (ourChat.messages | length) then theirChat.messages else ourChat.messages end,
-                    kv_store: ourChat.kv_store + theirChat.kv_store
-                }
-            end
-        );
-
-    def mergeStashedStates(ourState; theirState):
-        {
-            panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
-            inlineChats: ourState.inlineChats + theirState.inlineChats,
-            schemaVersion: ourState.schemaVersion,
-            deletedChats: {
-                deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
-                deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
-            },
-            kv_store: ourState.kv_store + theirState.kv_store
-        };
-
-    ourState = $ourState;
-    theirState = $theirState;
-
-    mergedState = mergeStashedStates(ourState; theirState);
-
-    mergedState
-    ' > "$MERGED"
-
-# Check if the merge was successful
-if [ $? -ne 0 ]; then
-    echo "Error during merging stashed states."
-    exit 1
-fi
-
-# Replace the current file with the merged result
-mv "$MERGED" "$CURRENT"
-
-# Indicate a successful merge
-exit 0
-`;
-        // Path to the custom merge driver script
-        const customMergeDriverPath = path.join(gaitFolderPath, 'custom-merge-driver.sh');
-
-        // Write the script to the .gait folder if it doesn't exist or content has changed
-        if (!fs.existsSync(customMergeDriverPath) || fs.readFileSync(customMergeDriverPath, 'utf8') !== customMergeDriverScript) {
-            fs.writeFileSync(customMergeDriverPath, customMergeDriverScript, { mode: 0o755 });
-            fs.chmodSync(customMergeDriverPath, 0o755); // Ensure the script is executable
-            vscode.window.showInformationMessage('Custom merge driver script updated.');
-        }
-
-        // Configure Git to use the custom merge driver
-        try {
-            const gitConfigNameCmd = `git config --local merge.custom-stashed-state.name "Custom merge driver for stashed state"`;
-            child_process.execSync(gitConfigNameCmd, { cwd: workspaceFolder.uri.fsPath });
-
-            const gitConfigDriverCmd = `git config --local merge.custom-stashed-state.driver "${customMergeDriverPath} %O %A %B"`;
-            child_process.execSync(gitConfigDriverCmd, { cwd: workspaceFolder.uri.fsPath });
-
-            vscode.window.showInformationMessage('Git merge driver configured successfully.');
-        } catch (error) {
-            console.error('Error configuring git merge driver:', error);
-            vscode.window.showErrorMessage('Failed to configure git merge driver.');
-        }
-
-        // Update the .gitattributes file
-        const gitAttributesPath = path.join(workspaceFolder.uri.fsPath, '.gitattributes');
-        let gitAttributesContent = '';
-        if (fs.existsSync(gitAttributesPath)) {
-            gitAttributesContent = fs.readFileSync(gitAttributesPath, 'utf8');
-        }
-
-        const mergeDriverAttribute = `${GAIT_FOLDER_NAME}/stashedPanelChats.json.gz merge=custom-stashed-state`;
-
-        if (!gitAttributesContent.includes(mergeDriverAttribute)) {
-            try {
-                fs.appendFileSync(gitAttributesPath, `\n${mergeDriverAttribute}\n`);
-                vscode.window.showInformationMessage('.gitattributes updated with custom merge driver.');
-            } catch (error) {
-                console.error('Error updating .gitattributes:', error);
-                vscode.window.showErrorMessage('Failed to update .gitattributes with custom merge driver.');
-            }
-        }
-    } catch (error) {
-        console.error('Error setting up custom merge driver:', error);
-        vscode.window.showErrorMessage('Failed to set up custom merge driver.');
-    }
-
     // Register all commands
     context.subscriptions.push(
         updateSidebarCommand, 
         inlineChatStartOverride, 
-        inlineChatContinue, 
         deleteInlineChatCommand, 
         openFileWithContentCommand,
         toggleDecorationsCommand,
-        registerGaitChatParticipantCommand, // Add the new command here
+        deletePanelChatCommand,
         exportPanelChatsToMarkdownCommand,
         handleMergeCommand,
-        setPanelChatModeCommand
     );
 
     debouncedRedecorate(context);
@@ -598,3 +610,4 @@ exit 0
  * Deactivates the extension.
  */
 export function deactivate() {}
+
