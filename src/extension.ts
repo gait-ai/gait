@@ -431,7 +431,7 @@ def mergeStashedStates(ourState; theirState):
       deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
       deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedChats.deletedPanelChatIDs) | unique
     },
-    kv_store: ourState.kv_store + theirState.kv_store
+    kv_store: (ourState.kv_store + theirState.kv_store)
   };
 
 ourState = $ourState;
