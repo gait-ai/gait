@@ -3,3 +3,4 @@ dist
 *.vsix
 .aider**
 /venv/
+gait_context.md
