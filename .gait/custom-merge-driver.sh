@@ -5,20 +5,36 @@
 # Git passes these parameters to the merge driver
 BASE="$1"    # %O - Ancestor's version (common base)
 CURRENT="$2" # %A - Current version (ours)
-OTHER="$3"   # %B - Other branch's version (theirs)
+OTHER="$3"   # %B - Other branch's version (theirs)"
 
 # Temporary file to store the merged result
 MERGED="$CURRENT.merged"
 
 # Check if jq is installed
-if ! command -v jq &> /dev/null
-then
+if ! command -v jq &> /dev/null; then
     echo "jq command could not be found. Please install jq to use this merge driver."
     exit 1
 fi
 
-# Define the jq filter as a single string with proper escaping
-JQ_FILTER='
+# Optional: Validate JSON inputs
+if ! jq empty "$CURRENT" 2>/dev/null; then
+    echo "Invalid JSON in CURRENT file: $CURRENT"
+    exit 1
+fi
+
+if ! jq empty "$OTHER" 2>/dev/null; then
+    echo "Invalid JSON in OTHER file: $OTHER"
+    exit 1
+fi
+
+# Create a temporary file for the jq filter
+TMP_JQ_FILTER=$(mktemp /tmp/jq_filter.XXXXXX)
+
+# Ensure the temporary file is deleted on script exit
+trap 'rm -f "$TMP_JQ_FILTER"' EXIT
+
+# Write the jq script to the temporary file
+cat <<'EOF' > "$TMP_JQ_FILTER"
 def mergePanelChats(ourChats; theirChats):
   (ourChats + theirChats)
   | group_by(.id)
@@ -49,22 +65,31 @@ def mergeStashedStates(ourState; theirState):
     schemaVersion: ourState.schemaVersion,
     deletedChats: {
       deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
-      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedChats.deletedPanelChatIDs) | unique
+      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
     },
     kv_store: ourState.kv_store + theirState.kv_store
   };
 
 mergeStashedStates($ourState; $theirState)
-'
+EOF
 
-# Perform the merge using jq with the inline filter
+# Debug: Verify the jq filter content
+echo "Using jq filter from $TMP_JQ_FILTER:"
+cat "$TMP_JQ_FILTER"
+
+# Perform the merge using jq with the temporary filter file
 jq -n \
     --argfile ourState "$CURRENT" \
     --argfile theirState "$OTHER" \
-    "$JQ_FILTER" > "$MERGED"
+    -f "$TMP_JQ_FILTER" > "$MERGED"
 
-# Check if the merge was successful
-if [ $? -ne 0 ]; then
+# Capture jq's exit status
+JQ_STATUS=$?
+
+# Debug: Print jq's exit status
+echo "jq exit status: $JQ_STATUS"
+
+if [ $JQ_STATUS -ne 0 ]; then
     echo "Error during merging stashed states."
     exit 1
 fi
