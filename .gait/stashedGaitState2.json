@@ -457,6 +457,35 @@
         }
       ],
       "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Testing Input Functionality",
+      "id": "970cc79d-df04-4088-b2c1-2b0caad5dba0",
+      "parent_id": null,
+      "created_on": "2024-10-02T05:37:35.952Z",
+      "messages": [
+        {
+          "id": "64eb7106-710f-4c46-8710-7f3b567ea068",
+          "messageText": "this is a test",
+          "responseText": "It looks like you are testing the input. How can I assist you with your code? If you have any specific questions or need modifications, please let me know!",
+          "model": "gpt-4o",
+          "timestamp": "2024-10-02T05:37:35.952Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "46a66d0c-b1aa-4d1e-9e0a-b46661641cc3",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/src/extension.ts",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/src/extension.ts",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {}
+        }
+      ],
+      "kv_store": {}
     }
   ],
   "inlineChats": [
