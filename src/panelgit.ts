@@ -100,7 +100,7 @@ function ensureDeletedChats(stashedState: StashedState, commitHash: string) {
 }
 
 /**
- * Processes a single commit's stashedGaitState.json and extracts active PanelChats and Messages.
+ * Processes a single commit's stashedGaitState2.json and extracts active PanelChats and Messages.
  * @param parsedContent - The parsed StashedState from the commit.
  * @param currentMessageIds - Set of active message IDs.
  * @param currentPanelChatIds - Set of active PanelChat IDs.
@@ -199,7 +199,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         throw new Error(`File not found: ${absoluteFilePath}`);
     }
 
-    // Step 1: Read the current stashedGaitState.json to collect existing message and panelChat IDs
+    // Step 1: Read the current stashedGaitState2.json to collect existing message and panelChat IDs
     let parsedCurrent: StashedState;
     const currentMessageIds: Set<string> = new Set();
     const currentPanelChatIds: Set<string> = new Set();
@@ -209,7 +209,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure 1.');
         }
-        log(`Parsed current stashedGaitState.json successfully.`, LogLevel.INFO);
+        log(`Parsed current stashedGaitState2.json successfully.`, LogLevel.INFO);
     } catch (error) {
         log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
         // Initialize with default structure if parsing fails
@@ -220,7 +220,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
         };
-        log(`Initialized default stashedGaitState.json structure due to parsing failure.`, LogLevel.INFO);
+        log(`Initialized default stashedGaitState2.json structure due to parsing failure.`, LogLevel.INFO);
     }
 
     // Ensure deletedChats exists
@@ -306,7 +306,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure 2.');
             }
-            log(`Parsed stashedGaitState.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+            log(`Parsed stashedGaitState2.json for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
             log(`Content: ${fileContent}`, LogLevel.WARN);
@@ -430,7 +430,7 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
         throw new Error(`Target file not found: ${absoluteTargetFilePath}`);
     }
 
-    // Step 1: Read the current stashedGaitState.json to collect existing message and panelChat IDs
+    // Step 1: Read the current stashedGaitState2.json to collect existing message and panelChat IDs
     let parsedCurrent: StashedState;
     const currentMessageIds: Set<string> = new Set();
     const currentPanelChatIds: Set<string> = new Set();
@@ -440,7 +440,7 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure.');
         }
-        log(`Parsed current stashedGaitState.json successfully.`, LogLevel.INFO);
+        log(`Parsed current stashedGaitState2.json successfully.`, LogLevel.INFO);
     } catch (error) {
         log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
         // Initialize with default structure if parsing fails
@@ -451,7 +451,7 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
         };
-        log(`Initialized default stashedGaitState.json structure due to parsing failure.`, LogLevel.INFO);
+        log(`Initialized default stashedGaitState2.json structure due to parsing failure.`, LogLevel.INFO);
     }
 
     const deletedPanelChatIds = new Set(parsedCurrent.deletedChats.deletedPanelChatIDs);
@@ -540,7 +540,7 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            log(`Parsed stashedGaitState.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+            log(`Parsed stashedGaitState2.json for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
             log(`Content: ${fileContent}`, LogLevel.WARN);
