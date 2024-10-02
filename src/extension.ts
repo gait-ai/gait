@@ -467,12 +467,7 @@ def mergeStashedStates(ourState; theirState):
     kv_store: (ourState.kv_store + theirState.kv_store)
   };
 
-ourState = $ourState;
-theirState = $theirState;
-
-mergedState = mergeStashedStates(ourState; theirState);
-
-mergedState
+mergeStashedStates(ourState; theirState)
 EOF
 
 # Detect OS and set sed in-place edit flag accordingly
