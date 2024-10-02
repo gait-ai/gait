@@ -594,7 +594,11 @@ exit 0
     const acceptInterval = setInterval(async () => {
         try {
             triggerAccept(stateReader, context);
-            await stateReader.matchPromptsToDiff();
+            triggerAcceptCount++;
+            if (triggerAcceptCount % 3 === 0) {
+                await stateReader.matchPromptsToDiff();
+                triggerAcceptCount = 0;
+            }
         } catch (error) {
             console.log("Error in accept interval", error);
         }
