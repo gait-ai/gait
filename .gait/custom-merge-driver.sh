@@ -17,11 +17,8 @@ then
     exit 1
 fi
 
-# Perform the merge using jq with a heredoc
-jq -n \
-    --argfile ourState "$CURRENT" \
-    --argfile theirState "$OTHER" \
-    -f - <<'EOF'
+# Define the jq filter as a single string with proper escaping
+JQ_FILTER='
 def mergePanelChats(ourChats; theirChats):
   (ourChats + theirChats)
   | group_by(.id)
@@ -52,13 +49,19 @@ def mergeStashedStates(ourState; theirState):
     schemaVersion: ourState.schemaVersion,
     deletedChats: {
       deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
-      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
+      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedChats.deletedPanelChatIDs) | unique
     },
     kv_store: ourState.kv_store + theirState.kv_store
   };
 
 mergeStashedStates($ourState; $theirState)
-EOF
+'
+
+# Perform the merge using jq with the inline filter
+jq -n \
+    --argfile ourState "$CURRENT" \
+    --argfile theirState "$OTHER" \
+    "$JQ_FILTER" > "$MERGED"
 
 # Check if the merge was successful
 if [ $? -ne 0 ]; then
