@@ -75,7 +75,7 @@ EOF
 
 # Debug: Verify the jq filter content
 echo "Using jq filter from $TMP_JQ_FILTER:"
-sed -i 's/\r$//'
+sed -i 's/\r$//' "$TMP_JQ_FILTER"
 cat "$TMP_JQ_FILTER"
 
 # Perform the merge using jq with the temporary filter file
