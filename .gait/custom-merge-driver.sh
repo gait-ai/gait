@@ -5,7 +5,7 @@
 # Git passes these parameters to the merge driver
 BASE="$1"    # %O - Ancestor's version (common base)
 CURRENT="$2" # %A - Current version (ours)
-OTHER="$3"   # %B - Other branch's version (theirs)"
+OTHER="$3"   # %B - Other branch's version (theirs)
 
 # Temporary file to store the merged result
 MERGED="$CURRENT.merged"
