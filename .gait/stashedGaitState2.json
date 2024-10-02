@@ -361,6 +361,44 @@
         }
       ],
       "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Merge Conflict Warning Discussion",
+      "id": "c264966b-38ff-4c39-807d-cce1bcea3388",
+      "parent_id": null,
+      "created_on": "2024-10-02T07:10:13.567Z",
+      "messages": [
+        {
+          "id": "1b51ffbc-4811-4568-9904-83968a937241",
+          "messageText": "This is an added change that should cause a merge conflict later 2",
+          "responseText": "It seems like you're indicating that there is a change that could lead to a merge conflict in your code. To help you better, could you please specify which part of the code you would like to modify or review? If you have a specific code snippet or file in mind, please share that, and I'll assist you accordingly.",
+          "model": "gpt-4o-mini",
+          "timestamp": "2024-10-02T07:10:13.567Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "37c89b7a-d77c-4736-af83-d979dc04dab8",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/.gait/stashedPanelChats.json",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/.gait/stashedPanelChats.json",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {}
+        },
+        {
+          "id": "2135df2e-36fd-47c3-ad41-0c8060cbdc03",
+          "messageText": "This chat should be new",
+          "responseText": "Understood! If you have any questions or need assistance with coding, feel free to ask!",
+          "model": "gpt-4o-mini",
+          "timestamp": "2024-10-02T07:10:13.567Z",
+          "context": [],
+          "kv_store": {}
+        }
+      ],
+      "kv_store": {}
     }
   ],
   "inlineChats": [],
