@@ -38,7 +38,7 @@ function sanitizePanelChats(panelChats: PanelChat[]): PanelChat[] {
 }
 
 /**
- * Monitors the panel chat and appends new chats to stashedGaitState2.json.
+ * Monitors the panel chat and appends new chats to state.json.
  * Note: Since 'lastAppended' has been removed from StashedState, this function has been simplified.
  * You may need to implement a new mechanism for tracking appended messages.
  */
