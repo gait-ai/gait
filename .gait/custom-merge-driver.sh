@@ -75,7 +75,8 @@ EOF
 
 # Debug: Verify the jq filter content
 echo "Using jq filter from $TMP_JQ_FILTER:"
-cat "$TMP_JQ_FILTER"
+dos2unix "$TMP_JQ_FILTER"
+file "$TMP_JQ_FILTER"
 
 # Perform the merge using jq with the temporary filter file
 jq -n \
