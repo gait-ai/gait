@@ -401,13 +401,13 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         };
     }).filter(pc => pc.messages.length > 0);
 
-    console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
+    // console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
 
     uncommitted = {
         panelChats: allCurrentPanelChats,
         inlineChats: []
     };
-    console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
+    // console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
 
     return {
         commits: allCommits,
@@ -614,7 +614,7 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
             };
         }).filter(pc => pc.messages.length > 0);
 
-        console.log(`Aggregated ${allAddedPanelChats.length} uncommitted PanelChats.`);
+        // console.log(`Aggregated ${allAddedPanelChats.length} uncommitted PanelChats.`);
 
         added = {
             panelChats: allAddedPanelChats,
