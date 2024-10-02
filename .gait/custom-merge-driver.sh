@@ -17,11 +17,11 @@ then
     exit 1
 fi
 
-# Perform the merge using jq
+# Perform the merge using jq with a heredoc
 jq -n \
     --argfile ourState "$CURRENT" \
     --argfile theirState "$OTHER" \
-    '
+    -f - <<'EOF'
 def mergePanelChats(ourChats; theirChats):
   (ourChats + theirChats)
   | group_by(.id)
@@ -36,7 +36,10 @@ def mergePanelChats(ourChats; theirChats):
             customTitle: $ourChat.customTitle,
             parent_id: $ourChat.parent_id,
             created_on: $ourChat.created_on,
-            messages: if ($theirChat.messages | length) > ($ourChat.messages | length) then $theirChat.messages else $ourChat.messages end,
+            messages: if ($theirChat.messages | length) > ($ourChat.messages | length) 
+                      then $theirChat.messages 
+                      else $ourChat.messages 
+                      end,
             kv_store: $ourChat.kv_store + $theirChat.kv_store
           }
       end
@@ -49,13 +52,13 @@ def mergeStashedStates(ourState; theirState):
     schemaVersion: ourState.schemaVersion,
     deletedChats: {
       deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
-      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedChats.deletedPanelChatIDs) | unique
+      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
     },
     kv_store: ourState.kv_store + theirState.kv_store
   };
 
 mergeStashedStates($ourState; $theirState)
-' > "$MERGED"
+EOF
 
 # Check if the merge was successful
 if [ $? -ne 0 ]; then
