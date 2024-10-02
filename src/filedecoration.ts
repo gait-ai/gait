@@ -75,7 +75,7 @@ export function matchDiffToCurrentFile(
     // Merge consecutive line numbers into ranges
     const ranges: vscode.Range[] = [];
     // Filter out ranges that are a single line
-    if (addedLinesSet.size < 3) {
+    if (addedLinesSet.size < 5) {
         return matchingLineNumbers.map(line => new vscode.Range(line, 0, line, documentLines[line].length));
     }
     let start = -1;
