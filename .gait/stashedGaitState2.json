@@ -457,6 +457,35 @@
         }
       ],
       "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Testing the System Functionality",
+      "id": "e2671102-ea50-446e-b3e1-57636a14f35d",
+      "parent_id": null,
+      "created_on": "2024-10-02T05:33:09.433Z",
+      "messages": [
+        {
+          "id": "31176480-37ac-4a73-acad-6851a9dfd92a",
+          "messageText": "This is a test",
+          "responseText": "It looks like you're testing the system. How can I assist you with your code or any other questions you might have?",
+          "model": "gpt-4o",
+          "timestamp": "2024-10-02T05:33:09.433Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "2bfce760-ec80-4ce5-8389-23ecedbe9381",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/.gait/stashedPanelChats 3.json",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/.gait/stashedPanelChats 3.json",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {}
+        }
+      ],
+      "kv_store": {}
     }
   ],
   "inlineChats": [
