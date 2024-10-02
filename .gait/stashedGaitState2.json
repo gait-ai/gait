@@ -364,24 +364,24 @@
     },
     {
       "ai_editor": "cursor",
-      "customTitle": "Testing Input Functionality",
-      "id": "970cc79d-df04-4088-b2c1-2b0caad5dba0",
+      "customTitle": "Potential Merge Conflict Discussion",
+      "id": "a39ff270-6abc-4d7f-a5cb-8f2e13ba8781",
       "parent_id": null,
-      "created_on": "2024-10-02T05:37:35.952Z",
+      "created_on": "2024-10-02T06:43:11.862Z",
       "messages": [
         {
-          "id": "64eb7106-710f-4c46-8710-7f3b567ea068",
-          "messageText": "this is a test",
-          "responseText": "It looks like you are testing the input. How can I assist you with your code? If you have any specific questions or need modifications, please let me know!",
-          "model": "gpt-4o",
-          "timestamp": "2024-10-02T05:37:35.952Z",
+          "id": "acdeed2a-4f31-4020-ae44-ada5e85fc6c8",
+          "messageText": "This is an added change that should cause a merge conflict later",
+          "responseText": "It seems like you're indicating that there is an added change in your code that may lead to a merge conflict. If you need assistance with handling merge conflicts or managing your code changes, please provide more details or specify what you would like to do next!",
+          "model": "gpt-4o-mini",
+          "timestamp": "2024-10-02T06:43:11.862Z",
           "context": [
             {
               "context_type": "file",
-              "key": "d000e4a3-08b5-4c7a-936e-eae88ced3235",
+              "key": "6e1c4e50-e746-48de-9424-197363145be0",
               "value": {
-                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/src/extension.ts",
-                "uri": "/Users/alex/Documents/GitHub/gait-copilot/src/extension.ts",
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
                 "isCurrentFile": true
               }
             }
