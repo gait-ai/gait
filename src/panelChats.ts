@@ -50,7 +50,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       // Skip if a previous append operation is still in progress
       return;
     }
-    const panelChatMode = context.workspaceState.get('panelChatMode');
+    const oldPanelChats: PanelChat[] | undefined = context.workspaceState.get('currentPanelChats');
     isAppending = true;
     try {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -67,6 +67,21 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
 
       // Parse the current panelChats
       const incomingPanelChats = sanitizePanelChats(await stateReader.parsePanelChatAsync());
+      // Check for new panel chats or messages
+      if (oldPanelChats && oldPanelChats.length !== incomingPanelChats.length) {
+        vscode.window.showInformationMessage('New panel chat detected!');
+      } 
+      if (oldPanelChats) {
+        const newMessageCount = incomingPanelChats.reduce((count, chat, index) => {
+          if (oldPanelChats[index] && chat.messages.length > oldPanelChats[index].messages.length) {
+            return count + (chat.messages.length - oldPanelChats[index].messages.length);
+          }
+          return count;
+        }, 0);
+        if (newMessageCount > 0) {
+          vscode.window.showInformationMessage(`${newMessageCount} new message${newMessageCount > 1 ? 's' : ''} detected!`);
+        }
+      }
       context.workspaceState.update('currentPanelChats', incomingPanelChats);
 
     } catch (error) {
@@ -75,7 +90,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
     } finally {
       isAppending = false;
     }
-  }, 1000); // Runs every second
+  }, 4000); // Runs 4 seconds
 }
 
 
