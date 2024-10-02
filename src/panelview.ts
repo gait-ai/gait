@@ -1094,7 +1094,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         const isRegularCommit = commit.commitHash !== 'added' && commit.commitHash !== 'uncommitted';
 
                         const commitMessage = isRegularCommit
-                        ? \`Commit Message: \${escapeHtml(commit.commitMessage)}\`
+                        ? \`\${escapeHtml(commit.commitMessage)}\`
                         : \`\${escapeHtml(commit.commitMessage)}\`;
 
 
