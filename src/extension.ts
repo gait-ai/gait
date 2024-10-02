@@ -563,14 +563,15 @@ mv "$MERGED" "$CURRENT"
 # Indicate a successful merge
 exit 0
 `;
-
         // Path to the custom merge driver script
         const customMergeDriverPath = path.join(gaitFolderPath, 'custom-merge-driver.sh');
 
-        // Write the script to the .gait folder
-        fs.writeFileSync(customMergeDriverPath, customMergeDriverScript, { mode: 0o755 });
-        fs.chmodSync(customMergeDriverPath, 0o755); // Ensure the script is executable
-        vscode.window.showInformationMessage('Custom merge driver script created successfully.');
+        // Write the script to the .gait folder if it doesn't exist or content has changed
+        if (!fs.existsSync(customMergeDriverPath) || fs.readFileSync(customMergeDriverPath, 'utf8') !== customMergeDriverScript) {
+            fs.writeFileSync(customMergeDriverPath, customMergeDriverScript, { mode: 0o755 });
+            fs.chmodSync(customMergeDriverPath, 0o755); // Ensure the script is executable
+            vscode.window.showInformationMessage('Custom merge driver script updated.');
+        }
 
         // Configure Git to use the custom merge driver
         try {
