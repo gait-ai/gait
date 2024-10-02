@@ -473,15 +473,6 @@ def mergeStashedStates(ourState; theirState):
 mergeStashedStates($ourState; $theirState)
 EOF
 
-# Detect OS and set sed in-place edit flag accordingly
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS (BSD sed)
-    SED_INPLACE=(-i '')
-else
-    # Assume GNU sed
-    SED_INPLACE=(-i)
-fi
-
 # Debug: Verify the jq filter content
 echo "Using jq filter from $TMP_JQ_FILTER:"
 
