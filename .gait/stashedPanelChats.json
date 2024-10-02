@@ -1180,6 +1180,35 @@
         }
       ],
       "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Potential Merge Conflict Discussion",
+      "id": "a39ff270-6abc-4d7f-a5cb-8f2e13ba8781",
+      "parent_id": null,
+      "created_on": "2024-10-02T06:43:11.862Z",
+      "messages": [
+        {
+          "id": "acdeed2a-4f31-4020-ae44-ada5e85fc6c8",
+          "messageText": "This is an added change that should cause a merge conflict later",
+          "responseText": "It seems like you're indicating that there is an added change in your code that may lead to a merge conflict. If you need assistance with handling merge conflicts or managing your code changes, please provide more details or specify what you would like to do next!",
+          "model": "gpt-4o-mini",
+          "timestamp": "2024-10-02T06:43:11.862Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "dfd03b2c-578f-4975-9aa5-5425f7b1f3b9",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {}
+        }
+      ],
+      "kv_store": {}
     }
   ],
   "inlineChats": [
