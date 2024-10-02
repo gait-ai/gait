@@ -16,6 +16,7 @@ import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
 import { getRelativePath } from './utils';
 import { readStashedStateFromFile, writeStashedState, readStashedState } from './stashedState';
+import * as child_process from 'child_process';
 
 const GAIT_FOLDER_NAME = '.gait';
 
@@ -481,6 +482,132 @@ export function activate(context: vscode.ExtensionContext) {
     const handleMergeCommand = vscode.commands.registerCommand('gait-copilot.handleMerge', () => {
         handleMerge(context);
     });
+
+    try {
+        const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
+
+        // Define the custom merge driver script content
+        const customMergeDriverScript = `#!/bin/bash
+
+# custom-merge-driver.sh
+
+# Git passes these parameters to the merge driver
+BASE="$1"    # %O - Ancestor's version (common base)
+CURRENT="$2" # %A - Current version (ours)
+OTHER="$3"   # %B - Other branch's version (theirs)
+
+# Temporary file to store the merged result
+MERGED="$CURRENT.merged"
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null
+then
+    echo "jq command could not be found. Please install jq to use this merge driver."
+    exit 1
+fi
+
+# Perform the merge using jq
+jq -n \\
+    --argfile ourState "$CURRENT" \\
+    --argfile theirState "$OTHER" \\
+    '
+    def mergePanelChats(ourChats; theirChats):
+        (ourChats + theirChats) | 
+        group_by(.id) | 
+        map(
+            if length == 1 then .[0]
+            else
+                ourChat = .[0];
+                theirChat = .[1];
+                {
+                    ai_editor: ourChat.ai_editor,
+                    id: ourChat.id,
+                    customTitle: ourChat.customTitle,
+                    parent_id: ourChat.parent_id,
+                    created_on: ourChat.created_on,
+                    messages: if (theirChat.messages | length) > (ourChat.messages | length) then theirChat.messages else ourChat.messages end,
+                    kv_store: ourChat.kv_store + theirChat.kv_store
+                }
+            end
+        );
+
+    def mergeStashedStates(ourState; theirState):
+        {
+            panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
+            inlineChats: ourState.inlineChats + theirState.inlineChats,
+            schemaVersion: ourState.schemaVersion,
+            deletedChats: {
+                deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
+                deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
+            },
+            kv_store: ourState.kv_store + theirState.kv_store
+        };
+
+    ourState = $ourState;
+    theirState = $theirState;
+
+    mergedState = mergeStashedStates(ourState; theirState);
+
+    mergedState
+    ' > "$MERGED"
+
+# Check if the merge was successful
+if [ $? -ne 0 ]; then
+    echo "Error during merging stashed states."
+    exit 1
+fi
+
+# Replace the current file with the merged result
+mv "$MERGED" "$CURRENT"
+
+# Indicate a successful merge
+exit 0
+`;
+
+        // Path to the custom merge driver script
+        const customMergeDriverPath = path.join(gaitFolderPath, 'custom-merge-driver.sh');
+
+        // Write the script to the .gait folder
+        fs.writeFileSync(customMergeDriverPath, customMergeDriverScript, { mode: 0o755 });
+        fs.chmodSync(customMergeDriverPath, 0o755); // Ensure the script is executable
+        vscode.window.showInformationMessage('Custom merge driver script created successfully.');
+
+        // Configure Git to use the custom merge driver
+        try {
+            const gitConfigNameCmd = `git config --local merge.custom-stashed-state.name "Custom merge driver for stashed state"`;
+            child_process.execSync(gitConfigNameCmd, { cwd: workspaceFolder.uri.fsPath });
+
+            const gitConfigDriverCmd = `git config --local merge.custom-stashed-state.driver "${customMergeDriverPath} %O %A %B"`;
+            child_process.execSync(gitConfigDriverCmd, { cwd: workspaceFolder.uri.fsPath });
+
+            vscode.window.showInformationMessage('Git merge driver configured successfully.');
+        } catch (error) {
+            console.error('Error configuring git merge driver:', error);
+            vscode.window.showErrorMessage('Failed to configure git merge driver.');
+        }
+
+        // Update the .gitattributes file
+        const gitAttributesPath = path.join(workspaceFolder.uri.fsPath, '.gitattributes');
+        let gitAttributesContent = '';
+        if (fs.existsSync(gitAttributesPath)) {
+            gitAttributesContent = fs.readFileSync(gitAttributesPath, 'utf8');
+        }
+
+        const mergeDriverAttribute = `${GAIT_FOLDER_NAME}/stashedState.json merge=custom-stashed-state`;
+
+        if (!gitAttributesContent.includes(mergeDriverAttribute)) {
+            try {
+                fs.appendFileSync(gitAttributesPath, `\n${mergeDriverAttribute}\n`);
+                vscode.window.showInformationMessage('.gitattributes updated with custom merge driver.');
+            } catch (error) {
+                console.error('Error updating .gitattributes:', error);
+                vscode.window.showErrorMessage('Failed to update .gitattributes with custom merge driver.');
+            }
+        }
+    } catch (error) {
+        console.error('Error setting up custom merge driver:', error);
+        vscode.window.showErrorMessage('Failed to set up custom merge driver.');
+    }
 
     // Register all commands
     context.subscriptions.push(
