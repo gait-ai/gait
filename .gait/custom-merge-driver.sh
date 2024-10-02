@@ -11,59 +11,72 @@ OTHER="$3"   # %B - Other branch's version (theirs)
 MERGED="$CURRENT.merged"
 
 # Check if jq is installed
-if ! command -v jq &> /dev/null
-then
+if ! command -v jq &> /dev/null; then
     echo "jq command could not be found. Please install jq to use this merge driver."
     exit 1
 fi
 
 # Perform the merge using jq
-jq -n \
-    --argfile ourState "$CURRENT" \
-    --argfile theirState "$OTHER" \
-    '
-    def mergePanelChats(ourChats; theirChats):
-        (ourChats + theirChats) | 
-        group_by(.id) | 
-        map(
-            if length == 1 then .[0]
-            else
-                ourChat = .[0];
-                theirChat = .[1];
-                {
-                    ai_editor: ourChat.ai_editor,
-                    id: ourChat.id,
-                    customTitle: ourChat.customTitle,
-                    parent_id: ourChat.parent_id,
-                    created_on: ourChat.created_on,
-                    messages: if (theirChat.messages | length) > (ourChat.messages | length) then theirChat.messages else ourChat.messages end,
-                    kv_store: ourChat.kv_store + theirChat.kv_store
-                }
-            end
-        );
+jq -n     --argfile ourState "$CURRENT"     --argfile theirState "$OTHER"     '
+def mergePanelChats(ourChats; theirChats):
+  (ourChats + theirChats)
+  | group_by(.id)
+  | map(
+      if length == 1 then .[0]
+      else
+        .[0] as $ourChat
+        | .[1] as $theirChat
+        | (if ($theirChat.messages | length) > ($ourChat.messages | length) then $theirChat.messages else $ourChat.messages end) as $mergedMessages
+        | ($ourChat.kv_store + $theirChat.kv_store) as $mergedKvStore
+        | {
+            ai_editor: $ourChat.ai_editor,
+            id: $ourChat.id,
+            customTitle: $ourChat.customTitle,
+            parent_id: $ourChat.parent_id,
+            created_on: $ourChat.created_on,
+            messages: $mergedMessages,
+            kv_store: $mergedKvStore
+          }
+      end
+    );
 
-    def mergeStashedStates(ourState; theirState):
-        {
-            panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
-            inlineChats: ourState.inlineChats + theirState.inlineChats,
-            schemaVersion: ourState.schemaVersion,
-            deletedChats: {
-                deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
-                deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
-            },
-            kv_store: ourState.kv_store + theirState.kv_store
-        };
+def mergeStashedStates(ourState; theirState):
+  {
+    panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
+    inlineChats: (ourState.inlineChats + theirState.inlineChats),
+    schemaVersion: ourState.schemaVersion,
+    deletedChats: {
+      deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
+      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedChats.deletedPanelChatIDs) | unique
+    },
+    kv_store: (ourState.kv_store + theirState.kv_store)
+  };
 
-    ourState = $ourState;
-    theirState = $theirState;
+mergeStashedStates($ourState; $theirState)
+' > "$MERGED"
 
-    mergedState = mergeStashedStates(ourState; theirState);
+# Detect OS and set sed in-place edit flag accordingly
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS (BSD sed)
+    SED_INPLACE=(-i '')
+else
+    # Assume GNU sed
+    SED_INPLACE=(-i)
+fi
 
-    mergedState
-    ' > "$MERGED"
+# Debug: Verify the jq filter content
+sed "${SED_INPLACE[@]}" 's/$//' "$TMP_JQ_FILTER"
 
-# Check if the merge was successful
-if [ $? -ne 0 ]; then
+# Perform the merge using jq with the temporary filter file
+jq -n     --argfile ourState "$CURRENT"     --argfile theirState "$OTHER"     -f "$TMP_JQ_FILTER" > "$MERGED"
+
+# Capture jq's exit status
+JQ_STATUS=$?
+
+# Debug: Print jq's exit status
+echo "jq exit status: $JQ_STATUS"
+
+if [ $JQ_STATUS -ne 0 ]; then
     echo "Error during merging stashed states."
     exit 1
 fi
