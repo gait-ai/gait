@@ -16,12 +16,12 @@ export type CommitData = {
     date: Date;
     commitMessage: string;
     author: string;
-    panelChats: PanelChat[]; // Updated from messages to panelChats
+    panelChats: PanelChat[];
     inlineChats: InlineChatInfo[];
 };
 
 export type UncommittedData = {
-    panelChats: PanelChat[]; // Updated from messages to panelChats
+    panelChats: PanelChat[];
     inlineChats: InlineChatInfo[];
 };
 
@@ -48,7 +48,7 @@ function log(message: string, level: LogLevel = LogLevel.INFO) {
     if (level >= CURRENT_LOG_LEVEL) {
         switch (level) {
             case LogLevel.INFO:
-                //console.log(message);
+                // Intentionally silenced
                 break;
             case LogLevel.WARN:
                 console.warn(message);
@@ -77,33 +77,12 @@ async function gitShowString(args: string[], repoPath: string): Promise<string> 
     }
 }
 
-/**
- * Ensures that the 'deletedChats' object and its nested properties exist.
- * @param stashedState - The StashedState object to validate and initialize.
- * @param commitHash - The hash of the current commit (for logging purposes).
- */
-function ensureDeletedChats(stashedState: StashedState, commitHash: string) {
-    if (!stashedState.deletedChats) {
-        stashedState.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
-        log(`'deletedChats' was undefined in commit ${commitHash}. Initialized with empty arrays.`, LogLevel.WARN);
-    }
-
-    if (!Array.isArray(stashedState.deletedChats.deletedPanelChatIDs)) {
-        stashedState.deletedChats.deletedPanelChatIDs = [];
-        log(`'deletedPanelChatIDs' was undefined or not an array in commit ${commitHash}. Initialized as empty array.`, LogLevel.WARN);
-    }
-
-    if (!Array.isArray(stashedState.deletedChats.deletedMessageIDs)) {
-        stashedState.deletedChats.deletedMessageIDs = [];
-        log(`'deletedMessageIDs' was undefined or not an array in commit ${commitHash}. Initialized as empty array.`, LogLevel.WARN);
-    }
-}
 
 /**
  * Processes a single commit's stashedGaitState2.json and extracts active PanelChats and Messages.
  * @param parsedContent - The parsed StashedState from the commit.
  * @param currentMessageIds - Set of active message IDs.
- * @param currentPanelChatIds - Set of active PanelChat IDs.
+ * @param currentInlineChatIds - Set of active inline chat IDs.
  * @param seenMessageIds - Set to track already processed message IDs.
  * @param commitData - The CommitData object to populate.
  * @param commitHash - The hash of the current commit (for logging purposes).
@@ -116,25 +95,23 @@ function processCommit(
     commitData: CommitData,
     commitHash: string
 ) {
+    log(`Processing Commit Hash: ${commitHash}`, LogLevel.INFO);
 
-    console.log("Commit Hash: ", commitHash);
-    ensureDeletedChats(parsedContent, commitHash);
+    const { deletedChats } = parsedContent;
+    const deletedPanelChatIds = new Set(deletedChats.deletedPanelChatIDs);
+    const deletedMessageIds = new Set(deletedChats.deletedMessageIDs);
 
-    const deletedPanelChatIds = new Set(parsedContent.deletedChats.deletedPanelChatIDs);
-    const deletedMessageIds = new Set(parsedContent.deletedChats.deletedMessageIDs);
-
+    // Process Inline Chats
     if (Array.isArray(parsedContent.inlineChats)) {
         for (const inlineChat of parsedContent.inlineChats) {
             const inlineChatId = inlineChat.inline_chat_id;
-            if (!currentInlineChatIds.has(inlineChatId)) {
-                continue;
+            if (currentInlineChatIds.has(inlineChatId)) {
+                commitData.inlineChats.push(inlineChat);
             }
-            commitData.inlineChats.push(inlineChat);
         }
-    } else {
-        //console.log("parsedContent.inlineChats", parsedContent.inlineChats);
     }
 
+    // Process Panel Chats
     for (const panelChat of parsedContent.panelChats) {
         const panelChatId = panelChat.id;
 
@@ -144,30 +121,20 @@ function processCommit(
             continue;
         }
 
-        // Create or retrieve existing PanelChat in commitData
+        // Retrieve or initialize existing PanelChat in commitData
         let existingPanelChat = commitData.panelChats.find(pc => pc.id === panelChatId);
         if (!existingPanelChat) {
-            existingPanelChat = {
-                ai_editor: panelChat.ai_editor,
-                id: panelChat.id,
-                customTitle: panelChat.customTitle,
-                parent_id: panelChat.parent_id,
-                created_on: panelChat.created_on,
-                messages: [],
-                kv_store: {}
-            };
+            existingPanelChat = { ...panelChat, messages: [], kv_store: {} };
             commitData.panelChats.push(existingPanelChat);
             log(`Initialized PanelChat ID ${panelChatId} in commit ${commitHash}.`, LogLevel.INFO);
         }
 
-        for (const messageEntry of panelChat.messages) {
-            const messageId = messageEntry.id;
-            //console.log("Message ID: ", messageId);
-            //console.log("Seen Message IDs: ", seenMessageIds);
+        // Process Messages within PanelChat
+        for (const message of panelChat.messages) {
+            const messageId = message.id;
 
-            // Only include active and unseen messages
-            if (currentMessageIds.has(messageId) && !seenMessageIds.has(messageId)) {
-                existingPanelChat.messages.push(messageEntry);
+            if (currentMessageIds.has(messageId) && !seenMessageIds.has(messageId) && !deletedMessageIds.has(messageId)) {
+                existingPanelChat.messages.push(message);
                 log(`Added Message ID ${messageId} from PanelChat ${panelChatId} in commit ${commitHash}.`, LogLevel.INFO);
                 seenMessageIds.add(messageId);
             } else {
@@ -181,71 +148,23 @@ function processCommit(
     }
 }
 
+
+
 /**
- * Retrieves the Git history for a specific file, capturing PanelChats instead of flat messages.
- * @param repoPath - The path to the Git repository.
- * @param filePath - The relative path to the target file within the repository.
- * @returns A Promise resolving to GitHistoryData containing commit history and uncommitted changes.
+ * Aggregates active PanelChat and InlineChat IDs from the current stashed state.
+ * @param parsedCurrent - The current StashedState.
+ * @returns An object containing sets of active PanelChat and Message IDs, and active InlineChat IDs.
  */
-export async function getGitHistory(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<GitHistoryData> {
-    const git: SimpleGit = simpleGit(repoPath);
-
-
-    log("Starting getGitHistory", LogLevel.INFO);
-
-    // Ensure the file exists in the repository
-    const absoluteFilePath = path.resolve(repoPath, filePath);
-    if (!fs.existsSync(absoluteFilePath)) {
-        throw new Error(`File not found: ${absoluteFilePath}`);
-    }
-
-    // Step 1: Read the current stashedGaitState2.json to collect existing message and panelChat IDs
-    let parsedCurrent: StashedState;
+function aggregateCurrentIds(parsedCurrent: StashedState) {
     const currentMessageIds: Set<string> = new Set();
     const currentPanelChatIds: Set<string> = new Set();
+    const currentInlineChatIds: Set<string> = new Set();
 
-    try {
-        parsedCurrent = readStashedState(context); // This no longer handles gzip decompression
-        if (!isStashedState(parsedCurrent)) {
-            throw new Error('Parsed content does not match StashedState structure 1.');
-        }
-        log(`Parsed current stashedGaitState2.json successfully.`, LogLevel.INFO);
-    } catch (error) {
-        log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
-        // Initialize with default structure if parsing fails
-        parsedCurrent = {
-            panelChats: [],
-            inlineChats: [],
-            schemaVersion: SCHEMA_VERSION,
-            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
-            kv_store: {}
-        };
-        log(`Initialized default stashedGaitState2.json structure due to parsing failure.`, LogLevel.INFO);
-    }
+    const { deletedChats, panelChats, inlineChats } = parsedCurrent;
+    const deletedPanelChatIds = new Set(deletedChats.deletedPanelChatIDs);
+    const deletedMessageIds = new Set(deletedChats.deletedMessageIDs);
 
-    // Ensure deletedChats exists
-    if (!parsedCurrent.deletedChats) {
-        parsedCurrent.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
-        log(`'deletedChats' was undefined. Initialized with empty arrays.`, LogLevel.WARN);
-    }
-
-    // Ensure deletedPanelChatIDs exists and is an array
-    if (!Array.isArray(parsedCurrent.deletedChats.deletedPanelChatIDs)) {
-        parsedCurrent.deletedChats.deletedPanelChatIDs = [];
-        log(`'deletedPanelChatIDs' was undefined or not an array. Initialized as empty array.`, LogLevel.WARN);
-    }
-
-    // Ensure deletedMessageIDs exists and is an array
-    if (!Array.isArray(parsedCurrent.deletedChats.deletedMessageIDs)) {
-        parsedCurrent.deletedChats.deletedMessageIDs = [];
-        log(`'deletedMessageIDs' was undefined or not an array. Initialized as empty array.`, LogLevel.WARN);
-    }
-
-    const deletedPanelChatIds = new Set(parsedCurrent.deletedChats.deletedPanelChatIDs);
-    const deletedMessageIds = new Set(parsedCurrent.deletedChats.deletedMessageIDs);
-
-    // Collect all current message and panelChat IDs excluding deleted ones
-    for (const panelChat of parsedCurrent.panelChats) {
+    for (const panelChat of panelChats) {
         if (!deletedPanelChatIds.has(panelChat.id)) {
             currentPanelChatIds.add(panelChat.id);
             for (const message of panelChat.messages) {
@@ -256,22 +175,42 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         }
     }
 
-    log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`, LogLevel.INFO);
-
-    const currentInlineChatIds: Set<string> = new Set();
-    // Collect all current message and panelChat IDs excluding deleted ones
-    for (const inlineChat of parsedCurrent.inlineChats) {
+    for (const inlineChat of inlineChats) {
         currentInlineChatIds.add(inlineChat.inline_chat_id);
     }
 
+    log(`Collected ${currentPanelChatIds.size} active PanelChat IDs, ${currentMessageIds.size} active Message IDs, and ${currentInlineChatIds.size} active InlineChat IDs.`, LogLevel.INFO);
+
+    return { currentMessageIds, currentPanelChatIds, currentInlineChatIds };
+}
+
+/**
+ * Retrieves the Git history for a specific file, capturing PanelChats instead of flat messages.
+ * @param context - The VSCode extension context.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the target file within the repository.
+ * @returns A Promise resolving to GitHistoryData containing commit history and uncommitted changes.
+ */
+export async function getGitHistory(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<GitHistoryData> {
+    const git: SimpleGit = simpleGit(repoPath);
+    log("Starting getGitHistory", LogLevel.INFO);
+
+    // Ensure the file exists in the repository
+    const absoluteFilePath = path.resolve(repoPath, filePath);
+    if (!fs.existsSync(absoluteFilePath)) {
+        throw new Error(`File not found: ${absoluteFilePath}`);
+    }
+
+    // Step 1: Read and validate the current stashedGaitState2.json
+    const parsedCurrent = readStashedState(context); 
+    const { currentMessageIds, currentPanelChatIds, currentInlineChatIds } = aggregateCurrentIds(parsedCurrent);
+    const seenMessageIds: Set<string> = new Set();
 
     // Step 2: Get the commit history for the file with --follow to track renames
-    // '--reverse' ensures commits are ordered from oldest to newest
     const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
-
     let logData: string;
+
     try {
-        // Use simple-git to get the log data
         logData = await git.raw(logArgs);
         log(`Retrieved git log data successfully.`, LogLevel.INFO);
     } catch (error) {
@@ -282,7 +221,6 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     log(`Processing ${logLines.length} commits from git log.`, LogLevel.INFO);
 
     const allCommitsMap: Map<string, CommitData> = new Map();
-    const seenMessageIds: Set<string> = new Set();
 
     for (const line of logLines) {
         const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
@@ -294,242 +232,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
             log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
         } catch (error) {
-            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
-            log(`Error: ${(error as Error).message}`, LogLevel.WARN);
-            continue; // Skip this commit
-        }
-
-        // Parse JSON
-        let parsedContent: StashedState;
-        try {
-            parsedContent = JSON.parse(fileContent);
-            if (!isStashedState(parsedContent)) {
-                throw new Error('Parsed content does not match StashedState structure 2.');
-            }
-            log(`Parsed stashedGaitState2.json for commit ${commitHash} successfully.`, LogLevel.INFO);
-        } catch (error) {
-            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
-            log(`Content: ${fileContent}`, LogLevel.WARN);
-            continue; // Skip this commit
-        }
-
-        // Initialize or retrieve existing CommitData for this commit
-        let commitData = allCommitsMap.get(commitHash);
-        if (!commitData) {
-            commitData = {
-                commitHash,
-                date: new Date(dateStr),
-                commitMessage,
-                author: authorName,
-                panelChats: [], // Initialize panelChats
-                inlineChats: [],
-            };
-            allCommitsMap.set(commitHash, commitData);
-            log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
-        }
-
-        // Process the commit's panelChats
-        processCommit(parsedContent, currentMessageIds, currentInlineChatIds, seenMessageIds, commitData, commitHash);
-    }
-
-    // Convert the map to an array
-    let allCommits: CommitData[] = Array.from(allCommitsMap.values());
-
-    // For each panel chat in each commit, filter it out if ti is empty
-    allCommits.forEach(commit => {
-        commit.panelChats = commit.panelChats.filter(pc => pc.messages.length > 0);
-    });
-    
-
-    // **New Addition:** Filter out commits with empty panelChats
-    allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
-    log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
-
-
-    let currentAddedContent = readStashedState(context);
-
-    // Aggregate all panelChats from uncommitted changes, excluding deleted ones
-    const allAddedPanelChats: PanelChat[] = currentAddedContent.panelChats.filter(pc =>
-        !deletedPanelChatIds.has(pc.id)
-    ).map(pc => {
-        const filteredMessages = pc.messages.filter(msg =>
-            !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
-        );
-        // Add all messages to seenMessageIds
-        pc.messages.forEach(msg => seenMessageIds.add(msg.id));
-        return {
-            ...pc,
-            messages: filteredMessages
-        };
-    }).filter(pc => pc.messages.length > 0);
-
-    const added = {
-        panelChats: allAddedPanelChats,
-        inlineChats: []
-    };
-
-    // Step 3: Check for uncommitted changes
-
-    let uncommitted: UncommittedData | null = null;
-    let currentUncommittedContent: PanelChat[];
-    try {
-        currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
-    } catch (error) {
-        console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
-        currentUncommittedContent = []; 
-    }
-
-    if (!Array.isArray(currentUncommittedContent)) {
-        throw new Error('Parsed content does not match PanelChat structure.');
-    }
-     
-    // If every element of currentUncommittedContent is a PanelChat, then we can proceed
-    if (! currentUncommittedContent.every(isPanelChat)) {
-        throw new Error('Parsed content does not match PanelChat structure.');
-    }
-
-    // Aggregate all panelChats from uncommitted changes, excluding deleted ones
-    const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.filter(pc =>
-        !deletedPanelChatIds.has(pc.id)
-    ).map(pc => {
-        const filteredMessages = pc.messages.filter(msg =>
-            !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
-        );
-        return {
-            ...pc,
-            messages: filteredMessages
-        };
-    }).filter(pc => pc.messages.length > 0);
-
-    // console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
-
-    uncommitted = {
-        panelChats: allCurrentPanelChats,
-        inlineChats: []
-    };
-    // console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
-
-    return {
-        commits: allCommits,
-        added,
-        uncommitted,
-    };
-}
-
-
-export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionContext, repoPath: string, filePath: string, targetFilePath: string): Promise<GitHistoryData> {
-    const git: SimpleGit = simpleGit(repoPath);
-
-    // Ensure both files exist in the repository
-    const absoluteFilePath = path.resolve(repoPath, filePath);
-    const absoluteTargetFilePath = path.resolve(repoPath, targetFilePath);
-    if (!fs.existsSync(absoluteFilePath)) {
-        throw new Error(`File not found: ${absoluteFilePath}`);
-    }
-    if (!fs.existsSync(absoluteTargetFilePath)) {
-        throw new Error(`Target file not found: ${absoluteTargetFilePath}`);
-    }
-
-    // Step 1: Read the current stashedGaitState2.json to collect existing message and panelChat IDs
-    let parsedCurrent: StashedState;
-    const currentMessageIds: Set<string> = new Set();
-    const currentPanelChatIds: Set<string> = new Set();
-
-    try {
-        parsedCurrent = readStashedState(context); // This no longer handles gzip decompression
-        if (!isStashedState(parsedCurrent)) {
-            throw new Error('Parsed content does not match StashedState structure.');
-        }
-        log(`Parsed current stashedGaitState2.json successfully.`, LogLevel.INFO);
-    } catch (error) {
-        log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
-        // Initialize with default structure if parsing fails
-        parsedCurrent = {
-            panelChats: [],
-            inlineChats: [],
-            schemaVersion: SCHEMA_VERSION,
-            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
-            kv_store: {}
-        };
-        log(`Initialized default stashedGaitState2.json structure due to parsing failure.`, LogLevel.INFO);
-    }
-
-    const deletedPanelChatIds = new Set(parsedCurrent.deletedChats.deletedPanelChatIDs);
-    const deletedMessageIds = new Set(parsedCurrent.deletedChats.deletedMessageIDs);
-
-    // Collect all current message and panelChat IDs excluding deleted ones
-    for (const panelChat of parsedCurrent.panelChats) {
-        if (!deletedPanelChatIds.has(panelChat.id)) {
-            currentPanelChatIds.add(panelChat.id);
-            for (const message of panelChat.messages) {
-                if (!deletedMessageIds.has(message.id)) {
-                    currentMessageIds.add(message.id);
-                }
-            }
-        }
-    }
-
-    log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`, LogLevel.INFO);
-
-    // Step 2: Get the commit history for the main file with --follow to track renames
-    // '--reverse' ensures commits are ordered from oldest to newest
-    const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
-
-    let logData: string;
-    try {
-        logData = await git.raw(logArgs);
-        log(`Retrieved git log data successfully.`, LogLevel.INFO);
-    } catch (error) {
-        throw new Error(`Failed to retrieve git log for ${filePath}: ${(error as Error).message}`);
-    }
-
-    const logLines = logData.split('\n').filter(line => line.trim() !== '');
-    //console.log(`Processing ${logLines.length} commits from git log.`);
-
-    const allCommitsMap: Map<string, CommitData> = new Map();
-    const seenMessageIds: Set<string> = new Set();
-
-    for (const line of logLines) {
-        //console.log("Processing Line: ", line);
-        const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
-        const commitMessage = commitMsgParts.join('\t');
-
-        // Skip commits that are solely for deletions
-        if (commitMessage.startsWith('Delete message with ID') || commitMessage.startsWith('Delete PanelChat with ID')) {
-            //console.log(`Skipping deletion commit ${commitHash}: ${commitMessage}`);
-            continue;
-        }
-
-        // Check if this commit also modifies the targetFilePath
-        let modifiesTargetFile = false;
-        try {
-            const filesChanged = await git.raw(['diff-tree', '--no-commit-id', '--name-only', '-r', commitHash]);
-            const files = filesChanged.split('\n').map(f => f.trim());
-            if (files.includes(targetFilePath)) {
-                modifiesTargetFile = true;
-                console.log(`Commit ${commitHash} modifies target file ${targetFilePath}.`);
-            } else {
-                console.log(`Commit ${commitHash} does not modify target file ${targetFilePath}. Skipping.`);
-            }
-        } catch (error) {
-            console.warn(`Warning: Failed to retrieve files changed in commit ${commitHash}: ${(error as Error).message}`);
-            continue; // Skip this commit
-        }
-
-        if (!modifiesTargetFile) {
-            // parsedContent.panelChats.forEach(pc => pc.messages.forEach(
-            //     msg => seenMessageIds.add(msg.id)));
-            continue; 
-        }
-
-        // Get the file content at this commit
-        let fileContent: string;
-        try {
-            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
-            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
-        } catch (error) {
-            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
-            log(`Error: ${(error as Error).message}`, LogLevel.WARN);
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}. Error: ${(error as Error).message}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
@@ -555,153 +258,323 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
                 date: new Date(dateStr),
                 commitMessage,
                 author: authorName,
-                panelChats: [], // Initialize panelChats
+                panelChats: [],
                 inlineChats: [],
             };
             allCommitsMap.set(commitHash, commitData);
-            //console.log(`Initialized CommitData for commit ${commitHash}.`);
+            log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
         }
 
-        // Process the commit's panelChats
-        processCommit(parsedContent, currentMessageIds, currentPanelChatIds, seenMessageIds, commitData, commitHash);
+        // Process the commit's panelChats and inlineChats
+        processCommit(parsedContent, currentMessageIds, currentInlineChatIds, seenMessageIds, commitData, commitHash);
     }
 
-    // Convert the map to an array
-    let allCommits: CommitData[] = Array.from(allCommitsMap.values());
+    // Convert the map to an array and filter out empty commits
+    let allCommits: CommitData[] = Array.from(allCommitsMap.values())
+        .map(commit => ({
+            ...commit,
+            panelChats: commit.panelChats.filter(pc => pc.messages.length > 0)
+        }))
+        .filter(commit => commit.panelChats.length > 0);
 
-    // For each panel chat in each commit, filter it out if ti is empty
-    allCommits.forEach(commit => {
-        commit.panelChats = commit.panelChats.filter(pc => pc.messages.length > 0);
-    });
+    log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
 
-    // **New Addition:** Filter out commits with empty panelChats
-    allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
+    // Step 3: Aggregate uncommitted added content
+    const allAddedPanelChats: PanelChat[] = parsedCurrent.panelChats
+        .filter(pc => !parsedCurrent.deletedChats.deletedPanelChatIDs.includes(pc.id))
+        .map(pc => ({
+            ...pc,
+            messages: pc.messages.filter(msg => 
+                !parsedCurrent.deletedChats.deletedMessageIDs.includes(msg.id) && 
+                !seenMessageIds.has(msg.id)
+            )
+        }))
+        .filter(pc => pc.messages.length > 0);
 
+    const added: UncommittedData = {
+        panelChats: allAddedPanelChats,
+        inlineChats: parsedCurrent.inlineChats.filter(ic => currentInlineChatIds.has(ic.inline_chat_id))
+    };
 
-    // Step 3: Check for uncommitted changes
-    let status;
+    // Step 4: Handle uncommitted changes
+    let uncommitted: UncommittedData | null = null;
     try {
-        status = await git.status();
-        //console.log(`Retrieved git status successfully.`);
-    } catch (error) {
-        throw new Error(`Failed to retrieve git status: ${(error as Error).message}`);
-    }
+        const currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
 
-    let uncommitted: UncommittedData = {panelChats: [], inlineChats: []};
-    let added: UncommittedData= {panelChats: [], inlineChats: []};
-    //console.log("Checking uncommitted changes");
-    if (
-        status.modified.includes(targetFilePath) ||
-        status.not_added.includes(targetFilePath) ||
-        status.created.includes(targetFilePath)
-    ) {
-        console.log("File is modified");
-
-        let currentAddedContent = readStashedState(context);
-
-        // Aggregate all panelChats from uncommitted changes, excluding deleted ones
-        const allAddedPanelChats: PanelChat[] = currentAddedContent.panelChats.filter(pc =>
-            !deletedPanelChatIds.has(pc.id)
-        ).map(pc => {
-            const filteredMessages = pc.messages.filter(msg =>
-                !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
-            );
-            // Add all messages to seenMessageIds
-            pc.messages.forEach(msg => seenMessageIds.add(msg.id));
-            return {
-                ...pc,
-                messages: filteredMessages
-            };
-        }).filter(pc => pc.messages.length > 0);
-
-        // console.log(`Aggregated ${allAddedPanelChats.length} uncommitted PanelChats.`);
-
-        added = {
-            panelChats: allAddedPanelChats,
-            inlineChats: []
-        };
-        let currentUncommittedContent: PanelChat[];
-        try {
-            currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
-        } catch (error) {
-            console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
-            currentUncommittedContent = []; 
-        }
-    
-        if (!Array.isArray(currentUncommittedContent)) {
-            throw new Error('Parsed content does not match PanelChat structure.');
-        }
-         
-        // If every element of currentUncommittedContent is a PanelChat, then we can proceed
-        if (! currentUncommittedContent.every(isPanelChat)) {
+        if (!Array.isArray(currentUncommittedContent) || !currentUncommittedContent.every(isPanelChat)) {
             throw new Error('Parsed content does not match PanelChat structure.');
         }
 
-        // Aggregate all panelChats from uncommitted changes, excluding deleted ones
-        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.filter(pc =>
-            !deletedPanelChatIds.has(pc.id)
-        ).map(pc => {
-            const filteredMessages = pc.messages.filter(msg =>
-                !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
-            );
-            return {
+        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent
+            .filter(pc => !parsedCurrent.deletedChats.deletedPanelChatIDs.includes(pc.id))
+            .map(pc => ({
                 ...pc,
-                messages: filteredMessages
-            };
-        }).filter(pc => pc.messages.length > 0);
-
-        //console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
+                messages: pc.messages.filter(msg => 
+                    !parsedCurrent.deletedChats.deletedMessageIDs.includes(msg.id) && 
+                    !seenMessageIds.has(msg.id)
+                )
+            }))
+            .filter(pc => pc.messages.length > 0);
 
         if (allCurrentPanelChats.length > 0) {
             uncommitted = {
                 panelChats: allCurrentPanelChats,
                 inlineChats: []
             };
-            console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
+            log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`, LogLevel.INFO);
         } else {
-            console.log("No uncommitted new panelChats found.");
+            log("No uncommitted new panelChats found.", LogLevel.INFO);
         }
+    } catch (error) {
+        log(`Warning: Failed to read current uncommitted content: ${(error as Error).message}`, LogLevel.WARN);
     }
 
     return {
         commits: allCommits,
-        added,
-        uncommitted,
+        added: allAddedPanelChats.length > 0 ? added : null,
+        uncommitted
     };
 }
 
 /**
- * Maps message and inline chat IDs to their respective commit information.
+ * Retrieves the Git history for a specific file that also touches a target file.
+ * @param context - The VSCode extension context.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the main target file within the repository.
+ * @param targetFilePath - The relative path to the additional target file within the repository.
+ * @returns A Promise resolving to GitHistoryData containing commit history and uncommitted changes.
+ */
+export async function getGitHistoryThatTouchesFile(
+    context: vscode.ExtensionContext,
+    repoPath: string,
+    filePath: string,
+    targetFilePath: string
+): Promise<GitHistoryData> {
+    const git: SimpleGit = simpleGit(repoPath);
+    log("Starting getGitHistoryThatTouchesFile", LogLevel.INFO);
+
+    // Ensure both files exist in the repository
+    const absoluteFilePath = path.resolve(repoPath, filePath);
+    const absoluteTargetFilePath = path.resolve(repoPath, targetFilePath);
+    if (!fs.existsSync(absoluteFilePath)) {
+        throw new Error(`File not found: ${absoluteFilePath}`);
+    }
+    if (!fs.existsSync(absoluteTargetFilePath)) {
+        throw new Error(`Target file not found: ${absoluteTargetFilePath}`);
+    }
+
+    // Step 1: Read and validate the current stashedGaitState2.json
+    const parsedCurrent = readStashedState(context); 
+    const { currentMessageIds, currentPanelChatIds, currentInlineChatIds } = aggregateCurrentIds(parsedCurrent);
+    const seenMessageIds: Set<string> = new Set();
+
+    // Step 2: Get the commit history for the main file with --follow to track renames
+    const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
+    let logData: string;
+
+    try {
+        logData = await git.raw(logArgs);
+        log(`Retrieved git log data successfully.`, LogLevel.INFO);
+    } catch (error) {
+        throw new Error(`Failed to retrieve git log for ${filePath}: ${(error as Error).message}`);
+    }
+
+    const logLines = logData.split('\n').filter(line => line.trim() !== '');
+    log(`Processing ${logLines.length} commits from git log.`, LogLevel.INFO);
+
+    const allCommitsMap: Map<string, CommitData> = new Map();
+
+    for (const line of logLines) {
+        const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
+        const commitMessage = commitMsgParts.join('\t');
+
+        // Skip commits that are solely for deletions
+        if (
+            commitMessage.startsWith('Delete message with ID') || 
+            commitMessage.startsWith('Delete PanelChat with ID')
+        ) {
+            log(`Skipping deletion commit ${commitHash}: ${commitMessage}`, LogLevel.INFO);
+            continue;
+        }
+
+        // Check if this commit modifies the targetFilePath
+        let modifiesTargetFile = false;
+        try {
+            const filesChanged = await git.raw(['diff-tree', '--no-commit-id', '--name-only', '-r', commitHash]);
+            const files = filesChanged.split('\n').map(f => f.trim());
+            modifiesTargetFile = files.includes(targetFilePath);
+            log(
+                `Commit ${commitHash} ${modifiesTargetFile ? 'modifies' : 'does not modify'} target file ${targetFilePath}.`,
+                LogLevel.INFO
+            );
+        } catch (error) {
+            log(`Warning: Failed to retrieve files changed in commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        if (!modifiesTargetFile) {
+            continue;
+        }
+
+        // Get the file content at this commit
+        let fileContent: string;
+        try {
+            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
+            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}. Error: ${(error as Error).message}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Parse JSON
+        let parsedContent: StashedState;
+        try {
+            parsedContent = JSON.parse(fileContent);
+            if (!isStashedState(parsedContent)) {
+                throw new Error('Parsed content does not match StashedState structure.');
+            }
+            log(`Parsed stashedGaitState2.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
+            log(`Content: ${fileContent}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Initialize or retrieve existing CommitData for this commit
+        let commitData = allCommitsMap.get(commitHash);
+        if (!commitData) {
+            commitData = {
+                commitHash,
+                date: new Date(dateStr),
+                commitMessage,
+                author: authorName,
+                panelChats: [],
+                inlineChats: [],
+            };
+            allCommitsMap.set(commitHash, commitData);
+            log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
+        }
+
+        // Process the commit's panelChats and inlineChats
+        processCommit(parsedContent, currentMessageIds, currentInlineChatIds, seenMessageIds, commitData, commitHash);
+    }
+
+    // Convert the map to an array and filter out empty commits
+    let allCommits: CommitData[] = Array.from(allCommitsMap.values())
+        .map(commit => ({
+            ...commit,
+            panelChats: commit.panelChats.filter(pc => pc.messages.length > 0)
+        }))
+        .filter(commit => commit.panelChats.length > 0);
+
+    log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
+
+    // Step 3: Aggregate uncommitted added content
+    const allAddedPanelChats: PanelChat[] = parsedCurrent.panelChats
+        .filter(pc => !parsedCurrent.deletedChats.deletedPanelChatIDs.includes(pc.id))
+        .map(pc => ({
+            ...pc,
+            messages: pc.messages.filter(msg => 
+                !parsedCurrent.deletedChats.deletedMessageIDs.includes(msg.id) && 
+                !seenMessageIds.has(msg.id)
+            )
+        }))
+        .filter(pc => pc.messages.length > 0);
+
+    const added: UncommittedData = {
+        panelChats: allAddedPanelChats,
+        inlineChats: parsedCurrent.inlineChats.filter(ic => currentInlineChatIds.has(ic.inline_chat_id))
+    };
+
+    // Step 4: Check for uncommitted changes
+    let uncommitted: UncommittedData | null = null;
+    try {
+        const status = await git.status();
+        const isModified = [
+            status.modified,
+            status.not_added,
+            status.created
+        ].some(list => list.includes(targetFilePath));
+
+        if (isModified) {
+            log(`File ${targetFilePath} is modified. Processing uncommitted changes.`, LogLevel.INFO);
+
+            const currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
+
+            if (!Array.isArray(currentUncommittedContent) || !currentUncommittedContent.every(isPanelChat)) {
+                throw new Error('Parsed content does not match PanelChat structure.');
+            }
+
+            const allCurrentPanelChats: PanelChat[] = currentUncommittedContent
+                .filter(pc => !parsedCurrent.deletedChats.deletedPanelChatIDs.includes(pc.id))
+                .map(pc => ({
+                    ...pc,
+                    messages: pc.messages.filter(msg => 
+                        !parsedCurrent.deletedChats.deletedMessageIDs.includes(msg.id) && 
+                        !seenMessageIds.has(msg.id)
+                    )
+                }))
+                .filter(pc => pc.messages.length > 0);
+
+            if (allCurrentPanelChats.length > 0) {
+                uncommitted = {
+                    panelChats: allCurrentPanelChats,
+                    inlineChats: []
+                };
+                log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`, LogLevel.INFO);
+            } else {
+                log("No uncommitted new panelChats found.", LogLevel.INFO);
+            }
+        }
+    } catch (error) {
+        log(`Warning: Failed to process uncommitted changes: ${(error as Error).message}`, LogLevel.WARN);
+    }
+
+    return {
+        commits: allCommits,
+        added: allAddedPanelChats.length > 0 ? added : null,
+        uncommitted
+    };
+}
+
+/**
+ * Maps message IDs to their respective commit information.
+ * @param context - The VSCode extension context.
  * @param repoPath - The path to the Git repository.
  * @param filePath - The relative path to the target file within the repository.
- * @returns A Promise resolving to a Map where keys are IDs and values are CommitData.
+ * @returns A Promise resolving to a Map where keys are message IDs and values are CommitData.
  */
 export async function getIdToCommitInfo(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
-    const gitHistory  = await getGitHistory(context, repoPath, filePath);
+    const gitHistory = await getGitHistory(context, repoPath, filePath);
     const idToCommitInfo = new Map<string, CommitData>();
+
     for (const commit of gitHistory.commits) {
-      for (const panelChat of commit.panelChats) { // Updated to iterate through panelChats
-        for (const message of panelChat.messages) { // Iterate through messages within each panelChat
-          idToCommitInfo.set(message.id, commit);
+        for (const panelChat of commit.panelChats) {
+            for (const message of panelChat.messages) {
+                idToCommitInfo.set(message.id, commit);
+            }
         }
-      }
     }
+
     return idToCommitInfo;
 }
 
 /**
  * Maps inline chat IDs to their respective commit information.
+ * @param context - The VSCode extension context.
  * @param repoPath - The path to the Git repository.
  * @param filePath - The relative path to the target file within the repository.
  * @returns A Promise resolving to a Map where keys are inline chat IDs and values are CommitData.
  */
 export async function getInlineChatIdToCommitInfo(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
-    const gitHistory  = await getGitHistory(context, repoPath, filePath);
+    const gitHistory = await getGitHistory(context, repoPath, filePath);
     const idToCommitInfo = new Map<string, CommitData>();
+
     for (const commit of gitHistory.commits) {
-      for (const inlineChat of commit.inlineChats) { // Updated to iterate through inlineChats
-        idToCommitInfo.set(inlineChat.inline_chat_id, commit);
-      }
+        for (const inlineChat of commit.inlineChats) {
+            idToCommitInfo.set(inlineChat.inline_chat_id, commit);
+        }
     }
+
     return idToCommitInfo;
 }
