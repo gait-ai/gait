@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import simpleGit, { SimpleGit } from 'simple-git';
 import { StashedState, PanelChat, isStashedState, isPanelChat } from './types';
 import { InlineChatInfo } from './inline';
-import { readStashedState } from './stashedState'; // Ensure this uses gzip
+import { readStashedState } from './stashedState'; // Ensure this does not use gzip
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -61,18 +61,17 @@ function log(message: string, level: LogLevel = LogLevel.INFO) {
 }
 
 const execFileAsync = promisify(execFile);
-const zlib = require('zlib');
 
 /**
- * Executes a Git command and returns the output as a Buffer.
+ * Executes a Git command and returns the output as a string.
  * @param args - Array of Git command arguments.
  * @param repoPath - The path to the Git repository.
- * @returns A Promise resolving to a Buffer containing the command output.
+ * @returns A Promise resolving to a string containing the command output.
  */
-async function gitShowBuffer(args: string[], repoPath: string): Promise<Buffer> {
+async function gitShowString(args: string[], repoPath: string): Promise<string> {
     try {
-        const { stdout } = await execFileAsync('git', args, { cwd: repoPath, encoding: null });
-        return Buffer.from(stdout); // 'stdout' is a Buffer when 'encoding' is set to null
+        const { stdout } = await execFileAsync('git', args, { cwd: repoPath });
+        return stdout;
     } catch (error) {
         throw new Error(`Git command failed: ${(error as Error).message}`);
     }
@@ -101,7 +100,7 @@ function ensureDeletedChats(stashedState: StashedState, commitHash: string) {
 }
 
 /**
- * Processes a single commit's stashedPanelChats.json.gz and extracts active PanelChats and Messages.
+ * Processes a single commit's stashedPanelChats.json and extracts active PanelChats and Messages.
  * @param parsedContent - The parsed StashedState from the commit.
  * @param currentMessageIds - Set of active message IDs.
  * @param currentPanelChatIds - Set of active PanelChat IDs.
@@ -200,18 +199,17 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         throw new Error(`File not found: ${absoluteFilePath}`);
     }
 
-    // Step 1: Read the current stashedPanelChats.json.gz to collect existing message and panelChat IDs
+    // Step 1: Read the current stashedPanelChats.json to collect existing message and panelChat IDs
     let parsedCurrent: StashedState;
     const currentMessageIds: Set<string> = new Set();
     const currentPanelChatIds: Set<string> = new Set();
 
-
     try {
-        parsedCurrent = readStashedState(context); // This now handles gzip decompression
+        parsedCurrent = readStashedState(context); // This no longer handles gzip decompression
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure 1.');
         }
-        log(`Parsed current stashedPanelChats.json.gz successfully.`, LogLevel.INFO);
+        log(`Parsed current stashedPanelChats.json successfully.`, LogLevel.INFO);
     } catch (error) {
         log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
         // Initialize with default structure if parsing fails
@@ -222,7 +220,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
         };
-        log(`Initialized default stashedPanelChats.json.gz structure due to parsing failure.`, LogLevel.INFO);
+        log(`Initialized default stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
     }
 
     // Ensure deletedChats exists
@@ -291,30 +289,27 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         const commitMessage = commitMsgParts.join('\t');
 
         // Get the file content at this commit using child_process
-        let fileBuffer: Buffer;
-        let decompressedBuffer: Buffer;
+        let fileContent: string;
         try {
-            fileBuffer = await gitShowBuffer(['show', `${commitHash}:${filePath}`], repoPath);
-            decompressedBuffer = zlib.gunzipSync(fileBuffer);
-            log(`Retrieved and decompressed file content for commit ${commitHash}.`, LogLevel.INFO);
+            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
+            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
         } catch (error) {
-            log(`Warning: Could not retrieve or decompress file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
             log(`Error: ${(error as Error).message}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
-        // Decompress and parse JSON
+        // Parse JSON
         let parsedContent: StashedState;
         try {
-            const jsonString = decompressedBuffer.toString('utf-8');
-            parsedContent = JSON.parse(jsonString);
+            parsedContent = JSON.parse(fileContent);
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure 2.');
             }
-            log(`Parsed stashedPanelChats.json.gz for commit ${commitHash} successfully.`, LogLevel.INFO);
+            log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
-            log(`Content Decompressed Buffer: ${decompressedBuffer}`, LogLevel.WARN);
+            log(`Content: ${fileContent}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
@@ -435,17 +430,17 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
         throw new Error(`Target file not found: ${absoluteTargetFilePath}`);
     }
 
-    // Step 1: Read the current stashedPanelChats.json.gz to collect existing message and panelChat IDs
+    // Step 1: Read the current stashedPanelChats.json to collect existing message and panelChat IDs
     let parsedCurrent: StashedState;
     const currentMessageIds: Set<string> = new Set();
     const currentPanelChatIds: Set<string> = new Set();
 
     try {
-        parsedCurrent = readStashedState(context); // This now handles gzip decompression
+        parsedCurrent = readStashedState(context); // This no longer handles gzip decompression
         if (!isStashedState(parsedCurrent)) {
             throw new Error('Parsed content does not match StashedState structure.');
         }
-        log(`Parsed current stashedPanelChats.json.gz successfully.`, LogLevel.INFO);
+        log(`Parsed current stashedPanelChats.json successfully.`, LogLevel.INFO);
     } catch (error) {
         log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
         // Initialize with default structure if parsing fails
@@ -456,7 +451,7 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
             deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
             kv_store: {}
         };
-        log(`Initialized default stashedPanelChats.json.gz structure due to parsing failure.`, LogLevel.INFO);
+        log(`Initialized default stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
     }
 
     const deletedPanelChatIds = new Set(parsedCurrent.deletedChats.deletedPanelChatIDs);
@@ -528,30 +523,27 @@ export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionCont
         }
 
         // Get the file content at this commit
-        let fileBuffer: Buffer;
-        let decompressedBuffer: Buffer;
+        let fileContent: string;
         try {
-            fileBuffer = await gitShowBuffer(['show', `${commitHash}:${filePath}`], repoPath);
-            decompressedBuffer = zlib.gunzipSync(fileBuffer);
-            log(`Retrieved and decompressed file content for commit ${commitHash}.`, LogLevel.INFO);
+            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
+            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
         } catch (error) {
-            log(`Warning: Could not retrieve or decompress file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
             log(`Error: ${(error as Error).message}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
-        // Decompress and parse JSON
+        // Parse JSON
         let parsedContent: StashedState;
         try {
-            const jsonString = decompressedBuffer.toString('utf-8');
-            parsedContent = JSON.parse(jsonString);
+            parsedContent = JSON.parse(fileContent);
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            log(`Parsed stashedPanelChats.json.gz for commit ${commitHash} successfully.`, LogLevel.INFO);
+            log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
-            log(`Content Decompressed Buffer: ${decompressedBuffer}`, LogLevel.WARN);
+            log(`Content: ${fileContent}`, LogLevel.WARN);
             continue; // Skip this commit
         }
 
