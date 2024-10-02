@@ -17,7 +17,7 @@ export async function createPanelHover(context: vscode.ExtensionContext, matched
     } else {
         try {
             const repoPath = workspaceFolder.uri.fsPath;
-            const filePath = '.gait/stashedPanelChats.json'; // Replace with your actual file path relative to repo
+            const filePath = '.gait/stashedGaitState.json'; // Replace with your actual file path relative to repo
             idToCommitInfo = await getIdToCommitInfo(context, repoPath, filePath);
         } catch (error) {
             console.warn(`Error getting commit info for ${document.fileName}: ${error}`);

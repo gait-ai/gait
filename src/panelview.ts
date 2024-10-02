@@ -27,7 +27,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         let context = this._context;
 
         const repoPath = workspaceFolder.uri.fsPath;
-        const filePath = '.gait/stashedPanelChats.json'; // Replace with your actual file path relative to repo
+        const filePath = '.gait/stashedGaitState.json'; // Replace with your actual file path relative to repo
 
         try {
             if (this._isFilteredView && additionalFilePath) {

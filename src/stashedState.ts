@@ -14,7 +14,7 @@ export function stashedStateFilePath(): string {
     }
 
     const repoPath = workspaceFolder.uri.fsPath;
-    return path.join(repoPath, '.gait', 'stashedPanelChats.json');
+    return path.join(repoPath, '.gait', 'stashedGaitState.json');
 }
 
 export function readStashedState(context: vscode.ExtensionContext): StashedState {

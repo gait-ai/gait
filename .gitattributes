@@ -3,4 +3,4 @@
 
 .gait/ -diff
 
-.gait/stashedPanelChats.json merge=custom-stashed-state
+.gait/stashedGaitState.json merge=custom-stashed-state
