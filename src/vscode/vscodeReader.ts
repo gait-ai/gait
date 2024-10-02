@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as Diff from 'diff';
 import * as Inline from '../inline';
 import { readVSCodeState } from '../tools/dbReader';
-import { Context, MessageEntry, PanelChat, StashedState, StateReader, TimedFileDiffs } from '../types';
+import { AIChangeMetadata, Context, MessageEntry, PanelChat, StashedState, StateReader, TimedFileDiffs } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { FileDiff, InlineChatInfo } from '../inline';
@@ -79,10 +79,11 @@ export class VSCodeReader implements StateReader {
     private inlineStartInfo: Inline.InlineStartInfo | null = null;
     private timedFileDiffs: TimedFileDiffs[] = [];
 
-    public pushFileDiffs(file_diffs: FileDiff[]): void {
+    public pushFileDiffs(file_diffs: FileDiff[], metadata: AIChangeMetadata): void {
         this.timedFileDiffs.push({
             timestamp: new Date().toISOString(),
-            file_diffs: file_diffs
+            file_diffs: file_diffs,
+            metadata: metadata
         });
     }
 
@@ -105,8 +106,20 @@ export class VSCodeReader implements StateReader {
             return;
         }
         const context = this.context;
+
+        
         for (const newChat of newChats) {
-            const matchedDiff = this.timedFileDiffs.pop();
+            let matchedDiff: TimedFileDiffs | undefined;
+            for (const diff of this.timedFileDiffs) {
+                if (diff.metadata.inlineChatStartInfo) {
+                    matchedDiff = diff;
+                    this.timedFileDiffs.splice(this.timedFileDiffs.indexOf(diff), 1);
+                    break;
+                }
+            }
+            if (!matchedDiff) {
+                matchedDiff = this.timedFileDiffs.pop();
+            }
             if (!matchedDiff) {
                 console.error("error no file diffs");
                 vscode.window.showErrorMessage('No file diffs found for new prompts!');

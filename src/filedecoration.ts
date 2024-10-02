@@ -144,13 +144,14 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
     const rangesToPanel: PanelMatchedRange[] = [];
     interface LineDecoration {
         timestamp: number;
+        type: 'inline' | 'panel';
         decorationType: vscode.TextEditorDecorationType;
         decorationOptions: vscode.DecorationOptions[];
     }
 
     const lineDecorations: Map<number, LineDecoration> = new Map();
 
-    function addDecorationType(color: string, line: number, timestamp: number) {
+    function addDecorationType(color: string, line: number, timestamp: number, type: 'inline' | 'panel') {
         if (!decorations_active) {
             return;
         }
@@ -165,15 +166,36 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
         }];
 
         const existingDecoration = lineDecorations.get(line);
-        if (!existingDecoration || timestamp < existingDecoration.timestamp) {
-            lineDecorations.set(line, { timestamp, decorationType, decorationOptions });
+        if (!existingDecoration || (timestamp < existingDecoration.timestamp)) {
+            lineDecorations.set(line, { timestamp, decorationType, decorationOptions, type });
         }
     }
 
-
-    const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
-
     let decorationIndex = 0;
+    const rangesToInline: Inline.InlineMatchedRange[] = [];
+    for (const chat of Object.values(inlineChats)) {
+        for (const diff of chat.file_diff) {
+            if (diff.file_path !== baseName) {
+                continue;
+            }
+            const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs);
+            if (currentRanges.length > 0) {
+                decorationIndex += 1;
+                const color = generateColors(decorationIndex);
+                // Get content at document in the range
+
+                // Create a new decoration type with the unique color
+                currentRanges.forEach(range => {
+                    rangesToInline.push({
+                        range: range,
+                        inlineChat: chat,
+                    });
+                    addDecorationType(color, range.start.line, new Date(chat.timestamp).getTime(), 'inline');
+                });
+            }
+        }
+    }
+    
     const allPanelChats = [...stashedState.panelChats, ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || [])];
 // Filter out deleted panel chats
     const currentPanelChats = allPanelChats.filter(chat => 
@@ -211,8 +233,8 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                     console.error(`Failed to associate file with message: ${error}`);
                 });
             }
-            decorationIndex += 1;
             if (currentRanges.length > 0) {
+                decorationIndex += 1;
                 const color = generateColors(decorationIndex);
 
                 function lineInRangesToPanel(line: number) {
@@ -227,7 +249,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                         panelChat: panelChat,
                         message_id: message.id,
                     });
-                    addDecorationType(color, range.start.line, new Date(panelChat.created_on).getTime());
+                    addDecorationType(color, range.start.line, new Date(panelChat.created_on).getTime(), 'panel');
                 }
 
                 currentRanges.forEach(range => {
@@ -237,8 +259,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                     for (let i = range.start.line; i <= range.end.line; i++) {
                         if (lineInRangesToPanel(i)) {
                             if (currentStart !== currentEnd) {
-                                addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
-                                );
+                                addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length));
                             }
                             currentStart = i + 1;
                             currentEnd = i + 1;
@@ -248,36 +269,10 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                     }
 
                     if (currentStart <= range.end.line) {
-                        addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length),
-            
-                        );
+                        addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length));
                     }
                 });
             }
-        }
-    }
-
-    const rangesToInline: Inline.InlineMatchedRange[] = [];
-    for (const chat of Object.values(inlineChats)) {
-        for (const diff of chat.file_diff) {
-            if (diff.file_path !== baseName) {
-                continue;
-            }
-            const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs);
-            if (currentRanges.length > 0) {
-                const color = generateColors(decorationIndex);
-                // Get content at document in the range
-
-                // Create a new decoration type with the unique color
-                currentRanges.forEach(range => {
-                    rangesToInline.push({
-                        range: range,
-                        inlineChat: chat,
-                    });
-                    addDecorationType(color, range.start.line, new Date(chat.timestamp).getTime());
-                });
-            }
-            decorationIndex += 1;
         }
     }
 

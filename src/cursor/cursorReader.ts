@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as Diff from 'diff';
 import * as Inline from '../inline';
 import { readVSCodeState } from '../tools/dbReader';
-import { Context, MessageEntry, PanelChat, StashedState, StateReader, TimedFileDiffs } from '../types';
+import { AIChangeMetadata, Context, MessageEntry, PanelChat, StashedState, StateReader, TimedFileDiffs } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { FileDiff, InlineChatInfo } from '../inline';
@@ -61,10 +61,11 @@ export class CursorReader implements StateReader {
     private inlineStartInfo: Inline.InlineStartInfo | null = null;
     private timedFileDiffs: TimedFileDiffs[] = [];
 
-    public pushFileDiffs(file_diffs: FileDiff[]): void {
+    public pushFileDiffs(file_diffs: FileDiff[], metadata: AIChangeMetadata): void {
         this.timedFileDiffs.push({
             timestamp: new Date().toISOString(),
-            file_diffs: file_diffs
+            file_diffs: file_diffs,
+            metadata: metadata
         });
     }
 
@@ -75,11 +76,11 @@ export class CursorReader implements StateReader {
             return;
         }
         const oldInlineChats = this.inlineChats;
-        const newInlineChats =  await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
+        const newInlineChats =  await readVSCodeState(getDBPath(this.context), 'aiService.prompts') || oldInlineChats;
         const newChats =  getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4));
         this.inlineChats = newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
         if (newChats.length === 0) {
-            const oneMinuteAgo = new Date(Date.now() - 15000).toISOString();
+            const oneMinuteAgo = new Date(Date.now() - 30000).toISOString();
             while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
                 this.timedFileDiffs.shift();
             }
@@ -87,7 +88,19 @@ export class CursorReader implements StateReader {
         }
         // console.log("newChats found: ", newChats);
         for (const newChat of newChats) {
-            const matchedDiff = this.timedFileDiffs.pop();
+            let matchedDiff: TimedFileDiffs | undefined;
+            if (newChat.commandType === 1) {
+                for (const diff of this.timedFileDiffs) {
+                    if (diff.metadata.inlineChatStartInfo) {
+                        matchedDiff = diff;
+                        this.timedFileDiffs.splice(this.timedFileDiffs.indexOf(diff), 1);
+                        break;
+                    }
+                }
+            }
+            if (!matchedDiff) {
+                matchedDiff = this.timedFileDiffs.pop();
+            }
             if (!matchedDiff) {
                 vscode.window.showErrorMessage('No file diffs found for new prompts!');
                 return;

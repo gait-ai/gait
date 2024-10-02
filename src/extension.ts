@@ -10,7 +10,7 @@ import { panelChatsToMarkdown } from './markdown';
 import * as CursorReader from './cursor/cursorReader';
 import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool, TOOL } from './ide';
-import { PanelChatMode, StateReader } from './types';
+import { AIChangeMetadata, PanelChatMode, StateReader } from './types';
 import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
@@ -29,6 +29,8 @@ let changeQueue: { cursor_position: vscode.Position,
     changes: vscode.TextDocumentContentChangeEvent[], 
     timestamp: number,
     document_content: string | null }[] = [];
+let triggerAcceptCount = 0;
+let lastInlineChatStart: Inline.InlineStartInfo | null = null;
 
 let fileState: { [key: string]: string } = {};
 
@@ -132,8 +134,8 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
 
             const beforeFileContents: { [key: string]: string } = {};
             changeQueue.forEach(change => {
-                if (change.document_content && !beforeFileContents[change.document_uri]) {
-                    beforeFileContents[change.document_uri] = change.document_content;
+                if (!beforeFileContents[change.document_uri]) {
+                    beforeFileContents[change.document_uri] = change.document_content || '';
                 }
             });
             changeQueue = [];
@@ -165,20 +167,50 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                     console.error(`Error processing file ${filePath}: ${error}`);
                 }
             });
-            //console.log("File Diffs:");
+            console.log("File Diffs:");
             fileDiffs.forEach((diff, index) => {
-                //console.log(`File ${index + 1}: ${diff.file_path}`);
-                //console.log("Diffs:");
+                console.log(`File ${index + 1}: ${diff.file_path}`);
+                console.log("Diffs:");
                 diff.diffs.forEach((change, changeIndex) => {
                     if (change.added) {
-                        //console.log(`  Added Change ${changeIndex + 1}:`);
-                        //console.log(`    ${change.value.replace(/\n/g, "\n    ")}`);
+                        console.log(`  Added Change ${changeIndex + 1}:`);
+                        console.log(`    ${change.value.replace(/\n/g, "\n    ")}`);
                     }
                 });
             });
-
-            console.log("Accepting inline AI change");
-            stateReader.pushFileDiffs(fileDiffs);
+            // Extract the position where changes start if only one file is modified
+            let changeStartPosition: vscode.Position | undefined;
+            if (fileDiffs.length === 1) {
+                const diff = fileDiffs[0];
+                const firstAddedChange = diff.diffs.find(change => change.added);
+                if (firstAddedChange) {
+                    const linesBefore = diff.diffs
+                        .slice(0, diff.diffs.indexOf(firstAddedChange))
+                        .reduce((sum, change) => sum + (change.count || 0), 0);
+                    changeStartPosition = new vscode.Position(linesBefore, 0);
+                }
+            }
+            let inlineChatStart = undefined;
+            if (lastInlineChatStart && fileDiffs.length === 1 && changeStartPosition) {
+                if (lastInlineChatStart.fileName === fileDiffs[0].file_path &&
+                    currentTime - new Date(lastInlineChatStart.startTimestamp).getTime() < 60000 &&
+                    changeStartPosition.line >= lastInlineChatStart.startSelection.line &&
+                    changeStartPosition.line <= lastInlineChatStart.startSelection.line + 10) {
+                    inlineChatStart = lastInlineChatStart;
+                } else {
+                    lastInlineChatStart = null;
+                }
+            }
+            
+            const metadata: AIChangeMetadata = {
+                changeStartPosition: changeStartPosition,
+                inlineChatStartInfo: inlineChatStart,
+            };
+            console.log("Accepting AI change: ", fileDiffs);
+            if (inlineChatStart){
+                vscode.window.showInformationMessage("Inline AI change detected");
+            }
+            stateReader.pushFileDiffs(fileDiffs, metadata);
         }
     }
 }
@@ -291,6 +323,7 @@ export function activate(context: vscode.ExtensionContext) {
             stateReader.startInline(inlineStartInfo).catch((error) => {
                 vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
             });
+            lastInlineChatStart = inlineStartInfo;
         }
         vscode.commands.executeCommand(startInlineCommand);
     });
