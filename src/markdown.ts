@@ -26,7 +26,7 @@ function contextToText(context: Context, seenFilenames: Set<string> = new Set<st
         if (context_type === "file"){
             const {uri} = value;
             const fileContent = readFileOrSeen(uri, seenFilenames);
-            return `Whole file in context:\n ${fileContent}`;
+            return `${uri}: wole file in context:\n\`\`\`\n${fileContent}\n\`\`\`\n`;
         } 
         if (context_type === "folder"){
             const {relativePath} = value;
@@ -62,15 +62,14 @@ export function panelChatsToMarkdown(panelChats: ({commit: CommitData, panelChat
     //console.log("panelChats: ", panelChats);
     let markdown = `# Panel Chats\n\n`;
     // Create a Set to store seen filenames
-    const seenFilenames = new Set<string>();
     panelChats.forEach(panelChat => {
+        markdown += "## Title: " + panelChat.panelChat.customTitle + "\n";
         if (panelChat.commit) {
             markdown += `- **Commit**: ${panelChat.commit.commitHash}\n`;
             markdown += `- **Commit Message**: ${panelChat.commit.commitMessage}\n`;
             markdown += `- **Author**: ${panelChat.commit.author}\n`;
             markdown += `- **Date**: ${panelChat.commit.date}\n`;
         }
-        markdown += "Panel Chat Title: " + panelChat.panelChat.customTitle + "\n";
         markdown += `- **Created On**: ${panelChat.panelChat.created_on}\n`;
         markdown += `- **Messages**:\n`;
         panelChat.panelChat.messages.forEach(message => {

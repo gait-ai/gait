@@ -322,11 +322,19 @@ export function activate(context: vscode.ExtensionContext) {
     // Register command to convert PanelChats to markdown and open in a new file
     const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (args) => {
         try {
-            const markdownContent = panelChatsToMarkdown(args.chats, true);
+            const decodedArgs = Buffer.from(args.data, 'base64').toString('utf-8');
+            const markdownData = JSON.parse(decodedArgs);
+            const continue_chat = args.continue_chat;
+            const markdownContent = panelChatsToMarkdown(markdownData, continue_chat);
             const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
             fs.writeFileSync(filePath, markdownContent, 'utf8');
-            await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
-            await vscode.commands.executeCommand(startPanelCommand);
+            if (continue_chat){
+                await vscode.workspace.openTextDocument(filePath);
+                await vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(filePath));
+                await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup');
+            } else {
+                await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });            }
+                await vscode.commands.executeCommand(startPanelCommand);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }

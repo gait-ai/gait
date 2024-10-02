@@ -53,17 +53,17 @@ export async function createPanelHover(context: vscode.ExtensionContext, matched
     }
 
     markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
-    const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]};
+    const markdownData = [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}];
 
-    // Add action buttons at the end of the hover content
-    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(JSON.stringify(markdownData))}`);
-    markdown.appendMarkdown(`\n\n[View in Markdown](${exportCommand})`);
-    markdown.appendMarkdown(`\n\n`);
+    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
+ 
+    const continueCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(
+        JSON.stringify({data: encodedData, continue_chat: false}))}`);
+    markdown.appendMarkdown(`[Continue Chat](${continueCommand})  |  `);
     const deleteCommand = vscode.Uri.parse(`command:gait-copilot.removePanelChat?${encodeURIComponent(JSON.stringify({
         panel_chat_id: panelChat.id,
         message_id: message.id
     }))}`);
     markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);
-
     return new vscode.Hover(markdown);
 }
