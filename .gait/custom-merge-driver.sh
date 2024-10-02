@@ -43,17 +43,19 @@ def mergePanelChats(ourChats; theirChats):
       else
         .[0] as $ourChat
         | .[1] as $theirChat
+        | (if ($theirChat.messages | length) > ($ourChat.messages | length) 
+           then $theirChat.messages 
+           else $ourChat.messages 
+           end) as $mergedMessages
+        | ($ourChat.kv_store + $theirChat.kv_store) as $mergedKvStore
         | {
             ai_editor: $ourChat.ai_editor,
             id: $ourChat.id,
             customTitle: $ourChat.customTitle,
             parent_id: $ourChat.parent_id,
             created_on: $ourChat.created_on,
-            messages: if ($theirChat.messages | length) > ($ourChat.messages | length) 
-                      then $theirChat.messages 
-                      else $ourChat.messages 
-                      end,
-            kv_store: $ourChat.kv_store + $theirChat.kv_store
+            messages: $mergedMessages,
+            kv_store: $mergedKvStore
           }
       end
     );
