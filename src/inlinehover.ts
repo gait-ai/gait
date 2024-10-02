@@ -78,15 +78,6 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
     
     markdown.appendMarkdown(`[View File at Prompt Time](${openFileCommand}) | ` +
                           `[Delete This Inline Chat Annotation](${deleteCommand})`);
-    
-    if (matchedRange) {
-        const continueCommand = vscode.Uri.parse(`command:gait-copilot.continueInlineChat?${encodeURIComponent(JSON.stringify({
-            parent_inline_chat_id: inlineChat.inline_chat_id,
-            startLine: matchedRange.range.start.line,
-            endLine: matchedRange.range.end.line
-    }))}`);
-        markdown.appendMarkdown(` | [Continue This Inline Chat Annotation](${continueCommand})`);
-    }
     if (parent_inline_chat_id) {
         // Load the parent inline chat
         const parentInlineChat = getInlineParent(context, parent_inline_chat_id);

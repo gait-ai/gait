@@ -341,7 +341,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
             // Append the markdown content to gaitContext.md
             fs.appendFileSync(filePath, markdownContent + '\n\n', 'utf-8');
-            vscode.window.showInformationMessage(`PanelChat with ID ${panelChatId} from commit ${commitHash} has been appended to gait_context.md.`);
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
             await vscode.commands.executeCommand('aichat.newchataction');
 

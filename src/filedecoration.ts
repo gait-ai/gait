@@ -174,10 +174,16 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
     const decorationsMap: Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]> = new Map();
 
     let decorationIndex = 0;
-    const currentPanelChats = [...stashedState.panelChats, ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || [])];
-
+    const allPanelChats = [...stashedState.panelChats, ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || [])];
+// Filter out deleted panel chats
+    const currentPanelChats = allPanelChats.filter(chat => 
+        !stashedState.deletedChats.deletedPanelChatIDs.includes(chat.id)
+    );
     const currentMessages = currentPanelChats.reduce((acc, panelChat) => {
         panelChat.messages.forEach(message => {
+            if (stashedState.deletedChats.deletedMessageIDs.includes(message.id)) {
+                return;
+            }
             const existingIndex = acc.findIndex(item => item.message.id === message.id);
             if (existingIndex === -1) {
                 acc.push({ message, panelChat });

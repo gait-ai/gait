@@ -44,58 +44,33 @@
         },
         "commands": [
             {
-                "command": "gait-copilot.helloWorld",
-                "title": "Hello World",
-                "category": "Gait"
-            },
-            {
                 "command": "gait-copilot.startInlineChat",
                 "title": "Start Inline Chat",
-                "category": "Gait"
+                "category": "gait"
             },
             {
                 "command": "gait-copilot.updateSidebar",
                 "title": "Update Sidebar",
-                "category": "Gait"
-            },
-            {
-                "command": "gait-copilot.acceptInlineChat",
-                "title": "Accept Inline Chat",
-                "category": "Gait"
+                "category": "gait"
             },
             {
                 "command": "gait-copilot.removeInlineChat",
                 "title": "Remove Inline Chat",
-                "category": "Gait"
-            },
-            {
-                "command": "gait-copilot.continueInlineChat",
-                "title": "Continue Inline Chat",
-                "category": "Gait"
+                "category": "gait"
             },
             {
                 "command": "gait-copilot.toggleDecorations",
                 "title": "Toggle Decorations",
-                "category": "Gait"
+                "category": "gait"
             },
             {
                 "command": "gait-copilot.deletePanelChat",
                 "title": "Delete Panel Chat",
-                "category": "Gait"
-            },
-            {
-                "command": "gait-copilot.registerGaitChatParticipant",
-                "title": "Load context into gait chat participant",
-                "category": "Gait"
+                "category": "gait"
             },
             {
                 "command": "gait-copilot.handleMerge",
                 "title": "Handle Merge",
-                "category": "Gait"
-            },
-            {
-                "command": "gait-copilot.setPanelChatMode",
-                "title": "Set Panel Chat Mode",
                 "category": "Gait"
             }
         ],
