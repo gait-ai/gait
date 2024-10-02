@@ -30,7 +30,7 @@ let changeQueue: { cursor_position: vscode.Position,
     changes: vscode.TextDocumentContentChangeEvent[], 
     timestamp: number,
     document_content: string | null }[] = [];
-
+let triggerAcceptCount = 0;
 let fileState: { [key: string]: string } = {};
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
@@ -113,7 +113,7 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
         const lastChange = changeQueue[changeQueue.length - 1];
         const currentTime = Date.now();
         
-        if (currentTime - lastChange.timestamp > 1000) {
+        if (currentTime - lastChange.timestamp > 500) {
             // Print out the changeQueue
             //console.log("Current changeQueue:");
             changeQueue.forEach((change, index) => {
@@ -560,7 +560,11 @@ exit 0
     const acceptInterval = setInterval(async () => {
         try {
             triggerAccept(stateReader, context);
-            await stateReader.matchPromptsToDiff();
+            if (triggerAcceptCount % 3 === 0) {
+                triggerAcceptCount= 0;
+                await stateReader.matchPromptsToDiff();
+            }
+            triggerAcceptCount++;
         } catch (error) {
             console.log("Error in accept interval", error);
         }
