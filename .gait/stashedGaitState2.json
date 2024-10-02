@@ -378,7 +378,7 @@
           "context": [
             {
               "context_type": "file",
-              "key": "37c89b7a-d77c-4736-af83-d979dc04dab8",
+              "key": "06741eef-a920-4cd1-91ff-3c1c97fc2ab5",
               "value": {
                 "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/.gait/stashedPanelChats.json",
                 "uri": "/Users/alex/Documents/GitHub/gait-copilot/.gait/stashedPanelChats.json",
@@ -395,6 +395,35 @@
           "model": "gpt-4o-mini",
           "timestamp": "2024-10-02T07:10:13.567Z",
           "context": [],
+          "kv_store": {}
+        }
+      ],
+      "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Testing Input Functionality",
+      "id": "970cc79d-df04-4088-b2c1-2b0caad5dba0",
+      "parent_id": null,
+      "created_on": "2024-10-02T05:37:35.952Z",
+      "messages": [
+        {
+          "id": "64eb7106-710f-4c46-8710-7f3b567ea068",
+          "messageText": "this is a test",
+          "responseText": "It looks like you are testing the input. How can I assist you with your code? If you have any specific questions or need modifications, please let me know!",
+          "model": "gpt-4o",
+          "timestamp": "2024-10-02T05:37:35.952Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "baff4ce0-e258-414b-b70c-41ed9697905c",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/src/extension.ts",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/src/extension.ts",
+                "isCurrentFile": true
+              }
+            }
+          ],
           "kv_store": {}
         }
       ],
