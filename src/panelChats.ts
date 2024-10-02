@@ -84,7 +84,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       }
       context.workspaceState.update('currentPanelChats', incomingPanelChats);
       const stashedState = readStashedStateFromFile();
-      context.workspaceState.update('fileStashedState', stashedState);
+      context.workspaceState.update('stashedState', stashedState);
 
     } catch (error) {
       console.error(`Error monitoring and saving state:`, error);

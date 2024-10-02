@@ -282,7 +282,7 @@ export function activate(context: vscode.ExtensionContext) {
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
     writeStashedState(context, readStashedStateFromFile());
-    context.workspaceState.update('fileStashedState', readStashedStateFromFile());
+    context.workspaceState.update('stashedState', readStashedStateFromFile());
     setTimeout(() => {
         monitorPanelChatAsync(stateReader, context);
     }, 3000); // Delay to ensure initial setup
