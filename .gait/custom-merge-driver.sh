@@ -11,17 +11,13 @@ OTHER="$3"   # %B - Other branch's version (theirs)
 MERGED="$CURRENT.merged"
 
 # Check if jq is installed
-if ! command -v jq &> /dev/null
-then
+if ! command -v jq &> /dev/null; then
     echo "jq command could not be found. Please install jq to use this merge driver."
     exit 1
 fi
 
 # Perform the merge using jq
-jq -n \
-    --argfile ourState "$CURRENT" \
-    --argfile theirState "$OTHER" \
-    '
+jq -n     --argfile ourState "$CURRENT"     --argfile theirState "$OTHER"     '
 def mergePanelChats(ourChats; theirChats):
   (ourChats + theirChats)
   | group_by(.id)
@@ -57,8 +53,28 @@ def mergeStashedStates(ourState; theirState):
 mergeStashedStates($ourState; $theirState)
 ' > "$MERGED"
 
-# Check if the merge was successful
-if [ $? -ne 0 ]; then
+# Detect OS and set sed in-place edit flag accordingly
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS (BSD sed)
+    SED_INPLACE=(-i '')
+else
+    # Assume GNU sed
+    SED_INPLACE=(-i)
+fi
+
+# Debug: Verify the jq filter content
+sed "${SED_INPLACE[@]}" 's/$//' "$TMP_JQ_FILTER"
+
+# Perform the merge using jq with the temporary filter file
+jq -n     --argfile ourState "$CURRENT"     --argfile theirState "$OTHER"     -f "$TMP_JQ_FILTER" > "$MERGED"
+
+# Capture jq's exit status
+JQ_STATUS=$?
+
+# Debug: Print jq's exit status
+echo "jq exit status: $JQ_STATUS"
+
+if [ $JQ_STATUS -ne 0 ]; then
     echo "Error during merging stashed states."
     exit 1
 fi
