@@ -15,7 +15,7 @@ import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
 import { getRelativePath } from './utils';
-import { readStashedStateFromFile, writeStashedState, readStashedState } from './stashedState';
+import { readStashedStateFromFile, writeStashedState, readStashedState, removePanelChatFromStashedState } from './stashedState';
 import * as child_process from 'child_process';
 
 const GAIT_FOLDER_NAME = '.gait';
@@ -349,6 +349,7 @@ export function activate(context: vscode.ExtensionContext) {
     const deleteInlineChatCommand = vscode.commands.registerCommand('gait-copilot.removeInlineChat', (args) => {
         //console.log("Removing inline chat", args);
         Inline.removeInlineChat(context, args.inline_chat_id);
+        vscode.window.showInformationMessage("removed inline chat.");
         debouncedRedecorate(context);
     });
 
@@ -371,6 +372,14 @@ export function activate(context: vscode.ExtensionContext) {
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
+    });
+
+    const removePanelChatCommand = vscode.commands.registerCommand('gait-copilot.removePanelChat', (args) => {
+        const stashedState = readStashedState(context);
+        stashedState.deletedChats.deletedPanelChatIDs.push(args.panelChatId);        
+        writeStashedState(context, stashedState);
+        vscode.window.showInformationMessage("Deleted panel chat.");
+        debouncedRedecorate(context);
     });
 
     const toggleDecorationsCommand = vscode.commands.registerCommand('gait-copilot.toggleDecorations', () => {
@@ -554,6 +563,7 @@ exit 0
 
     // Register all commands
     context.subscriptions.push(
+        removePanelChatCommand,
         updateSidebarCommand, 
         inlineChatStartOverride, 
         deleteInlineChatCommand, 
