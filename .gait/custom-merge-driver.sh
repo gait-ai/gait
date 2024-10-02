@@ -83,12 +83,7 @@ fi
 
 # Debug: Verify the jq filter content
 echo "Using jq filter from $TMP_JQ_FILTER:"
-<<<<<<< HEAD
-sed "${SED_INPLACE[@]}" 's/
-$//' "$TMP_JQ_FILTER"
-=======
 sed "${SED_INPLACE[@]}" 's/$//' "$TMP_JQ_FILTER"
->>>>>>> 21aeeaffdca6a3e88afdebc9d57f4d452ee0a893
 cat "$TMP_JQ_FILTER"
 
 # Perform the merge using jq with the temporary filter file
