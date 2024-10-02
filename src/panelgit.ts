@@ -48,8 +48,7 @@ function log(message: string, level: LogLevel = LogLevel.INFO) {
     if (level >= CURRENT_LOG_LEVEL) {
         switch (level) {
             case LogLevel.INFO:
-                // Intentionally silenced
-                break;
+                console.log(message);
             case LogLevel.WARN:
                 console.warn(message);
                 break;
@@ -79,7 +78,7 @@ async function gitShowString(args: string[], repoPath: string): Promise<string> 
 
 
 /**
- * Processes a single commit's stashedGaitState2.json and extracts active PanelChats and Messages.
+ * Processes a single commit's state.json and extracts active PanelChats and Messages.
  * @param parsedContent - The parsed StashedState from the commit.
  * @param currentMessageIds - Set of active message IDs.
  * @param currentInlineChatIds - Set of active inline chat IDs.
@@ -201,7 +200,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         throw new Error(`File not found: ${absoluteFilePath}`);
     }
 
-    // Step 1: Read and validate the current stashedGaitState2.json
+    // Step 1: Read and validate the current state.json
     const parsedCurrent = readStashedState(context); 
     const { currentMessageIds, currentPanelChatIds, currentInlineChatIds } = aggregateCurrentIds(parsedCurrent);
     const seenMessageIds: Set<string> = new Set();
@@ -243,7 +242,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            log(`Parsed stashedGaitState2.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+            log(`Parsed state.json for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
             log(`Content: ${fileContent}`, LogLevel.WARN);
@@ -363,7 +362,7 @@ export async function getGitHistoryThatTouchesFile(
         throw new Error(`Target file not found: ${absoluteTargetFilePath}`);
     }
 
-    // Step 1: Read and validate the current stashedGaitState2.json
+    // Step 1: Read and validate the current state.json
     const parsedCurrent = readStashedState(context); 
     const { currentMessageIds, currentPanelChatIds, currentInlineChatIds } = aggregateCurrentIds(parsedCurrent);
     const seenMessageIds: Set<string> = new Set();
@@ -433,7 +432,7 @@ export async function getGitHistoryThatTouchesFile(
             if (!isStashedState(parsedContent)) {
                 throw new Error('Parsed content does not match StashedState structure.');
             }
-            log(`Parsed stashedGaitState2.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+            log(`Parsed state.json for commit ${commitHash} successfully.`, LogLevel.INFO);
         } catch (error) {
             log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
             log(`Content: ${fileContent}`, LogLevel.WARN);
