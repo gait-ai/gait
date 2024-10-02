@@ -477,6 +477,14 @@ exit 0
         // Path to the custom merge driver script
         const customMergeDriverPath = path.join(gaitFolderPath, 'custom-merge-driver.sh');
 
+        // Add custom merge driver script to .gitignore
+        const gitignorePath = path.join(workspaceFolder.uri.fsPath, '.gitignore');
+        let gitignoreContent = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf8') : '';
+        if (!gitignoreContent.includes('custom-merge-driver.sh')) {
+            fs.appendFileSync(gitignorePath, '\n.gait/custom-merge-driver.sh\n');
+            vscode.window.showInformationMessage('Added custom merge driver script to .gitignore');
+        }
+
         // Write the script to the .gait folder if it doesn't exist or content has changed
         if (!fs.existsSync(customMergeDriverPath) || fs.readFileSync(customMergeDriverPath, 'utf8') !== customMergeDriverScript) {
             fs.writeFileSync(customMergeDriverPath, customMergeDriverScript, { mode: 0o755 });
