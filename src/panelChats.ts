@@ -7,7 +7,7 @@ const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
 
 import { MessageEntry, PanelChat, PanelChatMode, StashedState, StateReader } from './types';
-import { readStashedState, writeChatToStashedState } from './stashedState';
+import { readStashedState, readStashedStateFromFile, writeChatToStashedState } from './stashedState';
 
 
 
@@ -83,6 +83,8 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
         }
       }
       context.workspaceState.update('currentPanelChats', incomingPanelChats);
+      const stashedState = readStashedStateFromFile();
+      context.workspaceState.update('fileStashedState', stashedState);
 
     } catch (error) {
       console.error(`Error monitoring and saving state:`, error);
