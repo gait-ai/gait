@@ -1,613 +1,1158 @@
 # Panel Chats
 
-Panel Chat Title: Markdown Formatting Issues in Chat Export
-- **Created On**: 2024-10-02T04:59:44.850Z
+Panel Chat Title: Removing Gzip Decompression from Git File Handling
+- **Created On**: 2024-10-02T06:29:42.255Z
 - **Messages**:
-    - **Model**: claude-3.5-sonnet
-    - **Context**: /Users/kylel1/Documents/GitHub/gait-copilot/src/panelHover.ts
-    - **Text**: why is the markdown broken in view in markdwon?
-    - **Response**: The issue with the "View in Markdown" link is likely due to how the JSON data is being encoded in the command URI. Let's fix this by properly encoding the JSON data. Here's how we can update the relevant part of the code:
+    - **Model**: gpt-4o
+    - **Context**: /Users/alex/Documents/GitHub/gait-copilot/src/panelgit.ts
+    - **Text**: The file is no longer compressed, and therefore no longer needs to use gz unzipping or a buffer. Make these changes
+    - **Response**: Sure, I'll update the code to remove the gzip decompression and buffer handling. Here are the necessary changes:
 
-```typescript:src/panelHover.ts
+```src/panelgit.ts
 // ... existing code ...
-
-    const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]};
-
-    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(JSON.stringify(markdownData))}`);
-    markdown.appendMarkdown(`\n\n[View in Markdown](${exportCommand})`);
-
+import { readStashedState } from './stashedState'; // Ensure this does not use gzip
 // ... existing code ...
-```
-
-The problem is that `JSON.stringify()` might produce a string with characters that are not safe for URIs, even after using `encodeURIComponent()`. To fix this, we should use a more robust encoding method. Here's an improved version:
-
-```typescript:src/panelHover.ts
-// ... existing code ...
-
-    const markdownData = {chats: [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}]};
-
-    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
-    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodedData}`);
-    markdown.appendMarkdown(`\n\n[View in Markdown](${exportCommand})`);
-
-// ... existing code ...
-```
-
-This change does the following:
-
-1. We convert the `markdownData` object to a JSON string.
-2. We then convert this JSON string to a Base64-encoded string using `Buffer.from().toString('base64')`.
-3. We use this Base64-encoded string directly in the command URI without additional encoding.
-
-This approach ensures that all characters in the data are safely encoded for use in a URI, regardless of their original content. The `exportPanelChatsToMarkdown` command will need to be updated to decode this Base64 string back into JSON on the receiving end.
-
-Make sure to update the command handler for `gait-copilot.exportPanelChatsToMarkdown` to decode the Base64 string before parsing it as JSON.
- - **Expanded Context** + Whole file in context:
- import * as vscode from 'vscode';
-import { PanelMatchedRange } from './types';
-import { getIdToCommitInfo } from './panelgit';
 
 /**
- * Creates hover content for a matched panel chat range.
- * @param matchedRange The matched range containing the panel chat and message information.
- * @param document The VSCode text document.
- * @returns A promise that resolves to a VSCode Hover object.
+ * Executes a Git command and returns the output as a string.
+ * @param args - Array of Git command arguments.
+ * @param repoPath - The path to the Git repository.
+ * @returns A Promise resolving to a string containing the command output.
  */
-export async function createPanelHover(context: vscode.ExtensionContext, matchedRange: PanelMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
-    let markdown = new vscode.MarkdownString();
-    let idToCommitInfo = undefined;
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-        console.warn('No workspace folder found.');
-    } else {
-        try {
-            const repoPath = workspaceFolder.uri.fsPath;
-            const filePath = '.gait/stashedPanelChats.json.gz'; // Replace with your actual file path relative to repo
-            idToCommitInfo = await getIdToCommitInfo(context, repoPath, filePath);
-        } catch (error) {
-            console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
-        }
+async function gitShowString(args: string[], repoPath: string): Promise<string> {
+    try {
+        const { stdout } = await execFileAsync('git', args, { cwd: repoPath });
+        return stdout;
+    } catch (error) {
+        throw new Error(`Git command failed: ${(error as Error).message}`);
     }
-    const { panelChat, message_id } = matchedRange;
-
-    // Find the message that resulted in the matched range
-    const message = panelChat.messages.find(msg => msg.id === message_id);
-    if (!message) {
-        return undefined;
-    }
-
-    const commitInfo = idToCommitInfo?.get(message.id);
-    const author = commitInfo?.author ?? "You";
-    const commitMessage = commitInfo?.commitMessage ?? "Uncommited changes";
-
-    markdown.isTrusted = true;
-
-    // Display the message text and response
-    const messageAuthor = commitInfo?.author ?? "You";
-    markdown.appendMarkdown(`### ${messageAuthor}: ${message.messageText}\n\n`);
-    // Escape backticks and newlines in the response text
-    markdown.appendMarkdown(`**Response**: ${message.responseText}\n\n`);
-
-    // Display the context information in small text
-    if (message.context && message.context.length > 0) {
-        markdown.appendMarkdown(`**Context**: ${message.context[0].value.human_readable}`);
-        if (message.context.length > 1) {
-            markdown.appendMarkdown(` (and ${message.context.length - 1} more)`);
-        }
-        markdown.appendMarkdown(`\n\n`);
-    }
-
-    markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
-    const markdownData = [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}];
-
-    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
-    const exportCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(JSON.stringify({data: encodedData}))}`);
-    markdown.appendMarkdown(`\n\n[View in Markdown](${exportCommand}) | ` );
-    markdown.appendMarkdown(`\n\n`);
-    const deleteCommand = vscode.Uri.parse(`command:gait-copilot.removePanelChat?${encodeURIComponent(JSON.stringify({
-        panel_chat_id: panelChat.id,
-        message_id: message.id
-    }))}`);
-    markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);
-
-    return new vscode.Hover(markdown);
 }
-    - **Model**: claude-3.5-sonnet
-    - **Context**: /Users/kylel1/Documents/GitHub/gait-copilot/src/extension.ts
-    - **Text**: how do I modify the exportPanelChatsToMarkdownCommand to decode thsi base64?
-    - **Response**: To modify the `exportPanelChatsToMarkdownCommand` to decode the Base64 encoded data, you'll need to update the command handler. Here's how you can modify the relevant part of the code:
 
-```typescript:src/extension.ts
 // ... existing code ...
 
-const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (encodedArgs) => {
-    try {
-        const decodedArgs = Buffer.from(encodedArgs, 'base64').toString('utf-8');
-        const markdownData = JSON.parse(decodedArgs);
-        const markdownContent = panelChatsToMarkdown(markdownData.chats, true);
-        const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
-        fs.writeFileSync(filePath, markdownContent, 'utf8');
-        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
-        await vscode.commands.executeCommand(startPanelCommand);
-    } catch (error) {
-        vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-});
+export async function getGitHistory(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<GitHistoryData> {
+    // ... existing code ...
 
-// ... rest of the code ...
+    // Step 1: Read the current stashedPanelChats.json to collect existing message and panelChat IDs
+    let parsedCurrent: StashedState;
+    const currentMessageIds: Set<string> = new Set();
+    const currentPanelChatIds: Set<string> = new Set();
+
+    try {
+        parsedCurrent = readStashedState(context); // This no longer handles gzip decompression
+        if (!isStashedState(parsedCurrent)) {
+            throw new Error('Parsed content does not match StashedState structure 1.');
+        }
+        log(`Parsed current stashedPanelChats.json successfully.`, LogLevel.INFO);
+    } catch (error) {
+        log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
+        // Initialize with default structure if parsing fails
+        parsedCurrent = {
+            panelChats: [],
+            inlineChats: [],
+            schemaVersion: SCHEMA_VERSION,
+            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+            kv_store: {}
+        };
+        log(`Initialized default stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
+    }
+
+    // ... existing code ...
+
+    for (const line of logLines) {
+        // ... existing code ...
+
+        // Get the file content at this commit using child_process
+        let fileContent: string;
+        try {
+            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
+            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
+            log(`Error: ${(error as Error).message}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Parse JSON
+        let parsedContent: StashedState;
+        try {
+            parsedContent = JSON.parse(fileContent);
+            if (!isStashedState(parsedContent)) {
+                throw new Error('Parsed content does not match StashedState structure 2.');
+            }
+            log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
+            log(`Content: ${fileContent}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // ... existing code ...
+    }
+
+    // ... existing code ...
+}
+
+export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionContext, repoPath: string, filePath: string, targetFilePath: string): Promise<GitHistoryData> {
+    // ... existing code ...
+
+    // Step 1: Read the current stashedPanelChats.json to collect existing message and panelChat IDs
+    let parsedCurrent: StashedState;
+    const currentMessageIds: Set<string> = new Set();
+    const currentPanelChatIds: Set<string> = new Set();
+
+    try {
+        parsedCurrent = readStashedState(context); // This no longer handles gzip decompression
+        if (!isStashedState(parsedCurrent)) {
+            throw new Error('Parsed content does not match StashedState structure.');
+        }
+        log(`Parsed current stashedPanelChats.json successfully.`, LogLevel.INFO);
+    } catch (error) {
+        log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
+        // Initialize with default structure if parsing fails
+        parsedCurrent = {
+            panelChats: [],
+            inlineChats: [],
+            schemaVersion: SCHEMA_VERSION,
+            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+            kv_store: {}
+        };
+        log(`Initialized default stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
+    }
+
+    // ... existing code ...
+
+    for (const line of logLines) {
+        // ... existing code ...
+
+        // Get the file content at this commit
+        let fileContent: string;
+        try {
+            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
+            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
+            log(`Error: ${(error as Error).message}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Parse JSON
+        let parsedContent: StashedState;
+        try {
+            parsedContent = JSON.parse(fileContent);
+            if (!isStashedState(parsedContent)) {
+                throw new Error('Parsed content does not match StashedState structure.');
+            }
+            log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
+            log(`Content: ${fileContent}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // ... existing code ...
+    }
+
+    // ... existing code ...
+}
 ```
 
-This modification does the following:
+### Explanation:
+1. **Removed gzip decompression**: The `zlib.gunzipSync` and buffer handling have been removed.
+2. **Updated function to read Git output as a string**: The `gitShowBuffer` function has been replaced with `gitShowString` to return the output as a string.
+3. **Updated JSON parsing**: Directly parse the JSON string without decompression.
 
-1. The command now expects a single `encodedArgs` parameter, which is the Base64 encoded string.
-2. It decodes the Base64 string back into a UTF-8 string using `Buffer.from(encodedArgs, 'base64').toString('utf-8')`.
-3. The decoded string is then parsed as JSON to get the `markdownData` object.
-4. The rest of the function remains the same, using `markdownData.chats` to generate the markdown content.
-
-This change ensures that the command can handle the Base64 encoded data that you're now passing from the `panelHover.ts` file. Make sure that the `panelChatsToMarkdown` function is updated to work with the new structure of `markdownData.chats` if necessary.
+These changes ensure that the file content is handled as plain text JSON.
  - **Expanded Context** + Whole file in context:
- import * as vscode from 'vscode';
+ import * as fs from 'fs';
 import * as path from 'path';
-import * as fs from 'fs';
-import * as Inline from './inline';
-import * as InlineDecoration from './filedecoration';
-import { PanelViewProvider } from './panelview';
-import { monitorPanelChatAsync } from './panelChats';
-import * as VSCodeReader from './vscode/vscodeReader';
-import { panelChatsToMarkdown } from './markdown';
-import * as CursorReader from './cursor/cursorReader';
-import { activateGaitParticipant } from './vscode/gaitChatParticipant';
-import { checkTool, TOOL } from './ide';
-import { PanelChatMode, StateReader } from './types';
-import { generateKeybindings } from './keybind';
-import { handleMerge } from './automerge';
-import {diffLines} from 'diff';
-import { getRelativePath } from './utils';
-import { readStashedStateFromFile, writeStashedState, readStashedState } from './stashedState';
+import * as vscode from 'vscode';
 
-const GAIT_FOLDER_NAME = '.gait';
+import simpleGit, { SimpleGit } from 'simple-git';
+import { StashedState, PanelChat, isStashedState, isPanelChat } from './types';
+import { InlineChatInfo } from './inline';
+import { readStashedState } from './stashedState'; // Ensure this does not use gzip
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 
-let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider: vscode.Disposable } | undefined;
-let decorationsActive = true;
+const SCHEMA_VERSION = '1.0';
 
-let isRedecorating = false;
-let changeQueue: { cursor_position: vscode.Position, 
-    document_uri: string, 
-    changes: vscode.TextDocumentContentChangeEvent[], 
-    timestamp: number,
-    document_content: string | null }[] = [];
+export type CommitData = {
+    commitHash: string;
+    date: Date;
+    commitMessage: string;
+    author: string;
+    panelChats: PanelChat[]; // Updated from messages to panelChats
+    inlineChats: InlineChatInfo[];
+};
 
-let fileState: { [key: string]: string } = {};
+export type UncommittedData = {
+    panelChats: PanelChat[]; // Updated from messages to panelChats
+    inlineChats: InlineChatInfo[];
+};
 
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
-    let timeout: ReturnType<typeof setTimeout> | null = null;
+export type GitHistoryData = {
+    commits: CommitData[];
+    added: UncommittedData | null;
+    uncommitted: UncommittedData | null;
+};
 
-    return (...args: Parameters<F>): void => {
-        if (timeout !== null) {
-            clearTimeout(timeout);
+enum LogLevel {
+    INFO,
+    WARN,
+    ERROR
+}
+
+const CURRENT_LOG_LEVEL = LogLevel.INFO;
+
+/**
+ * Logs messages based on the specified log level.
+ * @param message - The message to log.
+ * @param level - The severity level of the log.
+ */
+function log(message: string, level: LogLevel = LogLevel.INFO) {
+    if (level >= CURRENT_LOG_LEVEL) {
+        switch (level) {
+            case LogLevel.INFO:
+                //console.log(message);
+                break;
+            case LogLevel.WARN:
+                console.warn(message);
+                break;
+            case LogLevel.ERROR:
+                console.error(message);
+                break;
         }
-        timeout = setTimeout(() => func(...args), waitFor);
+    }
+}
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Executes a Git command and returns the output as a string.
+ * @param args - Array of Git command arguments.
+ * @param repoPath - The path to the Git repository.
+ * @returns A Promise resolving to a string containing the command output.
+ */
+async function gitShowString(args: string[], repoPath: string): Promise<string> {
+    try {
+        const { stdout } = await execFileAsync('git', args, { cwd: repoPath });
+        return stdout;
+    } catch (error) {
+        throw new Error(`Git command failed: ${(error as Error).message}`);
+    }
+}
+
+/**
+ * Ensures that the 'deletedChats' object and its nested properties exist.
+ * @param stashedState - The StashedState object to validate and initialize.
+ * @param commitHash - The hash of the current commit (for logging purposes).
+ */
+function ensureDeletedChats(stashedState: StashedState, commitHash: string) {
+    if (!stashedState.deletedChats) {
+        stashedState.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
+        log(`'deletedChats' was undefined in commit ${commitHash}. Initialized with empty arrays.`, LogLevel.WARN);
+    }
+
+    if (!Array.isArray(stashedState.deletedChats.deletedPanelChatIDs)) {
+        stashedState.deletedChats.deletedPanelChatIDs = [];
+        log(`'deletedPanelChatIDs' was undefined or not an array in commit ${commitHash}. Initialized as empty array.`, LogLevel.WARN);
+    }
+
+    if (!Array.isArray(stashedState.deletedChats.deletedMessageIDs)) {
+        stashedState.deletedChats.deletedMessageIDs = [];
+        log(`'deletedMessageIDs' was undefined or not an array in commit ${commitHash}. Initialized as empty array.`, LogLevel.WARN);
+    }
+}
+
+/**
+ * Processes a single commit's stashedPanelChats.json and extracts active PanelChats and Messages.
+ * @param parsedContent - The parsed StashedState from the commit.
+ * @param currentMessageIds - Set of active message IDs.
+ * @param currentPanelChatIds - Set of active PanelChat IDs.
+ * @param seenMessageIds - Set to track already processed message IDs.
+ * @param commitData - The CommitData object to populate.
+ * @param commitHash - The hash of the current commit (for logging purposes).
+ */
+function processCommit(
+    parsedContent: StashedState,
+    currentMessageIds: Set<string>,
+    currentInlineChatIds: Set<string>,
+    seenMessageIds: Set<string>,
+    commitData: CommitData,
+    commitHash: string
+) {
+
+    console.log("Commit Hash: ", commitHash);
+    ensureDeletedChats(parsedContent, commitHash);
+
+    const deletedPanelChatIds = new Set(parsedContent.deletedChats.deletedPanelChatIDs);
+    const deletedMessageIds = new Set(parsedContent.deletedChats.deletedMessageIDs);
+
+    if (Array.isArray(parsedContent.inlineChats)) {
+        for (const inlineChat of parsedContent.inlineChats) {
+            const inlineChatId = inlineChat.inline_chat_id;
+            if (!currentInlineChatIds.has(inlineChatId)) {
+                continue;
+            }
+            commitData.inlineChats.push(inlineChat);
+        }
+    } else {
+        //console.log("parsedContent.inlineChats", parsedContent.inlineChats);
+    }
+
+    for (const panelChat of parsedContent.panelChats) {
+        const panelChatId = panelChat.id;
+
+        // Skip deleted PanelChats
+        if (deletedPanelChatIds.has(panelChatId)) {
+            log(`PanelChat ID ${panelChatId} has been deleted in commit ${commitHash}. Excluding from processing.`, LogLevel.INFO);
+            continue;
+        }
+
+        // Create or retrieve existing PanelChat in commitData
+        let existingPanelChat = commitData.panelChats.find(pc => pc.id === panelChatId);
+        if (!existingPanelChat) {
+            existingPanelChat = {
+                ai_editor: panelChat.ai_editor,
+                id: panelChat.id,
+                customTitle: panelChat.customTitle,
+                parent_id: panelChat.parent_id,
+                created_on: panelChat.created_on,
+                messages: [],
+                kv_store: {}
+            };
+            commitData.panelChats.push(existingPanelChat);
+            log(`Initialized PanelChat ID ${panelChatId} in commit ${commitHash}.`, LogLevel.INFO);
+        }
+
+        for (const messageEntry of panelChat.messages) {
+            const messageId = messageEntry.id;
+            //console.log("Message ID: ", messageId);
+            //console.log("Seen Message IDs: ", seenMessageIds);
+
+            // Only include active and unseen messages
+            if (currentMessageIds.has(messageId) && !seenMessageIds.has(messageId)) {
+                existingPanelChat.messages.push(messageEntry);
+                log(`Added Message ID ${messageId} from PanelChat ${panelChatId} in commit ${commitHash}.`, LogLevel.INFO);
+                seenMessageIds.add(messageId);
+            } else {
+                if (!currentMessageIds.has(messageId)) {
+                    log(`Message ID ${messageId} has been deleted in the current state. Excluding from commit ${commitHash}.`, LogLevel.INFO);
+                } else {
+                    log(`Message ID ${messageId} has already been processed. Skipping.`, LogLevel.INFO);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Retrieves the Git history for a specific file, capturing PanelChats instead of flat messages.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the target file within the repository.
+ * @returns A Promise resolving to GitHistoryData containing commit history and uncommitted changes.
+ */
+export async function getGitHistory(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<GitHistoryData> {
+    const git: SimpleGit = simpleGit(repoPath);
+
+
+    log("Starting getGitHistory", LogLevel.INFO);
+
+    // Ensure the file exists in the repository
+    const absoluteFilePath = path.resolve(repoPath, filePath);
+    if (!fs.existsSync(absoluteFilePath)) {
+        throw new Error(`File not found: ${absoluteFilePath}`);
+    }
+
+    // Step 1: Read the current stashedPanelChats.json to collect existing message and panelChat IDs
+    let parsedCurrent: StashedState;
+    const currentMessageIds: Set<string> = new Set();
+    const currentPanelChatIds: Set<string> = new Set();
+
+    try {
+        parsedCurrent = readStashedState(context); // This no longer handles gzip decompression
+        if (!isStashedState(parsedCurrent)) {
+            throw new Error('Parsed content does not match StashedState structure 1.');
+        }
+        log(`Parsed current stashedPanelChats.json successfully.`, LogLevel.INFO);
+    } catch (error) {
+        log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
+        // Initialize with default structure if parsing fails
+        parsedCurrent = {
+            panelChats: [],
+            inlineChats: [],
+            schemaVersion: SCHEMA_VERSION,
+            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+            kv_store: {}
+        };
+        log(`Initialized default stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
+    }
+
+    // Ensure deletedChats exists
+    if (!parsedCurrent.deletedChats) {
+        parsedCurrent.deletedChats = { deletedMessageIDs: [], deletedPanelChatIDs: [] };
+        log(`'deletedChats' was undefined. Initialized with empty arrays.`, LogLevel.WARN);
+    }
+
+    // Ensure deletedPanelChatIDs exists and is an array
+    if (!Array.isArray(parsedCurrent.deletedChats.deletedPanelChatIDs)) {
+        parsedCurrent.deletedChats.deletedPanelChatIDs = [];
+        log(`'deletedPanelChatIDs' was undefined or not an array. Initialized as empty array.`, LogLevel.WARN);
+    }
+
+    // Ensure deletedMessageIDs exists and is an array
+    if (!Array.isArray(parsedCurrent.deletedChats.deletedMessageIDs)) {
+        parsedCurrent.deletedChats.deletedMessageIDs = [];
+        log(`'deletedMessageIDs' was undefined or not an array. Initialized as empty array.`, LogLevel.WARN);
+    }
+
+    const deletedPanelChatIds = new Set(parsedCurrent.deletedChats.deletedPanelChatIDs);
+    const deletedMessageIds = new Set(parsedCurrent.deletedChats.deletedMessageIDs);
+
+    // Collect all current message and panelChat IDs excluding deleted ones
+    for (const panelChat of parsedCurrent.panelChats) {
+        if (!deletedPanelChatIds.has(panelChat.id)) {
+            currentPanelChatIds.add(panelChat.id);
+            for (const message of panelChat.messages) {
+                if (!deletedMessageIds.has(message.id)) {
+                    currentMessageIds.add(message.id);
+                }
+            }
+        }
+    }
+
+    log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`, LogLevel.INFO);
+
+    const currentInlineChatIds: Set<string> = new Set();
+    // Collect all current message and panelChat IDs excluding deleted ones
+    for (const inlineChat of parsedCurrent.inlineChats) {
+        currentInlineChatIds.add(inlineChat.inline_chat_id);
+    }
+
+
+    // Step 2: Get the commit history for the file with --follow to track renames
+    // '--reverse' ensures commits are ordered from oldest to newest
+    const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
+
+    let logData: string;
+    try {
+        // Use simple-git to get the log data
+        logData = await git.raw(logArgs);
+        log(`Retrieved git log data successfully.`, LogLevel.INFO);
+    } catch (error) {
+        throw new Error(`Failed to retrieve git log: ${(error as Error).message}`);
+    }
+
+    const logLines = logData.split('\n').filter(line => line.trim() !== '');
+    log(`Processing ${logLines.length} commits from git log.`, LogLevel.INFO);
+
+    const allCommitsMap: Map<string, CommitData> = new Map();
+    const seenMessageIds: Set<string> = new Set();
+
+    for (const line of logLines) {
+        const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
+        const commitMessage = commitMsgParts.join('\t');
+
+        // Get the file content at this commit using child_process
+        let fileContent: string;
+        try {
+            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
+            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
+            log(`Error: ${(error as Error).message}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Parse JSON
+        let parsedContent: StashedState;
+        try {
+            parsedContent = JSON.parse(fileContent);
+            if (!isStashedState(parsedContent)) {
+                throw new Error('Parsed content does not match StashedState structure 2.');
+            }
+            log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
+            log(`Content: ${fileContent}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Initialize or retrieve existing CommitData for this commit
+        let commitData = allCommitsMap.get(commitHash);
+        if (!commitData) {
+            commitData = {
+                commitHash,
+                date: new Date(dateStr),
+                commitMessage,
+                author: authorName,
+                panelChats: [], // Initialize panelChats
+                inlineChats: [],
+            };
+            allCommitsMap.set(commitHash, commitData);
+            log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
+        }
+
+        // Process the commit's panelChats
+        processCommit(parsedContent, currentMessageIds, currentInlineChatIds, seenMessageIds, commitData, commitHash);
+    }
+
+    // Convert the map to an array
+    let allCommits: CommitData[] = Array.from(allCommitsMap.values());
+
+    // For each panel chat in each commit, filter it out if ti is empty
+    allCommits.forEach(commit => {
+        commit.panelChats = commit.panelChats.filter(pc => pc.messages.length > 0);
+    });
+    
+
+    // **New Addition:** Filter out commits with empty panelChats
+    allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
+    log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
+
+
+    let currentAddedContent = readStashedState(context);
+
+    // Aggregate all panelChats from uncommitted changes, excluding deleted ones
+    const allAddedPanelChats: PanelChat[] = currentAddedContent.panelChats.filter(pc =>
+        !deletedPanelChatIds.has(pc.id)
+    ).map(pc => {
+        const filteredMessages = pc.messages.filter(msg =>
+            !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
+        );
+        // Add all messages to seenMessageIds
+        pc.messages.forEach(msg => seenMessageIds.add(msg.id));
+        return {
+            ...pc,
+            messages: filteredMessages
+        };
+    }).filter(pc => pc.messages.length > 0);
+
+    const added = {
+        panelChats: allAddedPanelChats,
+        inlineChats: []
+    };
+
+    // Step 3: Check for uncommitted changes
+
+    let uncommitted: UncommittedData | null = null;
+    let currentUncommittedContent: PanelChat[];
+    try {
+        currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
+    } catch (error) {
+        console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
+        currentUncommittedContent = []; 
+    }
+
+    if (!Array.isArray(currentUncommittedContent)) {
+        throw new Error('Parsed content does not match PanelChat structure.');
+    }
+     
+    // If every element of currentUncommittedContent is a PanelChat, then we can proceed
+    if (! currentUncommittedContent.every(isPanelChat)) {
+        throw new Error('Parsed content does not match PanelChat structure.');
+    }
+
+    // Aggregate all panelChats from uncommitted changes, excluding deleted ones
+    const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.filter(pc =>
+        !deletedPanelChatIds.has(pc.id)
+    ).map(pc => {
+        const filteredMessages = pc.messages.filter(msg =>
+            !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
+        );
+        return {
+            ...pc,
+            messages: filteredMessages
+        };
+    }).filter(pc => pc.messages.length > 0);
+
+    console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
+
+    uncommitted = {
+        panelChats: allCurrentPanelChats,
+        inlineChats: []
+    };
+    console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
+
+    return {
+        commits: allCommits,
+        added,
+        uncommitted,
     };
 }
 
 
-function getFileContent(file_path: string): string {
-    if (fileState[file_path]) {
-        //console.log("File content from fileState:", fileState[file_path]);
-        return fileState[file_path];
-    } else {
-        // Read the file content from the file system
+export async function getGitHistoryThatTouchesFile(context: vscode.ExtensionContext, repoPath: string, filePath: string, targetFilePath: string): Promise<GitHistoryData> {
+    const git: SimpleGit = simpleGit(repoPath);
+
+    // Ensure both files exist in the repository
+    const absoluteFilePath = path.resolve(repoPath, filePath);
+    const absoluteTargetFilePath = path.resolve(repoPath, targetFilePath);
+    if (!fs.existsSync(absoluteFilePath)) {
+        throw new Error(`File not found: ${absoluteFilePath}`);
+    }
+    if (!fs.existsSync(absoluteTargetFilePath)) {
+        throw new Error(`Target file not found: ${absoluteTargetFilePath}`);
+    }
+
+    // Step 1: Read the current stashedPanelChats.json to collect existing message and panelChat IDs
+    let parsedCurrent: StashedState;
+    const currentMessageIds: Set<string> = new Set();
+    const currentPanelChatIds: Set<string> = new Set();
+
+    try {
+        parsedCurrent = readStashedState(context); // This no longer handles gzip decompression
+        if (!isStashedState(parsedCurrent)) {
+            throw new Error('Parsed content does not match StashedState structure.');
+        }
+        log(`Parsed current stashedPanelChats.json successfully.`, LogLevel.INFO);
+    } catch (error) {
+        log(`Warning: Failed to parse current JSON content: ${(error as Error).message}`, LogLevel.WARN);
+        // Initialize with default structure if parsing fails
+        parsedCurrent = {
+            panelChats: [],
+            inlineChats: [],
+            schemaVersion: SCHEMA_VERSION,
+            deletedChats: { deletedMessageIDs: [], deletedPanelChatIDs: [] },
+            kv_store: {}
+        };
+        log(`Initialized default stashedPanelChats.json structure due to parsing failure.`, LogLevel.INFO);
+    }
+
+    const deletedPanelChatIds = new Set(parsedCurrent.deletedChats.deletedPanelChatIDs);
+    const deletedMessageIds = new Set(parsedCurrent.deletedChats.deletedMessageIDs);
+
+    // Collect all current message and panelChat IDs excluding deleted ones
+    for (const panelChat of parsedCurrent.panelChats) {
+        if (!deletedPanelChatIds.has(panelChat.id)) {
+            currentPanelChatIds.add(panelChat.id);
+            for (const message of panelChat.messages) {
+                if (!deletedMessageIds.has(message.id)) {
+                    currentMessageIds.add(message.id);
+                }
+            }
+        }
+    }
+
+    log(`Collected ${currentPanelChatIds.size} active PanelChat IDs and ${currentMessageIds.size} active Message IDs.`, LogLevel.INFO);
+
+    // Step 2: Get the commit history for the main file with --follow to track renames
+    // '--reverse' ensures commits are ordered from oldest to newest
+    const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
+
+    let logData: string;
+    try {
+        logData = await git.raw(logArgs);
+        log(`Retrieved git log data successfully.`, LogLevel.INFO);
+    } catch (error) {
+        throw new Error(`Failed to retrieve git log for ${filePath}: ${(error as Error).message}`);
+    }
+
+    const logLines = logData.split('\n').filter(line => line.trim() !== '');
+    //console.log(`Processing ${logLines.length} commits from git log.`);
+
+    const allCommitsMap: Map<string, CommitData> = new Map();
+    const seenMessageIds: Set<string> = new Set();
+
+    for (const line of logLines) {
+        //console.log("Processing Line: ", line);
+        const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
+        const commitMessage = commitMsgParts.join('\t');
+
+        // Skip commits that are solely for deletions
+        if (commitMessage.startsWith('Delete message with ID') || commitMessage.startsWith('Delete PanelChat with ID')) {
+            //console.log(`Skipping deletion commit ${commitHash}: ${commitMessage}`);
+            continue;
+        }
+
+        // Check if this commit also modifies the targetFilePath
+        let modifiesTargetFile = false;
         try {
-            //console.log("Reading file from file system:", file_path);
-            return fs.readFileSync(file_path, 'utf8');
+            const filesChanged = await git.raw(['diff-tree', '--no-commit-id', '--name-only', '-r', commitHash]);
+            const files = filesChanged.split('\n').map(f => f.trim());
+            if (files.includes(targetFilePath)) {
+                modifiesTargetFile = true;
+                console.log(`Commit ${commitHash} modifies target file ${targetFilePath}.`);
+            } else {
+                console.log(`Commit ${commitHash} does not modify target file ${targetFilePath}. Skipping.`);
+            }
         } catch (error) {
-            console.error(`Error reading file ${file_path}: ${error}`);
-            return '';
+            console.warn(`Warning: Failed to retrieve files changed in commit ${commitHash}: ${(error as Error).message}`);
+            continue; // Skip this commit
+        }
+
+        if (!modifiesTargetFile) {
+            // parsedContent.panelChats.forEach(pc => pc.messages.forEach(
+            //     msg => seenMessageIds.add(msg.id)));
+            continue; 
+        }
+
+        // Get the file content at this commit
+        let fileContent: string;
+        try {
+            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
+            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}.`, LogLevel.WARN);
+            log(`Error: ${(error as Error).message}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Parse JSON
+        let parsedContent: StashedState;
+        try {
+            parsedContent = JSON.parse(fileContent);
+            if (!isStashedState(parsedContent)) {
+                throw new Error('Parsed content does not match StashedState structure.');
+            }
+            log(`Parsed stashedPanelChats.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
+            log(`Content: ${fileContent}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Initialize or retrieve existing CommitData for this commit
+        let commitData = allCommitsMap.get(commitHash);
+        if (!commitData) {
+            commitData = {
+                commitHash,
+                date: new Date(dateStr),
+                commitMessage,
+                author: authorName,
+                panelChats: [], // Initialize panelChats
+                inlineChats: [],
+            };
+            allCommitsMap.set(commitHash, commitData);
+            //console.log(`Initialized CommitData for commit ${commitHash}.`);
+        }
+
+        // Process the commit's panelChats
+        processCommit(parsedContent, currentMessageIds, currentPanelChatIds, seenMessageIds, commitData, commitHash);
+    }
+
+    // Convert the map to an array
+    let allCommits: CommitData[] = Array.from(allCommitsMap.values());
+
+    // For each panel chat in each commit, filter it out if ti is empty
+    allCommits.forEach(commit => {
+        commit.panelChats = commit.panelChats.filter(pc => pc.messages.length > 0);
+    });
+
+    // **New Addition:** Filter out commits with empty panelChats
+    allCommits = allCommits.filter(commit => commit.panelChats.some(pc => pc.messages.length > 0));
+
+
+    // Step 3: Check for uncommitted changes
+    let status;
+    try {
+        status = await git.status();
+        //console.log(`Retrieved git status successfully.`);
+    } catch (error) {
+        throw new Error(`Failed to retrieve git status: ${(error as Error).message}`);
+    }
+
+    let uncommitted: UncommittedData = {panelChats: [], inlineChats: []};
+    let added: UncommittedData= {panelChats: [], inlineChats: []};
+    //console.log("Checking uncommitted changes");
+    if (
+        status.modified.includes(targetFilePath) ||
+        status.not_added.includes(targetFilePath) ||
+        status.created.includes(targetFilePath)
+    ) {
+        console.log("File is modified");
+
+        let currentAddedContent = readStashedState(context);
+
+        // Aggregate all panelChats from uncommitted changes, excluding deleted ones
+        const allAddedPanelChats: PanelChat[] = currentAddedContent.panelChats.filter(pc =>
+            !deletedPanelChatIds.has(pc.id)
+        ).map(pc => {
+            const filteredMessages = pc.messages.filter(msg =>
+                !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
+            );
+            // Add all messages to seenMessageIds
+            pc.messages.forEach(msg => seenMessageIds.add(msg.id));
+            return {
+                ...pc,
+                messages: filteredMessages
+            };
+        }).filter(pc => pc.messages.length > 0);
+
+        console.log(`Aggregated ${allAddedPanelChats.length} uncommitted PanelChats.`);
+
+        added = {
+            panelChats: allAddedPanelChats,
+            inlineChats: []
+        };
+        let currentUncommittedContent: PanelChat[];
+        try {
+            currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
+        } catch (error) {
+            console.warn(`Warning: Failed to read current file content: ${(error as Error).message}`);
+            currentUncommittedContent = []; 
+        }
+    
+        if (!Array.isArray(currentUncommittedContent)) {
+            throw new Error('Parsed content does not match PanelChat structure.');
+        }
+         
+        // If every element of currentUncommittedContent is a PanelChat, then we can proceed
+        if (! currentUncommittedContent.every(isPanelChat)) {
+            throw new Error('Parsed content does not match PanelChat structure.');
+        }
+
+        // Aggregate all panelChats from uncommitted changes, excluding deleted ones
+        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent.filter(pc =>
+            !deletedPanelChatIds.has(pc.id)
+        ).map(pc => {
+            const filteredMessages = pc.messages.filter(msg =>
+                !deletedMessageIds.has(msg.id) && !seenMessageIds.has(msg.id)
+            );
+            return {
+                ...pc,
+                messages: filteredMessages
+            };
+        }).filter(pc => pc.messages.length > 0);
+
+        //console.log(`Aggregated ${allCurrentPanelChats.length} uncommitted PanelChats.`);
+
+        if (allCurrentPanelChats.length > 0) {
+            uncommitted = {
+                panelChats: allCurrentPanelChats,
+                inlineChats: []
+            };
+            console.log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`);
+        } else {
+            console.log("No uncommitted new panelChats found.");
         }
     }
+
+    return {
+        commits: allCommits,
+        added,
+        uncommitted,
+    };
 }
+
 /**
- * Handles file changes to detect AI-generated changes.
+ * Maps message and inline chat IDs to their respective commit information.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the target file within the repository.
+ * @returns A Promise resolving to a Map where keys are IDs and values are CommitData.
  */
-async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateReader: StateReader, context: vscode.ExtensionContext) {
-    const changes = event.contentChanges;
-    const editor = vscode.window.activeTextEditor;
-    // Check if the file is in the workspace directory
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showErrorMessage('No workspace folder found. Extension failed.');
-        return; // No workspace folder open
-    }
-
-    const workspacePath = workspaceFolders[0].uri.fsPath;
-    const filePath = event.document.uri.fsPath;
-
-    if (!filePath.startsWith(workspacePath)) {
-        console.log(`File ${filePath} is not in the workspace directory`);
-        return; // File is not in the workspace directory
-    }
-    if (!event.document.fileName || event.reason || !editor || changes.length === 0 || event.document.fileName.includes(path.join(GAIT_FOLDER_NAME)) || event.document.fileName.includes("rendererLog")){
-        return;
-    }
-
-    const currentCursorPosition = editor.selection.active;
-    const lastCursorPosition = changeQueue.length > 0 ? changeQueue[changeQueue.length - 1].cursor_position : null;
-    const isCursorMoved = lastCursorPosition && !lastCursorPosition.isEqual(currentCursorPosition);
-
-    // Check if changes are AI-generated
-    const isAIChange = changes.some(change => change.text.length > 3 && !isCursorMoved); // Example threshold for AI-generated change
-    // Check if the change is not from clipboard paste
-    const clipboardContent = await vscode.env.clipboard.readText();
-    const isClipboardPaste = changes.some(change => change.text === clipboardContent);
-    if (!isClipboardPaste && isAIChange) {
-        const timestamp = Date.now();
-        changeQueue.push({
-            cursor_position: currentCursorPosition,
-            document_uri: getRelativePath(event.document),
-            changes: [...changes],
-            timestamp,
-            document_content: getFileContent(event.document.uri.fsPath),
-        });
-    }
-    const file_path: string = getRelativePath(event.document);
-    fileState[file_path] = event.document.getText();
-}
-
-function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContext) {
-    // Check if there are changes in the queue
-    if (changeQueue.length > 0) {
-        const lastChange = changeQueue[changeQueue.length - 1];
-        const currentTime = Date.now();
-        
-        if (currentTime - lastChange.timestamp > 1000) {
-            // Print out the changeQueue
-            //console.log("Current changeQueue:");
-            changeQueue.forEach((change, index) => {
-                //console.log(`Change ${index + 1}:`);
-                //console.log(`  Cursor Position: ${change.cursor_position.line}:${change.cursor_position.character}`);
-                //console.log(`  Document URI: ${change.document_uri}`);
-                //console.log(`  Timestamp: ${new Date(change.timestamp).toISOString()}`);
-                //console.log(`  Changes:`);
-                change.changes.forEach((c, i) => {
-                    //console.log(`    Change ${i + 1}:`);
-                    //console.log(`      Range: ${c.range.start.line}:${c.range.start.character} - ${c.range.end.line}:${c.range.end.character}`);
-                    //console.log(`      Text: ${c.text}`);
-                });
-            });
-            // Get the file content for each changed file
-            const changedFiles = new Set(changeQueue.map(change => change.document_uri));
-
-            const beforeFileContents: { [key: string]: string } = {};
-            changeQueue.forEach(change => {
-                if (change.document_content && !beforeFileContents[change.document_uri]) {
-                    beforeFileContents[change.document_uri] = change.document_content;
-                }
-            });
-            changeQueue = [];
-            // Get the current file content for each changed file
-            const afterFileContents: { [key: string]: string } = {};
-            changedFiles.forEach(filePath => {
-                const document = vscode.workspace.textDocuments.find(doc => getRelativePath(doc) === filePath);
-                if (document) {
-                    afterFileContents[filePath] = document.getText();
-                } else {
-                    console.error(`Document not found for file: ${filePath}`);
-                    afterFileContents[filePath] = '';
-                }
-            });
-            // Calculate file diffs
-            const fileDiffs: Inline.FileDiff[] = [];
-            changedFiles.forEach(filePath => {
-                try {
-                    const before = beforeFileContents[filePath];
-                    const after = afterFileContents[filePath];
-                    const diffs = diffLines(before, after);
-                    fileDiffs.push({
-                        file_path: filePath,
-                        before_content: before,
-                        after_content: after,
-                        diffs: diffs,
-                    });
-                } catch (error) {
-                    console.error(`Error processing file ${filePath}: ${error}`);
-                }
-            });
-            //console.log("File Diffs:");
-            fileDiffs.forEach((diff, index) => {
-                //console.log(`File ${index + 1}: ${diff.file_path}`);
-                //console.log("Diffs:");
-                diff.diffs.forEach((change, changeIndex) => {
-                    if (change.added) {
-                        //console.log(`  Added Change ${changeIndex + 1}:`);
-                        //console.log(`    ${change.value.replace(/\n/g, "\n    ")}`);
-                    }
-                });
-            });
-
-            console.log("Accepting inline AI change");
-            stateReader.pushFileDiffs(fileDiffs);
+export async function getIdToCommitInfo(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
+    const gitHistory  = await getGitHistory(context, repoPath, filePath);
+    const idToCommitInfo = new Map<string, CommitData>();
+    for (const commit of gitHistory.commits) {
+      for (const panelChat of commit.panelChats) { // Updated to iterate through panelChats
+        for (const message of panelChat.messages) { // Iterate through messages within each panelChat
+          idToCommitInfo.set(message.id, commit);
         }
+      }
     }
+    return idToCommitInfo;
 }
 
 /**
- * Function to redecorate the editor with debounce.
+ * Maps inline chat IDs to their respective commit information.
+ * @param repoPath - The path to the Git repository.
+ * @param filePath - The relative path to the target file within the repository.
+ * @returns A Promise resolving to a Map where keys are inline chat IDs and values are CommitData.
  */
-const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
-    if (isRedecorating) {return;}
-    isRedecorating = true;
-
-    if (disposibleDecorations) {
-        disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
-        disposibleDecorations.hoverProvider.dispose();
+export async function getInlineChatIdToCommitInfo(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
+    const gitHistory  = await getGitHistory(context, repoPath, filePath);
+    const idToCommitInfo = new Map<string, CommitData>();
+    for (const commit of gitHistory.commits) {
+      for (const inlineChat of commit.inlineChats) { // Updated to iterate through inlineChats
+        idToCommitInfo.set(inlineChat.inline_chat_id, commit);
+      }
     }
+    return idToCommitInfo;
+}    - **Model**: gpt-4o
+    - **Context**: /Users/alex/Documents/GitHub/gait-copilot/src/stashedState.ts
+    - **Text**: do the same for this file
+    - **Response**: Sure, I'll update the `src/stashedState.ts` file to remove the gzip decompression and buffer handling. Here are the necessary changes:
 
-    disposibleDecorations = InlineDecoration.decorateActive(context, decorationsActive);
-
-    isRedecorating = false;
-}, 300); // 300ms debounce time
+```src/stashedState.ts
+import fs from 'fs';
+import path from 'path';
+import { isStashedState, PanelChat, StashedState } from './types';
+import vscode from 'vscode';
+import { InlineChatInfo } from './inline';
 
 /**
- * Creates the .gait folder and necessary files if they don't exist.
+ * Returns the file path for the stashed state.
  */
-function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
-    const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-    if (!fs.existsSync(gaitFolderPath)) {
-        fs.mkdirSync(gaitFolderPath);
-        vscode.window.showInformationMessage(`${GAIT_FOLDER_NAME} folder created successfully`);
-    }
-
-
-    const gitAttributesPath = path.join(workspaceFolder.uri.fsPath, '.gitattributes');
-    const gitAttributesContent = fs.existsSync(gitAttributesPath)
-        ? fs.readFileSync(gitAttributesPath, 'utf-8')
-        : '';
-
-    if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/ -diff`)) {
-        fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/ -diff\n`);
-        vscode.window.showInformationMessage('.gitattributes updated successfully');
-    }
-}
-
-/**
- * Activates the extension.
- */
-export function activate(context: vscode.ExtensionContext) {
-    const tool: TOOL = checkTool();
-    // Set panelChatMode in extension workspaceStorage
-    const panelChatMode = "OnlyMatchedChats";
-    context.workspaceState.update('panelChatMode', panelChatMode);
-
-    generateKeybindings(context, tool);
-
-    const startInlineCommand = tool === "Cursor" ? "aipopup.action.modal.generate" : "inlineChat.start";
-    const startPanelCommand = tool === "Cursor" ? "aichat.newchataction" : "workbench.action.chat.openInSidebar";
-
+export function stashedStateFilePath(): string {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('No workspace folder found. Extension activation failed.');
-        return;
-    }
-    try {
-        createGaitFolderIfNotExists(workspaceFolder);
-    } catch (error) {
-        console.log("Error creating .gait folder", error);
+        throw new Error('No workspace folder found.');
     }
 
-    const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
+    const repoPath = workspaceFolder.uri.fsPath;
+    return path.join(repoPath, '.gait', 'stashedPanelChats.json');
+}
 
-    writeStashedState(context, readStashedStateFromFile());
-    context.workspaceState.update('fileStashedState', readStashedStateFromFile());
-    setTimeout(() => {
-        monitorPanelChatAsync(stateReader, context);
-    }, 3000); // Delay to ensure initial setup
-
-    const provider = new PanelViewProvider(context);
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(PanelViewProvider.viewType, provider, { webviewOptions: { retainContextWhenHidden: true } })
-    );
-
-    //console.log('WebviewViewProvider registered for', PanelViewProvider.viewType);
-
-    const updateSidebarCommand = vscode.commands.registerCommand('gait-copilot.updateSidebar', async () => {
-        vscode.window.showInformationMessage('Updating sidebar content');
-        try {
-            provider.updateContent();
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error updating sidebar: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    });
-
-    const inlineChatStartOverride = vscode.commands.registerCommand('gait-copilot.startInlineChat', () => {
-        // Display an information message
-        vscode.window.showInformationMessage('Starting inline chat...');
-        const editor = vscode.window.activeTextEditor;
-        if (editor) {
-            const document = editor.document;
-            const selection = editor.selection;
-            const inlineStartInfo: Inline.InlineStartInfo = {
-                fileName: vscode.workspace.asRelativePath(document.uri),
-                content: document.getText(),
-                lineCount: document.lineCount,
-                startTimestamp: new Date().toISOString(),
-                startSelection: selection.start,
-                endSelection: selection.end,
-                selectionContent: document.getText(selection),
-                parent_inline_chat_id: null,
-            };
-            stateReader.startInline(inlineStartInfo).catch((error) => {
-                vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            });
-        }
-        vscode.commands.executeCommand(startInlineCommand);
-    });
-
-    const openFileWithContentCommand = vscode.commands.registerCommand('gait-copilot.openFileWithContent', async (args) => {
-        try {
-            // Create a new untitled document
-            vscode.workspace.openTextDocument({
-                content: args.content,
-                language: args.languageId // You can change this to match the content type
-            }).then((document) => vscode.window.showTextDocument(document, {
-                preview: false, // This will open the document in preview mode
-                selection: new vscode.Selection(args.selectionStart, args.selectionEnd)
-            }));
-
-            vscode.window.showInformationMessage(`Opened new file: ${args.title}`);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to open file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    });
-
-    // Register the deleteInlineChat command
-    const deleteInlineChatCommand = vscode.commands.registerCommand('gait-copilot.removeInlineChat', (args) => {
-        //console.log("Removing inline chat", args);
-        Inline.removeInlineChat(context, args.inline_chat_id);
-        debouncedRedecorate(context);
-    });
-
-    // Register the deletePanelChat command
-    const deletePanelChatCommand = vscode.commands.registerCommand('gait-copilot.deletePanelChat', async () => {
-        try {
-            if (!workspaceFolder) {
-                throw new Error('No workspace folder found');
-            }
-
-            const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-            const stashedPath = path.join(gaitDir, 'stashedPanelChats.json.gz');
-
-            if (!fs.existsSync(stashedPath)) {
-                vscode.window.showErrorMessage('stashedPanelChats.json does not exist.');
-                return;
-            }
-
-            // Read existing chats
-            const fileContent = fs.readFileSync(stashedPath, 'utf-8');
-            const chats: { messageText: string; responseText: string }[] = JSON.parse(fileContent);
-
-            if (chats.length === 0) {
-                vscode.window.showInformationMessage('No chats to delete.');
-                return;
-            }
-
-            // Prompt user to select which chat to delete
-            const items = chats.map((chat, index) => ({
-                label: `Chat ${index + 1}`,
-                description: `Message: ${chat.messageText.substring(0, 50)}..., Response: ${chat.responseText.substring(0, 50)}...`,
-                index: index
-            }));
-
-            const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select a chat to delete'
-            });
-
-            if (!selected) {
-                return; // User cancelled the selection
-            }
-
-            // Confirm deletion
-            const confirm = await vscode.window.showWarningMessage(
-                `Are you sure you want to delete ${selected.label}?`,
-                { modal: true },
-                'Yes'
-            );
-
-            if (confirm !== 'Yes') {
-                return;
-            }
-
-            // Remove the selected chat
-            chats.splice(selected.index, 1);
-
-            // Write back the updated chats
-            fs.writeFileSync(stashedPath, JSON.stringify(chats, null, 2));
-            vscode.window.showInformationMessage(`Deleted ${selected.label} successfully.`);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to delete chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    });
-
-    // Register command to convert PanelChats to markdown and open in a new file
-    const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (args) => {
-        try {
-            const decodedArgs = Buffer.from(args.data, 'base64').toString('utf-8');
-            const markdownData = JSON.parse(decodedArgs);
-            const markdownContent = panelChatsToMarkdown(markdownData, true);
-            const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
-            fs.writeFileSync(filePath, markdownContent, 'utf8');
-            await vscode.workspace.openTextDocument(filePath);
-            await vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(filePath));
-            await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup');
-            await vscode.commands.executeCommand(startPanelCommand);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    });
-
-    const toggleDecorationsCommand = vscode.commands.registerCommand('gait-copilot.toggleDecorations', () => {
-        decorationsActive = !decorationsActive;
-        if (decorationsActive) {
-            debouncedRedecorate(context);
-            vscode.window.showInformationMessage('Gait context activated.');
-        } else {
-            if (disposibleDecorations) {
-                disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
-                disposibleDecorations.hoverProvider.dispose();
-                disposibleDecorations = undefined;
-            }
-            vscode.window.showInformationMessage('Gait context deactivated.');
-        }
-    });
-
-    const handleMergeCommand = vscode.commands.registerCommand('gait-copilot.handleMerge', () => {
-        handleMerge(context);
-    });
-
-    // Register all commands
-    context.subscriptions.push(
-        updateSidebarCommand, 
-        inlineChatStartOverride, 
-        deleteInlineChatCommand, 
-        openFileWithContentCommand,
-        toggleDecorationsCommand,
-        deletePanelChatCommand,
-        exportPanelChatsToMarkdownCommand,
-        handleMergeCommand,
-    );
-
-    debouncedRedecorate(context);
-    vscode.window.onDidChangeActiveTextEditor(() => {
-        debouncedRedecorate(context);
-    });
-    
-    vscode.workspace.onDidSaveTextDocument(() => {
-        debouncedRedecorate(context);
-    });
-
-    // Add a new event listener for text changes
-    vscode.workspace.onDidChangeTextDocument((event) => {
-        handleFileChange(event, stateReader, context);
-        debouncedRedecorate(context);
-    });
-
-    // Set up an interval to trigger accept every second
-    const acceptInterval = setInterval(async () => {
-        try {
-            triggerAccept(stateReader, context);
-            await stateReader.matchPromptsToDiff();
-        } catch (error) {
-            console.log("Error in accept interval", error);
-        }
-    }, 1000);
-
-    // Make sure to clear the interval when the extension is deactivated
-    context.subscriptions.push({
-        dispose: () => clearInterval(acceptInterval)
-    });
+export function readStashedState(context: vscode.ExtensionContext): StashedState {
+    const stashedState = context.workspaceState.get<StashedState>('stashedState');
+    if (!stashedState) {
+        return {
+            panelChats: [],
+            inlineChats: [],
+            schemaVersion: "1.0",
+            deletedChats: {
+                deletedMessageIDs: [],
+                deletedPanelChatIDs: []
+            },
+            kv_store: {}
+        };
+    }
+    return stashedState;
 }
 
 /**
- * Deactivates the extension.
+ * Reads the stashed state from the file.
  */
-export function deactivate() {}
+export function readStashedStateFromFile(): StashedState {
+    const filePath = stashedStateFilePath();
+    try {
+        if (!fs.existsSync(filePath)) {
+            const emptyStashedState: StashedState = {
+                panelChats: [],
+                inlineChats: [],
+                schemaVersion: "1.0",
+                deletedChats: {
+                    deletedMessageIDs: [],
+                    deletedPanelChatIDs: []
+                },
+                kv_store: {}
+            };
+
+            writeStashedStateToFile(emptyStashedState);
+        }
+
+        // Read the file content as a string
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const stashedState: StashedState = JSON.parse(fileContent);
+
+        if (!isStashedState(stashedState)) {
+            throw new Error('Invalid stashed state');
+        }
+
+        return stashedState;
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error reading stashed state: ${(error as Error).message}`);
+        throw new Error('Error reading stashed state');
+    }
+}
+
+export function writeStashedState(context: vscode.ExtensionContext, stashedState: StashedState): void {
+    context.workspaceState.update('stashedState', stashedState);
+    writeStashedStateToFile(stashedState);
+    return;
+}
+
+export function writeChatToStashedState(context: vscode.ExtensionContext, newChat: PanelChat): void {
+    const currentState = readStashedState(context);
+    const existingChatIndex = currentState.panelChats.findIndex((chat) => chat.id === newChat.id);
+    if (existingChatIndex !== -1) {
+        const existingChat = currentState.panelChats[existingChatIndex];
+        const newMessages = newChat.messages.filter((message) => !existingChat.messages.some((existingMessage) => existingMessage.id === message.id));
+        existingChat.messages.push(...newMessages);
+        currentState.panelChats[existingChatIndex] = existingChat;
+    } else {
+        currentState.panelChats.push(newChat);
+    }
+    writeStashedState(context, currentState);
+}
+
+export function removeMessageFromStashedState(context: vscode.ExtensionContext, message_id: string): void {
+    const currentState = readStashedState(context);
+    const chatIndex = currentState.panelChats.findIndex((chat) => chat.messages.some((message) => message.id === message_id));
+    if (chatIndex === -1) {
+        return;
+    }
+    const chat = currentState.panelChats[chatIndex];
+    chat.messages = chat.messages.filter((message) => message.id !== message_id);
+    currentState.panelChats[chatIndex] = chat;
+    writeStashedState(context, currentState);
+}
+
+export function removePanelChatFromStashedState(context: vscode.ExtensionContext, panel_chat_id: string): void {
+    const currentState = readStashedState(context);
+    currentState.panelChats = currentState.panelChats.filter((chat) => chat.id !== panel_chat_id);
+    writeStashedState(context, currentState);
+}
+
+/**
+ * Writes the stashed state to the file.
+ */
+function writeStashedStateToFile(stashedState: StashedState): void {
+    const filePath = stashedStateFilePath();
+    try {
+        // Convert the stashed state to a JSON string with indentation
+        const jsonString = JSON.stringify(stashedState, null, 2);
+
+        // Write the JSON string to the file
+        fs.writeFileSync(filePath, jsonString, 'utf-8');
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error writing stashed state: ${(error as Error).message}`);
+        throw new Error('Error writing stashed state');
+    }
+}
+
+export function getInlineParent(context: vscode.ExtensionContext, id: string): InlineChatInfo | undefined {
+    const stashedState = readStashedState(context);
+    const parent = stashedState.inlineChats.find((parent) => parent.inline_chat_id === id);
+    if (!parent) {
+        return undefined;
+    }
+    return parent;
+}
+```
+
+### Explanation:
+1. **Removed gzip decompression**: The `zlib.gunzipSync` and buffer handling have been removed.
+2. **Updated file reading**: Directly read the file content as a string using `fs.readFileSync(filePath, 'utf-8')`.
+3. **Updated file writing**: Directly write the JSON string to the file using `fs.writeFileSync(filePath, jsonString, 'utf-8')`.
+
+These changes ensure that the file content is handled as plain text JSON.
+ - **Expanded Context** + Whole file in context:
+ import fs from 'fs';
+import path from 'path';
+import { isStashedState, PanelChat, StashedState } from './types';
+import vscode from 'vscode';
+import { InlineChatInfo } from './inline';
+
+/**
+ * Returns the file path for the stashed state.
+ */
+export function stashedStateFilePath(): string {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        throw new Error('No workspace folder found.');
+    }
+
+    const repoPath = workspaceFolder.uri.fsPath;
+    return path.join(repoPath, '.gait', 'stashedPanelChats.json');
+}
+
+export function readStashedState(context: vscode.ExtensionContext): StashedState {
+    const stashedState = context.workspaceState.get<StashedState>('stashedState');
+    if (!stashedState) {
+        return {
+            panelChats: [],
+            inlineChats: [],
+            schemaVersion: "1.0",
+            deletedChats: {
+                deletedMessageIDs: [],
+                deletedPanelChatIDs: []
+            },
+            kv_store: {}
+        };
+    }
+    return stashedState;
+}
+
+/**
+ * Reads the stashed state from the file.
+ */
+export function readStashedStateFromFile(): StashedState {
+    const filePath = stashedStateFilePath();
+    try {
+        if (!fs.existsSync(filePath)) {
+            const emptyStashedState: StashedState = {
+                panelChats: [],
+                inlineChats: [],
+                schemaVersion: "1.0",
+                deletedChats: {
+                    deletedMessageIDs: [],
+                    deletedPanelChatIDs: []
+                },
+                kv_store: {}
+            };
+
+            writeStashedStateToFile(emptyStashedState);
+        }
+
+        // Read the file content as a string
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const stashedState: StashedState = JSON.parse(fileContent);
+
+        if (!isStashedState(stashedState)) {
+            throw new Error('Invalid stashed state');
+        }
+
+        return stashedState;
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error reading stashed state: ${(error as Error).message}`);
+        throw new Error('Error reading stashed state');
+    }
+}
+
+export function writeStashedState(context: vscode.ExtensionContext, stashedState: StashedState): void {
+    context.workspaceState.update('stashedState', stashedState);
+    writeStashedStateToFile(stashedState);
+    return;
+}
+
+export function writeChatToStashedState(context: vscode.ExtensionContext, newChat: PanelChat): void {
+    const currentState = readStashedState(context);
+    const existingChatIndex = currentState.panelChats.findIndex((chat) => chat.id === newChat.id);
+    if (existingChatIndex !== -1) {
+        const existingChat = currentState.panelChats[existingChatIndex];
+        const newMessages = newChat.messages.filter((message) => !existingChat.messages.some((existingMessage) => existingMessage.id === message.id));
+        existingChat.messages.push(...newMessages);
+        currentState.panelChats[existingChatIndex] = existingChat;
+    } else {
+        currentState.panelChats.push(newChat);
+    }
+    writeStashedState(context, currentState);
+}
+
+export function removeMessageFromStashedState(context: vscode.ExtensionContext, message_id: string): void {
+    const currentState = readStashedState(context);
+    const chatIndex = currentState.panelChats.findIndex((chat) => chat.messages.some((message) => message.id === message_id));
+    if (chatIndex === -1) {
+        return;
+    }
+    const chat = currentState.panelChats[chatIndex];
+    chat.messages = chat.messages.filter((message) => message.id !== message_id);
+    currentState.panelChats[chatIndex] = chat;
+    writeStashedState(context, currentState);
+}
+
+export function removePanelChatFromStashedState(context: vscode.ExtensionContext, panel_chat_id: string): void {
+    const currentState = readStashedState(context);
+    currentState.panelChats = currentState.panelChats.filter((chat) => chat.id !== panel_chat_id);
+    writeStashedState(context, currentState);
+}
+
+/**
+ * Writes the stashed state to the file.
+ */
+function writeStashedStateToFile(stashedState: StashedState): void {
+    const filePath = stashedStateFilePath();
+    try {
+        // Convert the stashed state to a JSON string with indentation
+        const jsonString = JSON.stringify(stashedState, null, 2);
+
+        // Write the JSON string to the file
+        fs.writeFileSync(filePath, jsonString, 'utf-8');
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error writing stashed state: ${(error as Error).message}`);
+        throw new Error('Error writing stashed state');
+    }
+}
+
+export function getInlineParent(context: vscode.ExtensionContext, id: string): InlineChatInfo | undefined {
+    const stashedState = readStashedState(context);
+    const parent = stashedState.inlineChats.find((parent) => parent.inline_chat_id === id);
+    if (!parent) {
+        return undefined;
+    }
+    return parent;
+}
 
