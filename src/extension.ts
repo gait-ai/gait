@@ -545,7 +545,7 @@ exit 0
             gitAttributesContent = fs.readFileSync(gitAttributesPath, 'utf8');
         }
 
-        const mergeDriverAttribute = `${GAIT_FOLDER_NAME}/stashedGaitState2.json merge=custom-stashed-state`;
+        const mergeDriverAttribute = `${GAIT_FOLDER_NAME}/state.json merge=custom-stashed-state`;
 
         if (!gitAttributesContent.includes(mergeDriverAttribute)) {
             try {
