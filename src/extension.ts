@@ -381,11 +381,25 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
-# Perform the merge using jq
-jq -n \
-    --argfile ourState "$CURRENT" \
-    --argfile theirState "$OTHER" \
-    '
+# Optional: Validate JSON inputs
+if ! jq empty "$CURRENT" 2>/dev/null; then
+    echo "Invalid JSON in CURRENT file: $CURRENT"
+    exit 1
+fi
+
+if ! jq empty "$OTHER" 2>/dev/null; then
+    echo "Invalid JSON in OTHER file: $OTHER"
+    exit 1
+fi
+
+# Create a temporary file for the jq filter
+TMP_JQ_FILTER=$(mktemp /tmp/jq_filter.XXXXXX)
+
+# Ensure the temporary file is deleted on script exit
+trap 'rm -f "$TMP_JQ_FILTER"' EXIT
+
+# Write the jq script to the temporary file
+cat <<'EOF' > "$TMP_JQ_FILTER"
 def mergePanelChats(ourChats; theirChats):
   (ourChats + theirChats)
   | group_by(.id)
@@ -415,13 +429,13 @@ def mergeStashedStates(ourState; theirState):
     schemaVersion: ourState.schemaVersion,
     deletedChats: {
       deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
-      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedChats.deletedPanelChatIDs) | unique
+      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
     },
     kv_store: (ourState.kv_store + theirState.kv_store)
   };
 
 mergeStashedStates($ourState; $theirState)
-' > "$MERGED"
+EOF
 
 # Detect OS and set sed in-place edit flag accordingly
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -433,7 +447,9 @@ else
 fi
 
 # Debug: Verify the jq filter content
+echo "Using jq filter from $TMP_JQ_FILTER:"
 sed "\${SED_INPLACE[@]}" 's/\r$//' "$TMP_JQ_FILTER"
+cat "$TMP_JQ_FILTER"
 
 # Perform the merge using jq with the temporary filter file
 jq -n \
