@@ -63,13 +63,13 @@ def mergePanelChats(ourChats; theirChats):
 def mergeStashedStates(ourState; theirState):
   {
     panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
-    inlineChats: ourState.inlineChats + theirState.inlineChats,
+    inlineChats: (ourState.inlineChats + theirState.inlineChats),
     schemaVersion: ourState.schemaVersion,
     deletedChats: {
       deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
       deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
     },
-    kv_store: ourState.kv_store + theirState.kv_store
+    kv_store: (ourState.kv_store + theirState.kv_store)
   };
 
 mergeStashedStates($ourState; $theirState)
