@@ -400,13 +400,16 @@ export function activate(context: vscode.ExtensionContext) {
 
 # custom-merge-driver.sh
 
+# Exit immediately if a command exits with a non-zero status
+set -e
+
 # Git passes these parameters to the merge driver
 BASE="$1"    # %O - Ancestor's version (common base)
 CURRENT="$2" # %A - Current version (ours)
 OTHER="$3"   # %B - Other branch's version (theirs)
 
 # Temporary file to store the merged result
-MERGED="$CURRENT.merged"
+MERGED="\${CURRENT}.merged"
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null
@@ -467,7 +470,7 @@ def mergeStashedStates(ourState; theirState):
     kv_store: (ourState.kv_store + theirState.kv_store)
   };
 
-mergeStashedStates(ourState; theirState)
+mergeStashedStates($ourState; $theirState)
 EOF
 
 # Detect OS and set sed in-place edit flag accordingly
@@ -481,19 +484,18 @@ fi
 
 # Debug: Verify the jq filter content
 echo "Using jq filter from $TMP_JQ_FILTER:"
-sed "\${SED_INPLACE[@]}" 's/\r$//' "$TMP_JQ_FILTER"
 
 # Perform the merge using jq with the temporary filter file
 jq -n \
     --argfile ourState "$CURRENT" \
     --argfile theirState "$OTHER" \
     -f "$TMP_JQ_FILTER" > "$MERGED"
-    
+
 # Capture jq's exit status
 JQ_STATUS=$?
 
 # Check if the merge was successful
-if [ $? -ne 0 ]; then
+if [ "$JQ_STATUS" -ne 0 ]; then
     echo "Error during merging stashed states."
     exit 1
 fi
