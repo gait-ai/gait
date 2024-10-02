@@ -22,45 +22,40 @@ jq -n \
     --argfile ourState "$CURRENT" \
     --argfile theirState "$OTHER" \
     '
-    def mergePanelChats(ourChats; theirChats):
-        (ourChats + theirChats) | 
-        group_by(.id) | 
-        map(
-            if length == 1 then .[0]
-            else
-                ourChat = .[0];
-                theirChat = .[1];
-                {
-                    ai_editor: ourChat.ai_editor,
-                    id: ourChat.id,
-                    customTitle: ourChat.customTitle,
-                    parent_id: ourChat.parent_id,
-                    created_on: ourChat.created_on,
-                    messages: if (theirChat.messages | length) > (ourChat.messages | length) then theirChat.messages else ourChat.messages end,
-                    kv_store: ourChat.kv_store + theirChat.kv_store
-                }
-            end
-        );
+def mergePanelChats(ourChats; theirChats):
+  (ourChats + theirChats)
+  | group_by(.id)
+  | map(
+      if length == 1 then .[0]
+      else
+        .[0] as $ourChat
+        | .[1] as $theirChat
+        | {
+            ai_editor: $ourChat.ai_editor,
+            id: $ourChat.id,
+            customTitle: $ourChat.customTitle,
+            parent_id: $ourChat.parent_id,
+            created_on: $ourChat.created_on,
+            messages: if ($theirChat.messages | length) > ($ourChat.messages | length) then $theirChat.messages else $ourChat.messages end,
+            kv_store: $ourChat.kv_store + $theirChat.kv_store
+          }
+      end
+    );
 
-    def mergeStashedStates(ourState; theirState):
-        {
-            panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
-            inlineChats: ourState.inlineChats + theirState.inlineChats,
-            schemaVersion: ourState.schemaVersion,
-            deletedChats: {
-                deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
-                deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
-            },
-            kv_store: ourState.kv_store + theirState.kv_store
-        };
+def mergeStashedStates(ourState; theirState):
+  {
+    panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
+    inlineChats: ourState.inlineChats + theirState.inlineChats,
+    schemaVersion: ourState.schemaVersion,
+    deletedChats: {
+      deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
+      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedChats.deletedPanelChatIDs) | unique
+    },
+    kv_store: ourState.kv_store + theirState.kv_store
+  };
 
-    ourState = $ourState;
-    theirState = $theirState;
-
-    mergedState = mergeStashedStates(ourState; theirState);
-
-    mergedState
-    ' > "$MERGED"
+mergeStashedStates($ourState; $theirState)
+' > "$MERGED"
 
 # Check if the merge was successful
 if [ $? -ne 0 ]; then
