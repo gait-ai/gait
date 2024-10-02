@@ -4,3 +4,4 @@ dist
 .aider**
 /venv/
 gait_context.md
+.gait/custom-merge-driver.sh

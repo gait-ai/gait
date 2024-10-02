@@ -92,10 +92,16 @@ export interface PanelMatchedRange {
   message_id: string;
 }
 
+export interface AIChangeMetadata {
+  changeStartPosition: vscode.Position | undefined;
+  inlineChatStartInfo: InlineStartInfo | undefined;
+}
 export interface TimedFileDiffs {
   timestamp: string;
   file_diffs: FileDiff[]
+  metadata: AIChangeMetadata;
 }
+
 
 export interface StateReader {   
   /**
@@ -106,7 +112,7 @@ export interface StateReader {
   /**
   * Processes the editor content during inline chat acceptance.
   */
-  pushFileDiffs(file_diffs: FileDiff[]): void;
+  pushFileDiffs(file_diffs: FileDiff[], metadata: AIChangeMetadata): void;
 
   /**
   * Processes the editor content during inline chat acceptance.
