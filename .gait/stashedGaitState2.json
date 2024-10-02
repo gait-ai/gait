@@ -210,8 +210,8 @@
     },
     {
       "ai_editor": "cursor",
-      "customTitle": "Potential Merge Conflict Discussion",
       "id": "a39ff270-6abc-4d7f-a5cb-8f2e13ba8781",
+      "customTitle": "Potential Merge Conflict Discussion",
       "parent_id": null,
       "created_on": "2024-10-02T06:43:11.862Z",
       "messages": [
