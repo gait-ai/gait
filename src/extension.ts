@@ -383,50 +383,87 @@ then
     exit 1
 fi
 
-# Perform the merge using jq
-jq -n \\
-    --argfile ourState "$CURRENT" \\
-    --argfile theirState "$OTHER" \\
-    '
-    def mergePanelChats(ourChats; theirChats):
-        (ourChats + theirChats) | 
-        group_by(.id) | 
-        map(
-            if length == 1 then .[0]
-            else
-                ourChat = .[0];
-                theirChat = .[1];
-                {
-                    ai_editor: ourChat.ai_editor,
-                    id: ourChat.id,
-                    customTitle: ourChat.customTitle,
-                    parent_id: ourChat.parent_id,
-                    created_on: ourChat.created_on,
-                    messages: if (theirChat.messages | length) > (ourChat.messages | length) then theirChat.messages else ourChat.messages end,
-                    kv_store: ourChat.kv_store + theirChat.kv_store
-                }
-            end
-        );
+# Optional: Validate JSON inputs
+if ! jq empty "$CURRENT" 2>/dev/null; then
+    echo "Invalid JSON in CURRENT file: $CURRENT"
+    exit 1
+fi
+if ! jq empty "$OTHER" 2>/dev/null; then
+    echo "Invalid JSON in OTHER file: $OTHER"
+    exit 1
+fi
 
-    def mergeStashedStates(ourState; theirState):
-        {
-            panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
-            inlineChats: ourState.inlineChats + theirState.inlineChats,
-            schemaVersion: ourState.schemaVersion,
-            deletedChats: {
-                deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
-                deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedPanelChatIDs) | unique
-            },
-            kv_store: ourState.kv_store + theirState.kv_store
-        };
+# Create a temporary file for the jq filter
+TMP_JQ_FILTER=$(mktemp /tmp/jq_filter.XXXXXX)
 
-    ourState = $ourState;
-    theirState = $theirState;
+# Ensure the temporary file is deleted on script exit
+trap 'rm -f "$TMP_JQ_FILTER"' EXIT
 
-    mergedState = mergeStashedStates(ourState; theirState);
+# Write the jq script to the temporary file
+cat <<'EOF' > "$TMP_JQ_FILTER"
+def mergePanelChats(ourChats; theirChats):
+  (ourChats + theirChats)
+  | group_by(.id)
+  | map(
+      if length == 1 then .[0]
+      else
+        .[0] as $ourChat
+        | .[1] as $theirChat
+        | (if ($theirChat.messages | length) > ($ourChat.messages | length) then $theirChat.messages else $ourChat.messages end) as $mergedMessages
+        | ($ourChat.kv_store + $theirChat.kv_store) as $mergedKvStore
+        | {
+            ai_editor: $ourChat.ai_editor,
+            id: $ourChat.id,
+            customTitle: $ourChat.customTitle,
+            parent_id: $ourChat.parent_id,
+            created_on: $ourChat.created_on,
+            messages: $mergedMessages,
+            kv_store: $mergedKvStore
+          }
+      end
+    );
 
-    mergedState
-    ' > "$MERGED"
+def mergeStashedStates(ourState; theirState):
+  {
+    panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
+    inlineChats: (ourState.inlineChats + theirState.inlineChats),
+    schemaVersion: ourState.schemaVersion,
+    deletedChats: {
+      deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
+      deletedPanelChatIDs: (ourState.deletedChats.deletedPanelChatIDs + theirState.deletedChats.deletedPanelChatIDs) | unique
+    },
+    kv_store: ourState.kv_store + theirState.kv_store
+  };
+
+ourState = $ourState;
+theirState = $theirState;
+
+mergedState = mergeStashedStates(ourState; theirState);
+
+mergedState
+EOF
+
+# Detect OS and set sed in-place edit flag accordingly
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS (BSD sed)
+    SED_INPLACE=(-i '')
+else
+    # Assume GNU sed
+    SED_INPLACE=(-i)
+fi
+
+# Debug: Verify the jq filter content
+echo "Using jq filter from $TMP_JQ_FILTER:"
+sed "\${SED_INPLACE[@]}" 's/\r$//' "$TMP_JQ_FILTER"
+
+# Perform the merge using jq with the temporary filter file
+jq -n \
+    --argfile ourState "$CURRENT" \
+    --argfile theirState "$OTHER" \
+    -f "$TMP_JQ_FILTER" > "$MERGED"
+    
+# Capture jq's exit status
+JQ_STATUS=$?
 
 # Check if the merge was successful
 if [ $? -ne 0 ]; then
@@ -442,6 +479,14 @@ exit 0
 `;
         // Path to the custom merge driver script
         const customMergeDriverPath = path.join(gaitFolderPath, 'custom-merge-driver.sh');
+
+        const gitignorePath = path.join(workspaceFolder.uri.fsPath, '.gitignore');
+        let gitignoreContent = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf8') : '';
+        if (!gitignoreContent.includes('custom-merge-driver.sh')) {
+            fs.appendFileSync(gitignorePath, '\n.gait/custom-merge-driver.sh\n');
+            vscode.window.showInformationMessage('Added custom merge driver script to .gitignore');
+        }
+
 
         // Write the script to the .gait folder if it doesn't exist or content has changed
         if (!fs.existsSync(customMergeDriverPath) || fs.readFileSync(customMergeDriverPath, 'utf8') !== customMergeDriverScript) {
