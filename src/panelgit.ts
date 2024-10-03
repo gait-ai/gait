@@ -296,6 +296,13 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
         }))
         .filter(pc => pc.messages.length > 0);
 
+    // Add all seen messages to seenMessageIds
+    for (const panelChat of parsedCurrent.panelChats) {
+        for (const message of panelChat.messages) {
+            seenMessageIds.add(message.id);
+        }
+    }
+
     const added: UncommittedData = {
         panelChats: allAddedPanelChats,
         inlineChats: parsedCurrent.inlineChats.filter(ic => currentInlineChatIds.has(ic.inline_chat_id) && !seenInlineChatIds.has(ic.inline_chat_id))
