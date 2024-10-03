@@ -258,6 +258,18 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
+
+    const firstTime = context.globalState.get('firstTime', true);
+
+    if (firstTime) {
+        // Mark that it's no longer the first time
+        context.globalState.update('firstTime', false);
+
+        // Open the welcome markdown file
+        const welcomeFile = vscode.Uri.joinPath(context.extensionUri, 'resources', 'welcome.md');
+        vscode.commands.executeCommand('markdown.showPreview', welcomeFile);
+    }
+    
     const tool: TOOL = checkTool();
     // Set panelChatMode in extension workspaceStorage
     const panelChatMode = "OnlyMatchedChats";
