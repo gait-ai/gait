@@ -46,13 +46,16 @@ function extractCodeBlocks(text: string): string[] {
     return codeBlocks;
 }
 
+function isMeaningfulLine(line: string): boolean {
+    return /[a-zA-Z0-9]/.test(line.trim()) && !line.trim().startsWith('import ');
+}
+
 export function matchDiffToCurrentFile(
     document: vscode.TextDocument,
     diff: Diff.Change[]
 ): vscode.Range[] {
     const documentLines = document.getText().split('\n');
 
-    // Extract all added lines from the diff and create a Set for faster lookup
     const addedLinesSet = new Set(
         diff.filter(change => change.added)
            .flatMap(change => change.value.split('\n').map(line => line.trim()))
@@ -64,21 +67,25 @@ export function matchDiffToCurrentFile(
     }
 
     const matchingLineNumbers: number[] = [];
+    const lineOccurrences: Map<string, number> = new Map();
 
-    // Collect all matching line numbers
     for (let i = 0; i < documentLines.length; i++) {
         const trimmedLine = documentLines[i].trim();
         if (addedLinesSet.has(trimmedLine)) {
             matchingLineNumbers.push(i);
+            lineOccurrences.set(trimmedLine, (lineOccurrences.get(trimmedLine) || 0) + 1);
         }
     }
 
-    // Merge consecutive line numbers into ranges
-    const ranges: vscode.Range[] = [];
-    // Filter out ranges that are a single line
     if (addedLinesSet.size < 5) {
-        return matchingLineNumbers.map(line => new vscode.Range(line, 0, line, documentLines[line].length));
+        return matchingLineNumbers
+            .filter(line => {
+                const trimmedLine = documentLines[line].trim();
+                return isMeaningfulLine(documentLines[line]) && lineOccurrences.get(trimmedLine) === 1;
+            })
+            .map(line => new vscode.Range(line, 0, line, documentLines[line].length));
     }
+
     let start = -1;
     let end = -1;
     const multiLineRanges: vscode.Range[] = [];
@@ -94,7 +101,6 @@ export function matchDiffToCurrentFile(
         if (nextLine === undefined || nextLine !== currentLine + 1) {
             end = currentLine;
 
-            // Check if the range is meaningful
             let meaningfulLines = 0;
             for (let j = start; j <= end; j++) {
                 const line = documentLines[j].trim();
@@ -103,10 +109,14 @@ export function matchDiffToCurrentFile(
                 }
             }
 
-            // If we have at least two meaningful lines, add the range
             if (meaningfulLines >= 2) {
                 for (let j = start; j <= end; j++) {
                     multiLineRanges.push(new vscode.Range(j, 0, j, documentLines[j].length));
+                }
+            } else if (meaningfulLines === 1) {
+                const trimmedLine = documentLines[start].trim();
+                if (lineOccurrences.get(trimmedLine) === 1 && isMeaningfulLine(trimmedLine)) {
+                    multiLineRanges.push(new vscode.Range(start, 0, start, documentLines[start].length));
                 }
             }
 
@@ -117,6 +127,7 @@ export function matchDiffToCurrentFile(
 
     return multiLineRanges;
 }
+
 
 
 export function decorateActive(context: vscode.ExtensionContext, decorations_active: boolean) {
