@@ -357,7 +357,6 @@ export async function getGitHistoryThatTouchesFile(
 ): Promise<GitHistoryData> {
     const git: SimpleGit = simpleGit(repoPath);
     log("Starting getGitHistoryThatTouchesFile", LogLevel.INFO);
-
     // Ensure both files exist in the repository
     const absoluteFilePath = path.resolve(repoPath, filePath);
     const absoluteTargetFilePath = path.resolve(repoPath, targetFilePath);
@@ -367,14 +366,16 @@ export async function getGitHistoryThatTouchesFile(
     if (!fs.existsSync(absoluteTargetFilePath)) {
         throw new Error(`Target file not found: ${absoluteTargetFilePath}`);
     }
+    const gitHistory = await getGitHistory(context, repoPath, filePath);
+    const hashToCommitInfo = new Map<string, CommitData>();
 
-    // Step 1: Read and validate the current state.json
-    const parsedCurrent = readStashedState(context); 
-    const { currentMessageIds, currentPanelChatIds, currentInlineChatIds } = aggregateCurrentIds(parsedCurrent);
-    const seenMessageIds: Set<string> = new Set();
+    for (const commit of gitHistory.commits) {
+        hashToCommitInfo.set(commit.commitHash, commit);
+    }
+    const relativeTargetFilePath = path.relative(repoPath, absoluteTargetFilePath);
 
     // Step 2: Get the commit history for the main file with --follow to track renames
-    const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
+    const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', relativeTargetFilePath];
     let logData: string;
 
     try {
@@ -391,91 +392,13 @@ export async function getGitHistoryThatTouchesFile(
 
     for (const line of logLines) {
         const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
-        const commitMessage = commitMsgParts.join('\t');
-
-        // Skip commits that are solely for deletions
-        if (
-            commitMessage.startsWith('Delete message with ID') || 
-            commitMessage.startsWith('Delete PanelChat with ID')
-        ) {
-            log(`Skipping deletion commit ${commitHash}: ${commitMessage}`, LogLevel.INFO);
-            continue;
-        }
-
-        // Check if this commit modifies the targetFilePath
-        let modifiesTargetFile = false;
-        try {
-            const filesChanged = await git.raw(['diff-tree', '--no-commit-id', '--name-only', '-r', commitHash]);
-            const files = filesChanged.split('\n').map(f => f.trim());
-            modifiesTargetFile = files.includes(targetFilePath);
-            log(
-                `Commit ${commitHash} ${modifiesTargetFile ? 'modifies' : 'does not modify'} target file ${targetFilePath}.`,
-                LogLevel.INFO
-            );
-        } catch (error) {
-            log(`Warning: Failed to retrieve files changed in commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
-            continue; // Skip this commit
-        }
-
-        if (!modifiesTargetFile) {
-            continue;
-        }
-
-        // Get the file content at this commit
-        let fileContent: string;
-        try {
-            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
-            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
-        } catch (error) {
-            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}. Error: ${(error as Error).message}`, LogLevel.WARN);
-            continue; // Skip this commit
-        }
-
-        // Parse JSON
-        let parsedContent: StashedState;
-        try {
-            parsedContent = JSON.parse(fileContent);
-            if (!isStashedState(parsedContent)) {
-                throw new Error('Parsed content does not match StashedState structure.');
-            }
-            log(`Parsed state.json for commit ${commitHash} successfully.`, LogLevel.INFO);
-        } catch (error) {
-            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
-            log(`Content: ${fileContent}`, LogLevel.WARN);
-            continue; // Skip this commit
-        }
-
-        // Initialize or retrieve existing CommitData for this commit
-        let commitData = allCommitsMap.get(commitHash);
-        if (!commitData) {
-            commitData = {
-                commitHash,
-                date: new Date(dateStr),
-                commitMessage,
-                author: authorName,
-                panelChats: [],
-                inlineChats: [],
-            };
+        const commitData = hashToCommitInfo.get(commitHash);
+        if (commitData && (commitData.panelChats.length > 0 || commitData.inlineChats.length > 0)) {
             allCommitsMap.set(commitHash, commitData);
-            log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
         }
-
-        // Process the commit's panelChats and inlineChats
-        processCommit(parsedContent, currentMessageIds, currentInlineChatIds, seenMessageIds, commitData, commitHash);
     }
-
-    // Convert the map to an array and filter out empty commits
-    let allCommits: CommitData[] = Array.from(allCommitsMap.values())
-        .map(commit => ({
-            ...commit,
-            panelChats: commit.panelChats.filter(pc => pc.messages.length > 0)
-        }))
-        .filter(commit => commit.panelChats.length > 0);
-
-    log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
-
     return {
-        commits: allCommits,
+        commits: Array.from(allCommitsMap.values()),
         added: null,
         uncommitted: null
     };
