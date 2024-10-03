@@ -70,11 +70,11 @@ export class CursorReader implements StateReader {
         });
     }
 
-    public async matchPromptsToDiff(): Promise<void> {
+    public async matchPromptsToDiff(): Promise<boolean> {
         if (this.inlineChats === null) {
             const inlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
             this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
-            return;
+            return false;
         }
         const oldInlineChats = this.inlineChats;
         const newInlineChats =  await readVSCodeState(getDBPath(this.context), 'aiService.prompts') || oldInlineChats;
@@ -85,9 +85,9 @@ export class CursorReader implements StateReader {
             while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
                 this.timedFileDiffs.shift();
             }
-            return;
+            return false;
         }
-        // console.log("newChats found: ", newChats);
+        let added = false;
         for (const newChat of newChats) {
             let matchedDiff: TimedFileDiffs | undefined;
             if (newChat.commandType === 1) {
@@ -105,7 +105,7 @@ export class CursorReader implements StateReader {
             if (!matchedDiff) {
                 vscode.window.showErrorMessage('Error: failed to match prompts to diffs!');
                 posthog.capture('no_file_diffs_for_new_prompts');
-                return;
+                return false;
             }
             const inlineChatInfoObj: InlineChatInfo = {
                 inline_chat_id: uuidv4(),
@@ -116,6 +116,7 @@ export class CursorReader implements StateReader {
                 parent_inline_chat_id: null,
             };
             Inline.writeInlineChat(this.context, inlineChatInfoObj);
+            added = true;
             if (newChat.commandType === 1 ) {
                 vscode.window.showInformationMessage(`Recorded Inline Chat - ${newChat.text}`);
                 posthog.capture('cursor_inline_chat');
@@ -124,6 +125,7 @@ export class CursorReader implements StateReader {
                 posthog.capture('cursor_composer_chat');
             }
         }
+        return added;
     }
 
     constructor(context: vscode.ExtensionContext) {

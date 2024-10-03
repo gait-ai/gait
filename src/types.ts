@@ -117,7 +117,7 @@ export interface StateReader {
   /**
   * Processes the editor content during inline chat acceptance.
   */
-  matchPromptsToDiff(): Promise<void>;
+  matchPromptsToDiff(): Promise<boolean>;
 
   /**
   * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.

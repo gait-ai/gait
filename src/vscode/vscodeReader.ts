@@ -88,11 +88,11 @@ export class VSCodeReader implements StateReader {
         });
     }
 
-    public async matchPromptsToDiff(): Promise<void> {
+    public async matchPromptsToDiff(): Promise<boolean> {
         if (this.interactiveSessions === null) {
             const inlineChats = await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
             this.interactiveSessions= inlineChats;
-            return;
+            return false;
         }
         const oldInlineChats = this.interactiveSessions;
         const newInlineChats =  await readVSCodeState(getDBPath(this.context), 'memento/interactive-session');
@@ -104,10 +104,11 @@ export class VSCodeReader implements StateReader {
             while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
                 this.timedFileDiffs.shift();
             }
-            return;
+            return false;
         }
         const context = this.context;
 
+        let added = false
         
         for (const newChat of newChats) {
             let matchedDiff: TimedFileDiffs | undefined;
@@ -124,7 +125,7 @@ export class VSCodeReader implements StateReader {
             if (!matchedDiff) {
                 console.error("error no file diffs");
                 vscode.window.showErrorMessage('No file diffs found for new prompts!');
-                return;
+                return false;
             }
             const inlineChatInfoObj: InlineChatInfo = {
                 inline_chat_id: uuidv4(),
@@ -136,8 +137,10 @@ export class VSCodeReader implements StateReader {
             };
             Inline.writeInlineChat(context, inlineChatInfoObj);
             posthog.capture('vscode_inline_chat');
+            added = true;
             vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat}`);
         }
+        return added;
     }
 
     constructor(context: vscode.ExtensionContext) {

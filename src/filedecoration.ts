@@ -79,9 +79,17 @@ export function matchDiffToCurrentFile(
     if (addedLinesSet.size < 5) {
         return matchingLineNumbers.map(line => new vscode.Range(line, 0, line, documentLines[line].length));
     }
+    const multiLineRanges: vscode.Range[] = [];
+
+    if (matchingLineNumbers.length > 0.8 * addedLinesSet.size) {
+        return matchingLineNumbers.map(line => new vscode.Range(line, 0, line, documentLines[line].length));
+    }
+    if (matchingLineNumbers.length < 0.2 * addedLinesSet.size) {
+        return [];
+    }
+    
     let start = -1;
     let end = -1;
-    const multiLineRanges: vscode.Range[] = [];
 
     for (let i = 0; i < matchingLineNumbers.length; i++) {
         const currentLine = matchingLineNumbers[i];
