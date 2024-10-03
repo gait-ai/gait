@@ -6,6 +6,7 @@ import { AIChangeMetadata, Context, MessageEntry, PanelChat, StashedState, State
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { FileDiff, InlineChatInfo } from '../inline';
+import posthog from 'posthog-js';
 const SCHEMA_VERSION = '1.0';
 
 
@@ -102,7 +103,8 @@ export class CursorReader implements StateReader {
                 matchedDiff = this.timedFileDiffs.pop();
             }
             if (!matchedDiff) {
-                vscode.window.showErrorMessage('No file diffs found for new prompts!');
+                vscode.window.showErrorMessage('Error: failed to match prompts to diffs!');
+                posthog.capture('no_file_diffs_for_new_prompts');
                 return;
             }
             const inlineChatInfoObj: InlineChatInfo = {
@@ -115,10 +117,11 @@ export class CursorReader implements StateReader {
             };
             Inline.writeInlineChat(this.context, inlineChatInfoObj);
             if (newChat.commandType === 1 ) {
-                vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat.text}`);
-                
+                vscode.window.showInformationMessage(`Recorded Inline Chat - ${newChat.text}`);
+                posthog.capture('cursor_inline_chat');
             } else if (newChat.commandType === 4) {
-                vscode.window.showInformationMessage(`Recorded Composer Request - ${newChat.text}`);
+                vscode.window.showInformationMessage(`Recorded Composer Chat - ${newChat.text}`);
+                posthog.capture('cursor_composer_chat');
             }
         }
     }
@@ -223,6 +226,7 @@ export class CursorReader implements StateReader {
 
             if (!Array.isArray(raw_data.tabs)) {
                 vscode.window.showErrorMessage('Invalid internal chat data structure.');
+                posthog.capture('invalid_internal_chat_data_structure');
                 return [];
             }
             let panelChats: PanelChat[] = [];

@@ -8,7 +8,6 @@ import { monitorPanelChatAsync } from './panelChats';
 import * as VSCodeReader from './vscode/vscodeReader';
 import { panelChatsToMarkdown } from './markdown';
 import * as CursorReader from './cursor/cursorReader';
-import { activateGaitParticipant } from './vscode/gaitChatParticipant';
 import { checkTool, TOOL } from './ide';
 import { AIChangeMetadata, PanelChatMode, StateReader } from './types';
 import { generateKeybindings } from './keybind';
@@ -17,11 +16,22 @@ import {diffLines} from 'diff';
 import { getRelativePath } from './utils';
 import { readStashedStateFromFile, writeStashedState, readStashedState, removePanelChatFromStashedState } from './stashedState';
 import * as child_process from 'child_process';
+import posthog from 'posthog-js';
+import { identifyRepo, identifyUser } from './identify_user';
+import simpleGit from 'simple-git';
+
+posthog.init('phc_vosMtvFFxCN470e8uHGDYCD6YuuSRSoFoZeLuciujry',
+    {
+        api_host: 'https://us.i.posthog.com',
+        person_profiles: 'always' // or 'always' to create profiles for anonymous users as well
+    }
+);
 
 const GAIT_FOLDER_NAME = '.gait';
 
 let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider: vscode.Disposable } | undefined;
 let decorationsActive = true;
+let timeOfLastDecorationChange = Date.now();
 
 let isRedecorating = false;
 let changeQueue: { cursor_position: vscode.Position, 
@@ -70,12 +80,13 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateRead
     // Check if the file is in the workspace directory
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showErrorMessage('No workspace folder found. Extension failed.');
+        vscode.window.showInformationMessage('Open a workspace to use gait!');
         return; // No workspace folder open
     }
 
     const workspacePath = workspaceFolders[0].uri.fsPath;
     const filePath = event.document.uri.fsPath;
+
 
     if (!filePath.startsWith(workspacePath)) {
         console.log(`File ${filePath} is not in the workspace directory`);
@@ -90,7 +101,7 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent, stateRead
     const isCursorMoved = lastCursorPosition && !lastCursorPosition.isEqual(currentCursorPosition);
 
     // Check if changes are AI-generated
-    const isAIChange = changes.some(change => change.text.length > 3 && !isCursorMoved); // Example threshold for AI-generated change
+    const isAIChange = changes.some(change => change.text.length > 5 && !isCursorMoved); // Example threshold for AI-generated change
     // Check if the change is not from clipboard paste
     const clipboardContent = await vscode.env.clipboard.readText();
     const isClipboardPaste = changes.some(change => change.text === clipboardContent);
@@ -114,7 +125,7 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
         const lastChange = changeQueue[changeQueue.length - 1];
         const currentTime = Date.now();
         
-        if (currentTime - lastChange.timestamp > 1000) {
+        if (currentTime - lastChange.timestamp > 1500) {
             // Print out the changeQueue
             //console.log("Current changeQueue:");
             changeQueue.forEach((change, index) => {
@@ -258,10 +269,28 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
+    const firstTime = context.globalState.get('firstTime', true);
+    if (firstTime) {
+        // Mark that it's no longer the first time
+        context.globalState.update('firstTime', false);
+        posthog.capture('user_download');
+
+        // Open the welcome markdown file
+        const welcomeFile = vscode.Uri.joinPath(context.extensionUri, 'resources', 'welcome.md');
+        vscode.commands.executeCommand('markdown.showPreview', welcomeFile);
+    }
+    
     const tool: TOOL = checkTool();
     // Set panelChatMode in extension workspaceStorage
     const panelChatMode = "OnlyMatchedChats";
     context.workspaceState.update('panelChatMode', panelChatMode);
+
+
+    posthog.capture('activate_extension', {
+        tool: tool,
+    });
+
+
 
     generateKeybindings(context, tool);
 
@@ -273,12 +302,14 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No workspace folder found. Extension activation failed.');
         return;
     }
+
     try {
         createGaitFolderIfNotExists(workspaceFolder);
     } catch (error) {
         console.log("Error creating .gait folder", error);
     }
-
+    identifyUser(context);
+    identifyRepo(context);
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
     writeStashedState(context, readStashedStateFromFile());
@@ -293,15 +324,6 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     //console.log('WebviewViewProvider registered for', PanelViewProvider.viewType);
-
-    const updateSidebarCommand = vscode.commands.registerCommand('gait-copilot.updateSidebar', async () => {
-        vscode.window.showInformationMessage('Updating sidebar content');
-        try {
-            provider.updateContent();
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error updating sidebar: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    });
 
     const inlineChatStartOverride = vscode.commands.registerCommand('gait-copilot.startInlineChat', () => {
         // Display an information message
@@ -363,6 +385,7 @@ export function activate(context: vscode.ExtensionContext) {
             const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
             fs.writeFileSync(filePath, markdownContent, 'utf8');
             if (continue_chat){
+                posthog.capture('continue_chat');
                 await vscode.workspace.openTextDocument(filePath);
                 await vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(filePath));
                 await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup');
@@ -385,20 +408,25 @@ export function activate(context: vscode.ExtensionContext) {
     const toggleDecorationsCommand = vscode.commands.registerCommand('gait-copilot.toggleDecorations', () => {
         decorationsActive = !decorationsActive;
         if (decorationsActive) {
+            posthog.capture('activate_decorations', {
+                time_deactivated: Date.now() - timeOfLastDecorationChange,
+            });
+            timeOfLastDecorationChange = Date.now();
             debouncedRedecorate(context);
             vscode.window.showInformationMessage('Gait context activated.');
         } else {
+            posthog.capture('deactivate_decorations');
             if (disposibleDecorations) {
+                timeOfLastDecorationChange = Date.now();
+                posthog.capture('deactivate_decorations', {
+                    time_activated: Date.now() - timeOfLastDecorationChange,
+                });
                 disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
                 disposibleDecorations.hoverProvider.dispose();
                 disposibleDecorations = undefined;
             }
             vscode.window.showInformationMessage('Gait context deactivated.');
         }
-    });
-
-    const handleMergeCommand = vscode.commands.registerCommand('gait-copilot.handleMerge', () => {
-        handleMerge(context);
     });
 
     try {
@@ -564,13 +592,11 @@ exit 0
     // Register all commands
     context.subscriptions.push(
         removePanelChatCommand,
-        updateSidebarCommand, 
         inlineChatStartOverride, 
         deleteInlineChatCommand, 
         openFileWithContentCommand,
         toggleDecorationsCommand,
         exportPanelChatsToMarkdownCommand,
-        handleMergeCommand,
     );
 
     debouncedRedecorate(context);

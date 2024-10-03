@@ -7,6 +7,8 @@ import { PanelChat } from './types';
 import { readStashedState, writeStashedState, removeMessageFromStashedState, removePanelChatFromStashedState, writeChatToStashedState } from './stashedState';
 import { panelChatsToMarkdown } from './markdown'; // Added import
 import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
+import posthog from 'posthog-js';
+import { identifyUser } from './identify_user';
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'gait-copilot.panelView';
@@ -220,7 +222,19 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken
     ) {
+        identifyUser(this._context);
+        posthog.capture('$pageview');
         this._view = webviewView;
+        // Add analytics for the number of inlineChats and panelChats saved
+        const stashedState = readStashedState(this._context);
+        const panelChatsCount = stashedState.panelChats.length;
+        const inlineChatsCount = stashedState.inlineChats.length;
+        
+        posthog.capture('panel_view_opened', {
+            panelChatsCount: panelChatsCount,
+            inlineChatsCount: inlineChatsCount,
+            repo: this._context.workspaceState.get('repoid')
+        });
 
         webviewView.webview.options = {
             enableScripts: true,
@@ -234,10 +248,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     this.updateContent();
                     break;
                 case 'deleteMessage':
+                    posthog.capture('delete_message');
                     this.handleDeleteMessage(message.id);
                     this.updateContent();
                     break;
                 case 'deletePanelChat':
+                    posthog.capture('delete_panelchat');
                     this.handleDeletePanelChat(message.id);
                     this.updateContent();
                     break;
@@ -252,10 +268,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'writeChatToStashedState': // New case for writing chat to stashed state
                     this.handleWriteChatToStashedState(message.panelChatId, message.messageId);
+                    posthog.capture('manual_stage');
                     this.updateContent();
                     break;                
                 case 'removePanelChatFromStashedState': // New case for removing panelChat from stashed state
                     this.handleRemovePanelChatFromStashedState(message.panelChatId);
+                    posthog.capture('manual_unstage');
                     this.updateContent();
                     break;
                 case 'removeMessageFromStashedState': // New case for removing message from stashed state
@@ -391,6 +409,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys getNextSurveyStep onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_vosMtvFFxCN470e8uHGDYCD6YuuSRSoFoZeLuciujry',{api_host:'https://us.i.posthog.com',})
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Git Commit History</title>

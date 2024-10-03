@@ -8,6 +8,7 @@ import { InlineChatInfo } from './inline';
 import { readStashedState } from './stashedState'; // Ensure this does not use gzip
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import posthog from 'posthog-js';
 
 const SCHEMA_VERSION = '1.0';
 
@@ -528,7 +529,7 @@ export async function getGitHistoryThatTouchesFile(
     } catch (error) {
         log(`Warning: Failed to process uncommitted changes: ${(error as Error).message}`, LogLevel.WARN);
     }
-
+    
     return {
         commits: allCommits,
         added: allAddedPanelChats.length > 0 ? added : null,
