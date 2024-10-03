@@ -126,7 +126,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
     }
 
     const baseName = vscode.workspace.asRelativePath(editor.document.uri);
-    if (baseName === 'gait_context.md') {
+    if (baseName === 'gait_context.md' || baseName === '.gait/state.json') {
         return;
     }
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
