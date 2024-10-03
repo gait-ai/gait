@@ -6,6 +6,7 @@ import { AIChangeMetadata, Context, MessageEntry, PanelChat, StashedState, State
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { FileDiff, InlineChatInfo } from '../inline';
+import posthog from 'posthog-js';
 
 function fnv1aHash(str: string): number {
     let hash = 2166136261; // FNV offset basis
@@ -134,6 +135,7 @@ export class VSCodeReader implements StateReader {
                 parent_inline_chat_id: null,
             };
             Inline.writeInlineChat(context, inlineChatInfoObj);
+            posthog.capture('vscode_inline_chat');
             vscode.window.showInformationMessage(`Recorded Inline Request - ${newChat}`);
         }
     }

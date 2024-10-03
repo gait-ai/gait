@@ -8,6 +8,7 @@ import { associateFileWithMessage } from './panelChats';
 import { MessageEntry, PanelChat, PanelMatchedRange, StashedState } from './types';
 import { readStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
+import posthog from 'posthog-js';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
 const colorHueMap: Record<ColorType, number> = {
@@ -296,12 +297,14 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                 const oldestRange = panelRanges.reduce((max, current) => 
                     current.panelChat.created_on < max.panelChat.created_on ? current : max
                 );
+                posthog.capture('panel_hover');
                 const hover = await PanelHover.createPanelHover(context, oldestRange, editor.document);
                 return hover;
             }
             const oldestRange = ranges.reduce((max, current) => 
                 current.inlineChat.timestamp < max.inlineChat.timestamp ? current : max
             );
+            posthog.capture('inline_hover');
             const hover = await InlineHover.createHover(context, oldestRange, editor.document);
             return hover;
         }
