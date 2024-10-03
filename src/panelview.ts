@@ -1171,6 +1171,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                 const panelChatInfo = document.createElement('div');
                                 panelChatInfo.className = 'panel-chat-info';
                                 panelChatInfo.innerHTML = \`
+                                    <strong>Author:</strong> \${escapeHtml(commit.author || 'Unknown')}<br>
                                     <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
                                     <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
                                 \`;
