@@ -1322,7 +1322,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         data-id="\${escapeHtml(panelChat.id)}" 
                                         title="Append to context"
                                     >
-                                        📄
+                                        ▶️
                                     </button>
                                 \`;
 
