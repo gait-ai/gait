@@ -280,7 +280,7 @@ export function activate(context: vscode.ExtensionContext) {
     const panelChatMode = "OnlyMatchedChats";
     context.workspaceState.update('panelChatMode', panelChatMode);
 
-
+    identifyUser();
     posthog.capture('activate_extension', {
         tool: tool,
     });
@@ -303,7 +303,6 @@ export function activate(context: vscode.ExtensionContext) {
     } catch (error) {
         console.log("Error creating .gait folder", error);
     }
-    identifyUser();
     identifyRepo(context);
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
