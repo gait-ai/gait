@@ -62,6 +62,8 @@ export function matchDiffToCurrentFile(
            .filter(line => line.trim().length > 0)
     );
 
+    const matchedLinesSet = new Set()
+
     if (addedLinesSet.size === 0) {
         return [];
     }
@@ -73,6 +75,7 @@ export function matchDiffToCurrentFile(
         const trimmedLine = documentLines[i].trim();
         if (addedLinesSet.has(trimmedLine)) {
             matchingLineNumbers.push(i);
+            matchedLinesSet.add(trimmedLine);
             lineOccurrences.set(trimmedLine, (lineOccurrences.get(trimmedLine) || 0) + 1);
         }
     }
@@ -84,6 +87,11 @@ export function matchDiffToCurrentFile(
                 return isMeaningfulLine(documentLines[line]) && lineOccurrences.get(trimmedLine) === 1;
             })
             .map(line => new vscode.Range(line, 0, line, documentLines[line].length));
+    }
+
+
+    if (addedLinesSet.size * 0.2 > matchedLinesSet.size) {
+        return [];
     }
 
     let start = -1;
@@ -104,7 +112,7 @@ export function matchDiffToCurrentFile(
             let meaningfulLines = 0;
             for (let j = start; j <= end; j++) {
                 const line = documentLines[j].trim();
-                if (/[a-zA-Z0-9]/.test(line)) {
+                if (isMeaningfulLine(line)) {
                     meaningfulLines++;
                 }
             }
