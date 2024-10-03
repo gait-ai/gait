@@ -9,6 +9,7 @@ import { panelChatsToMarkdown } from './markdown'; // Added import
 import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 import posthog from 'posthog-js';
 import { identifyUser } from './identify_user';
+import { InlineChatInfo, removeInlineChat } from './inline'; 
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'gait-copilot.panelView';
@@ -162,6 +163,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         console.log(`Removing message with ID ${messageId} from stashed state.`);
         removeMessageFromStashedState(this._context, messageId);
     }
+    
+    private async handleDeleteInlineChat(inlineChatId: string) {
+        console.log(`Removing inlineChat with ID ${inlineChatId} from stashed state.`);
+        removeInlineChat(this._context, inlineChatId);
+    }
 
     private async handleWriteChatToStashedState(panelChatId?: string, messageId?: string) {
         if ((panelChatId && messageId) || (!panelChatId && !messageId)) {
@@ -278,6 +284,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'removeMessageFromStashedState': // New case for removing message from stashed state
                     this.handleRemoveMessageFromStashedState(message.messageId);
+                    this.updateContent();
+                    break;
+                case 'deleteInlineChat':
+                    this.handleDeleteInlineChat(message.id);
                     this.updateContent();
                     break;
                 case 'openFile':
@@ -688,6 +698,67 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             display: flex; /* or block, depending on your layout needs */
         }
 
+        /* Inline Chat Styles */
+        .inline-chats-container {
+            border: 1px solid var(--vscode-editorWidget-border);
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: var(--vscode-editor-inactiveSelectionBackground);
+        }
+
+        .inline-chats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .inline-chats-header:hover {
+            background-color: var(--vscode-editor-selectionBackground);
+        }
+
+        .inline-chats-details {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .inline-chat {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid var(--vscode-editorWidget-border);
+            border-radius: 5px;
+            background-color: var(--vscode-editor-background);
+        }
+
+        .inline-chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .inline-chat-header:hover {
+            background-color: var(--vscode-editor-selectionBackground);
+        }
+
+        .inline-chat-details {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .inline-chat-prompt {
+            margin-bottom: 5px;
+        }
+
+        .file-diff {
+            margin-left: 20px;
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 8px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+
 
         /* Override Prism.js styles if necessary */
         /* Example: Adjusting code block background */
@@ -866,6 +937,47 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             });
         }
 
+       /**
+         * Attaches click listeners to inline chat headers to toggle visibility of inline chat details.
+         */
+        function attachInlineChatToggleListeners() {
+            const inlineChatsHeaders = document.querySelectorAll('.inline-chats-header');
+            inlineChatsHeaders.forEach(header => {
+                header.addEventListener('click', () => {
+                    const details = header.nextElementSibling;
+                    if (details) {
+                        if (details.style.display === 'block') {
+                            details.style.display = 'none';
+                            isInlineChatsExpanded = false;
+                        } else {
+                            details.style.display = 'block';
+                            Prism.highlightAll();
+                            isInlineChatsExpanded = true;
+                        }
+                    }
+                });
+            });
+
+            const inlineChatHeaders = document.querySelectorAll('.inline-chat-header');
+            inlineChatHeaders.forEach(header => {
+                header.addEventListener('click', () => {
+                    const details = header.nextElementSibling;
+                    if (details) {
+                        if (details.style.display === 'block') {
+                            details.style.display = 'none';
+                        } else {
+                            details.style.display = 'block';
+                            const codeBlocks = details.querySelectorAll('pre code');
+                            console.log('Found code blocks in inline chat:', codeBlocks);
+                            codeBlocks.forEach((block) => {
+                                Prism.highlightElement(block);
+                            });
+                        }
+                    }
+                });
+            });
+        }
+
         /**
          * Attaches click listeners to delete, write, and remove buttons to handle respective actions.
          */
@@ -963,6 +1075,19 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     }
                 });
             });
+            // Inline Chat Delete Buttons
+            const deleteInlineChatButtons = document.querySelectorAll('.delete-inlinechat-button');
+            deleteInlineChatButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Prevent triggering the inline chat toggle
+                    const inlineChatId = button.getAttribute('data-id');
+                    if (inlineChatId) {
+                        showConfirmationModal('inlineChat', inlineChatId);
+                    } else {
+                        console.warn('Delete InlineChat button clicked without a valid InlineChat ID.');
+                    }
+                });
+            });
         }
 
         /**
@@ -989,6 +1114,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 } else if (type === 'panelChat') {
                     //console.log('Sending deletePanelChat command for ID: ' + id);
                     vscode.postMessage({ command: 'deletePanelChat', id: id });
+                } else if (type === 'inlineChat') {
+                    vscode.postMessage({ command: 'deleteInlineChat', id: id });
                 }
                 // Hide the modal after action
                 modal.classList.remove('visible');
@@ -1033,6 +1160,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         let scrollPosition = 0;
         let expandedCommits = new Set();
         let expandedPanelChats = new Set(); // New Set to track expanded panel chats
+        let expandedInlineChats = new Set(); // New Set to track expanded inline chats
+        let isInlineChatsExpanded = false; // New flag to track the expanded state of inline chats
+
 
         function saveScrollPosition() {
             scrollPosition = document.scrollingElement.scrollTop;
@@ -1090,6 +1220,45 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             });
         }
 
+         function saveExpandedInlineChats() {
+            expandedInlineChats.clear();
+            document.querySelectorAll('.inline-chat-details').forEach((details, index) => {
+                const header = details.previousElementSibling;
+                const inlineChatId = header.getAttribute('data-id');
+                if (details.style.display === 'block' && inlineChatId) {
+                    expandedInlineChats.add(inlineChatId);
+                }
+            });
+        }
+
+        /**
+         * Restores the expanded state of inline chats.
+         */
+        function restoreExpandedInlineChats() {
+            document.querySelectorAll('.inline-chat-details').forEach((details) => {
+                const header = details.previousElementSibling;
+                const inlineChatId = header.getAttribute('data-id');
+                if (inlineChatId && expandedInlineChats.has(inlineChatId)) {
+                    details.style.display = 'block';
+                }
+            });
+        }
+
+
+        /**
+         * Restores the expansion state of the top-level inline chats container.
+         */
+        function restoreInlineChatsExpandedState() {
+            const inlineChatsDetails = document.querySelector('.inline-chats-details');
+            if (inlineChatsDetails) {
+                if (isInlineChatsExpanded) {
+                    inlineChatsDetails.style.display = 'block';
+                } else {
+                    inlineChatsDetails.style.display = 'none';
+                }
+            }
+        }
+
         /**
          * Handles incoming messages from the extension backend.
          */
@@ -1099,6 +1268,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 saveScrollPosition();
                 saveExpandedCommits();
                 saveExpandedPanelChats(); // Save expanded panel chats
+                saveExpandedInlineChats(); // Save expanded inline chats
 
                 const contentElement = document.getElementById('content');
                 contentElement.innerHTML = ''; // Clear existing content
@@ -1331,6 +1501,73 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                             commitDetails.appendChild(noPanelChats);
                         }
 
+                        // Populate Inline Chats
+                        if (commit.inlineChats && commit.inlineChats.length > 0 && commit.commitHash === 'added') {
+                            // Create Inline Chats Container
+                            const inlineChatsContainer = document.createElement('div');
+                            inlineChatsContainer.className = 'inline-chats-container';
+
+                            // Inline Chats Header
+                            const inlineChatsHeader = document.createElement('div');
+                            inlineChatsHeader.className = 'inline-chats-header';
+                            inlineChatsHeader.innerHTML = \`
+                                <h4>Inline Chats</h4>
+                            \`;
+                            inlineChatsContainer.appendChild(inlineChatsHeader);
+
+                            // Inline Chats Details
+                            const inlineChatsDetails = document.createElement('div');
+                            inlineChatsDetails.className = 'inline-chats-details';
+                            inlineChatsDetails.style.display = 'none'; // Initially collapsed
+                            inlineChatsContainer.appendChild(inlineChatsDetails);
+
+                            // Iterate through each inline chat
+                            commit.inlineChats.forEach(inlineChat => {
+                                // Create Inline Chat Container
+                                const inlineChatDiv = document.createElement('div');
+                                inlineChatDiv.className = 'inline-chat';
+
+                                // Inline Chat Header
+                                const inlineChatHeader = document.createElement('div');
+                                inlineChatHeader.className = 'inline-chat-header';
+                                inlineChatHeader.setAttribute('data-id', \`\${inlineChat.inline_chat_id}\`);
+                                inlineChatHeader.innerHTML = \`
+                                    <span>\${escapeHtml(inlineChat.prompt)}</span>
+                                    <div>
+                                        <button class="delete-inlinechat-button" data-id="\${escapeHtml(inlineChat.inline_chat_id)}" title="Delete Inline Chat">🗑️</button>
+                                    </div>
+                                \`;
+                                inlineChatDiv.appendChild(inlineChatHeader);
+
+                                // Inline Chat Details
+                                const inlineChatDetails = document.createElement('div');
+                                inlineChatDetails.className = 'inline-chat-details';
+
+                                // Prompt
+                                const promptDiv = document.createElement('div');
+                                promptDiv.className = 'inline-chat-prompt';
+                                promptDiv.innerHTML = \`<strong>Prompt:</strong> \${escapeHtml(inlineChat.prompt)}\`;
+                                inlineChatDetails.appendChild(promptDiv);
+
+                                // File Diffs
+                                if (inlineChat.file_diff && inlineChat.file_diff.length > 0) {
+                                    inlineChat.file_diff.forEach(file_diff => {
+                                        const diffDiv = document.createElement('div');
+                                        diffDiv.className = 'file-diff';
+                                        diffDiv.innerHTML = \`
+                                            <strong>File:</strong> \${escapeHtml(file_diff.file_path)}<br>
+                                            <pre><code class="language-diff">\${file_diff.diffs.map(diff => escapeHtml(diff.value)).join('')}</code></pre>
+                                        \`;
+                                        inlineChatDetails.appendChild(diffDiv);
+                                    });
+                                }
+
+                                inlineChatDiv.appendChild(inlineChatDetails);
+                                inlineChatsDetails.appendChild(inlineChatDiv);
+                            });
+
+                            commitDetails.appendChild(inlineChatsContainer);
+                        }
                         commitDiv.appendChild(commitDetails);
                         contentElement.appendChild(commitDiv);
                     });
@@ -1345,6 +1582,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     attachButtonListeners();
 
                     attachLinkListeners();
+
+                    attachInlineChatToggleListeners();
                 } else {
                     const noCommits = document.createElement('div');
                     noCommits.className = 'no-commits';
@@ -1355,6 +1594,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 // After updating the content
                 restoreExpandedCommits();
                 restoreExpandedPanelChats(); // Restore expanded panel chats
+                restoreExpandedInlineChats();
+                restoreInlineChatsExpandedState(); // Restore expanded inline chats state
                 restoreScrollPosition();
                 Prism.highlightAll();
             }

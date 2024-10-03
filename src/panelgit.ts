@@ -205,6 +205,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     const parsedCurrent = readStashedState(context); 
     const { currentMessageIds, currentPanelChatIds, currentInlineChatIds } = aggregateCurrentIds(parsedCurrent);
     const seenMessageIds: Set<string> = new Set();
+    const seenInlineChatIds: Set<string> = new Set();
 
     // Step 2: Get the commit history for the file with --follow to track renames
     const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
@@ -265,6 +266,10 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
         }
 
+        // Add all inline chat ids from parsedContent to the seenInlineChats set
+        parsedContent.inlineChats.forEach(inlineChat => {
+            seenInlineChatIds.add(inlineChat.inline_chat_id);
+        });
         // Process the commit's panelChats and inlineChats
         processCommit(parsedContent, currentMessageIds, currentInlineChatIds, seenMessageIds, commitData, commitHash);
     }
@@ -293,7 +298,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
 
     const added: UncommittedData = {
         panelChats: allAddedPanelChats,
-        inlineChats: parsedCurrent.inlineChats.filter(ic => currentInlineChatIds.has(ic.inline_chat_id))
+        inlineChats: parsedCurrent.inlineChats.filter(ic => currentInlineChatIds.has(ic.inline_chat_id) && !seenInlineChatIds.has(ic.inline_chat_id))
     };
 
     // Step 4: Handle uncommitted changes
@@ -331,7 +336,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
 
     return {
         commits: allCommits,
-        added: allAddedPanelChats.length > 0 ? added : null,
+        added,
         uncommitted
     };
 }
