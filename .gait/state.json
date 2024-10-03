@@ -1107,7 +1107,8 @@
     "deletedMessageIDs": [],
     "deletedPanelChatIDs": [
       "a488df93-c80e-4a81-87ce-beec2330150e",
-      "b218a37d-e155-4b81-aaa1-e6f58f48aadb"
+      "b218a37d-e155-4b81-aaa1-e6f58f48aadb",
+      "e7f59633-27d4-4a56-a3ae-237dc29c3772"
     ]
   },
   "kv_store": {}

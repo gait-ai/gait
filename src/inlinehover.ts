@@ -69,18 +69,8 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
         filePath: vscode.workspace.asRelativePath(document.uri),
         inline_chat_id: inlineChat.inline_chat_id
     }))}`);
-    const before_content = matchingDiff.diffs.filter(diff => !diff.added).map(diff => diff.value).join('\n');
-
-    const openFileCommand = vscode.Uri.parse(`command:gait-copilot.openFileWithContent?${encodeURIComponent(JSON.stringify({
-        content: before_content,
-        title: `${path.basename(matchingDiff.file_path)} (at prompt time)`,
-        languageId: vscode.window.activeTextEditor?.document.languageId,
-        selectionStart: inlineChat.selection?.startSelection,
-        selectionEnd: inlineChat.selection?.endSelection
-    }))}`);
     
-    markdown.appendMarkdown(`[View File at Prompt Time](${openFileCommand}) | ` +
-                          `[Delete This Inline Chat Annotation](${deleteCommand})`);
+    markdown.appendMarkdown(`[Delete This Inline Chat Annotation](${deleteCommand})`);
     if (parent_inline_chat_id) {
         // Load the parent inline chat
         const parentInlineChat = getInlineParent(context, parent_inline_chat_id);
