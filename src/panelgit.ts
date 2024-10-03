@@ -469,71 +469,10 @@ export async function getGitHistoryThatTouchesFile(
 
     log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
 
-    // Step 3: Aggregate uncommitted added content
-    const allAddedPanelChats: PanelChat[] = parsedCurrent.panelChats
-        .filter(pc => !parsedCurrent.deletedChats.deletedPanelChatIDs.includes(pc.id))
-        .map(pc => ({
-            ...pc,
-            messages: pc.messages.filter(msg => 
-                !parsedCurrent.deletedChats.deletedMessageIDs.includes(msg.id) && 
-                !seenMessageIds.has(msg.id)
-            )
-        }))
-        .filter(pc => pc.messages.length > 0);
-
-    const added: UncommittedData = {
-        panelChats: allAddedPanelChats,
-        inlineChats: parsedCurrent.inlineChats.filter(ic => currentInlineChatIds.has(ic.inline_chat_id))
-    };
-
-    // Step 4: Check for uncommitted changes
-    let uncommitted: UncommittedData | null = null;
-    try {
-        const status = await git.status();
-        const isModified = [
-            status.modified,
-            status.not_added,
-            status.created
-        ].some(list => list.includes(targetFilePath));
-
-        if (isModified) {
-            log(`File ${targetFilePath} is modified. Processing uncommitted changes.`, LogLevel.INFO);
-
-            const currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
-
-            if (!Array.isArray(currentUncommittedContent) || !currentUncommittedContent.every(isPanelChat)) {
-                throw new Error('Parsed content does not match PanelChat structure.');
-            }
-
-            const allCurrentPanelChats: PanelChat[] = currentUncommittedContent
-                .filter(pc => !parsedCurrent.deletedChats.deletedPanelChatIDs.includes(pc.id))
-                .map(pc => ({
-                    ...pc,
-                    messages: pc.messages.filter(msg => 
-                        !parsedCurrent.deletedChats.deletedMessageIDs.includes(msg.id) && 
-                        !seenMessageIds.has(msg.id)
-                    )
-                }))
-                .filter(pc => pc.messages.length > 0);
-
-            if (allCurrentPanelChats.length > 0) {
-                uncommitted = {
-                    panelChats: allCurrentPanelChats,
-                    inlineChats: []
-                };
-                log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`, LogLevel.INFO);
-            } else {
-                log("No uncommitted new panelChats found.", LogLevel.INFO);
-            }
-        }
-    } catch (error) {
-        log(`Warning: Failed to process uncommitted changes: ${(error as Error).message}`, LogLevel.WARN);
-    }
-    
     return {
         commits: allCommits,
-        added: allAddedPanelChats.length > 0 ? added : null,
-        uncommitted
+        added: null,
+        uncommitted: null
     };
 }
 
