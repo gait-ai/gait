@@ -170,8 +170,6 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                     const diffs = diffLines(before, after);
                     fileDiffs.push({
                         file_path: filePath,
-                        before_content: before,
-                        after_content: after,
                         diffs: diffs,
                     });
                 } catch (error) {
@@ -358,7 +356,6 @@ export function activate(context: vscode.ExtensionContext) {
                 language: args.languageId // You can change this to match the content type
             }).then((document) => vscode.window.showTextDocument(document, {
                 preview: false, // This will open the document in preview mode
-                selection: new vscode.Selection(args.selectionStart, args.selectionEnd)
             }));
 
             vscode.window.showInformationMessage(`Opened new file: ${args.title}`);

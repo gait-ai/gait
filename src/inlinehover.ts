@@ -69,8 +69,10 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
         filePath: vscode.workspace.asRelativePath(document.uri),
         inline_chat_id: inlineChat.inline_chat_id
     }))}`);
+    const before_content = matchingDiff.diffs.filter(diff => !diff.added).map(diff => diff.value).join('\n');
+
     const openFileCommand = vscode.Uri.parse(`command:gait-copilot.openFileWithContent?${encodeURIComponent(JSON.stringify({
-        content: matchingDiff.before_content,
+        content: before_content,
         title: `${path.basename(matchingDiff.file_path)} (at prompt time)`,
         languageId: vscode.window.activeTextEditor?.document.languageId,
         selectionStart: inlineChat.selection?.startSelection,

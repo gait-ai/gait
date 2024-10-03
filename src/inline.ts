@@ -19,8 +19,6 @@ export interface InlineStartInfo {
 
 export interface FileDiff {
     file_path: string;
-    before_content: string;
-    after_content: string;
     diffs: Diff.Change[];
 }
 
@@ -95,8 +93,6 @@ export function InlineStartToInlineChatInfo(inlineStartInfo: InlineStartInfo, af
         inline_chat_id: uuidv4(),
         file_diff: [{
             file_path: inlineStartInfo.fileName,
-            before_content: inlineStartInfo.content,
-            after_content: after_content,
             diffs: diffLines(inlineStartInfo.content, after_content)
         }],
         selection: {
@@ -147,8 +143,6 @@ function isFileDiff(obj: any): obj is FileDiff {
         obj !== null &&
         typeof obj === 'object' &&
         typeof obj.file_path === 'string' &&
-        typeof obj.before_content === 'string' &&
-        typeof obj.after_content === 'string' &&
         Array.isArray(obj.diffs) &&
         obj.diffs.every(isDiffChange)
     );
