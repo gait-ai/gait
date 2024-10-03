@@ -54,8 +54,13 @@ export async function createPanelHover(context: vscode.ExtensionContext, matched
     }
 
     markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
-    const markdownData = [{commit: idToCommitInfo?.get(message.id), panelChat: panelChat}];
 
+    if (commitInfo) {
+        commitInfo.inlineChats =[];
+        commitInfo.panelChats =[];
+    }
+
+    const markdownData = [{commit: commitInfo, panelChat: panelChat}];
     const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
  
     const continueCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(
