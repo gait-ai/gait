@@ -222,7 +222,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken
     ) {
-        identifyUser(this._context);
+        identifyUser();
         posthog.capture('$pageview');
         this._view = webviewView;
         // Add analytics for the number of inlineChats and panelChats saved
