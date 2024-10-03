@@ -4,7 +4,7 @@ import simpleGit, { SimpleGit } from 'simple-git';
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 
-export async function identifyUser(context: vscode.ExtensionContext): Promise<void> {
+export async function identifyUser(): Promise<void> {
     const git: SimpleGit = simpleGit();
     
     try {

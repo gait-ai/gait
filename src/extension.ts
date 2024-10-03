@@ -303,7 +303,7 @@ export function activate(context: vscode.ExtensionContext) {
     } catch (error) {
         console.log("Error creating .gait folder", error);
     }
-    identifyUser(context);
+    identifyUser();
     identifyRepo(context);
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
@@ -621,6 +621,9 @@ exit 0
                 if (await stateReader.matchPromptsToDiff()) {
                     debouncedRedecorate(context);
                 }
+            }
+            if (triggerAcceptCount % 4000 === 0) {
+                identifyUser();
                 triggerAcceptCount = 0;
             }
         } catch (error) {
