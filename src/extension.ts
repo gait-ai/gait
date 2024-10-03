@@ -76,6 +76,7 @@ function getFileContent(file_path: string): string {
  */
 async function handleFileChange(event: vscode.TextDocumentChangeEvent) {
     const changes = event.contentChanges;
+    
     const editor = vscode.window.activeTextEditor;
     // Check if the file is in the workspace directory
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -114,6 +115,12 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent) {
             timestamp,
             document_content: getFileContent(event.document.uri.fsPath),
         });
+        changes.forEach((change, index) => {
+            console.log(`Change ${index + 1}:`);
+            console.log(`  Range: ${change.range.start.line}:${change.range.start.character} - ${change.range.end.line}:${change.range.end.character}`);
+            console.log(`  Text: ${change.text}`);
+        });
+
     }
     const file_path: string = getRelativePath(event.document);
     fileState[file_path] = event.document.getText();
@@ -124,22 +131,14 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
     if (changeQueue.length > 0) {
         const lastChange = changeQueue[changeQueue.length - 1];
         const currentTime = Date.now();
-        
         if (currentTime - lastChange.timestamp > 1500) {
+
+            // Display cursor positions using vscode.window.showInformationMessage
+            const cursorPositions = changeQueue.map((change, index) => 
+                `${change.cursor_position.line}:${change.cursor_position.character}`
+            );
+            
             // Print out the changeQueue
-            //console.log("Current changeQueue:");
-            changeQueue.forEach((change, index) => {
-                //console.log(`Change ${index + 1}:`);
-                //console.log(`  Cursor Position: ${change.cursor_position.line}:${change.cursor_position.character}`);
-                //console.log(`  Document URI: ${change.document_uri}`);
-                //console.log(`  Timestamp: ${new Date(change.timestamp).toISOString()}`);
-                //console.log(`  Changes:`);
-                change.changes.forEach((c, i) => {
-                    //console.log(`    Change ${i + 1}:`);
-                    //console.log(`      Range: ${c.range.start.line}:${c.range.start.character} - ${c.range.end.line}:${c.range.end.character}`);
-                    //console.log(`      Text: ${c.text}`);
-                });
-            });
             // Get the file content for each changed file
             const changedFiles = new Set(changeQueue.map(change => change.document_uri));
 
@@ -199,16 +198,17 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                     changeStartPosition = new vscode.Position(linesBefore, 0);
                 }
             }
-            let inlineChatStart = undefined;
-            if (lastInlineChatStart && fileDiffs.length === 1 && changeStartPosition) {
-                if (lastInlineChatStart.fileName === fileDiffs[0].file_path &&
-                    currentTime - new Date(lastInlineChatStart.startTimestamp).getTime() < 60000 &&
-                    changeStartPosition.line >= lastInlineChatStart.startSelection.line &&
-                    changeStartPosition.line <= lastInlineChatStart.startSelection.line + 10) {
-                    inlineChatStart = lastInlineChatStart;
-                } else {
-                    lastInlineChatStart = null;
+            let inlineChatStart: Inline.InlineStartInfo | undefined = undefined; 
+            const inlineData:Inline.InlineStartInfo | null = context.workspaceState.get('lastInlineChatStart')?? lastInlineChatStart;
+            if (inlineData && fileDiffs.length === 1 && changeStartPosition) {
+                if (inlineData.fileName === fileDiffs[0].file_path &&
+                    currentTime - new Date(inlineData.startTimestamp).getTime() < 60000 &&
+                    changeStartPosition.line >= inlineData.startSelection.line &&
+                    changeStartPosition.line <= inlineData.startSelection.line + 10) {
+                    inlineChatStart = inlineData;
                 }
+                context.workspaceState.update('lastInlineChatStart', null);
+                lastInlineChatStart = null;
             }
             
             const metadata: AIChangeMetadata = {
@@ -216,9 +216,6 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                 inlineChatStartInfo: inlineChatStart,
             };
             console.log("Accepting AI change: ", fileDiffs);
-            if (inlineChatStart){
-                vscode.window.showInformationMessage("Inline AI change detected");
-            }
             stateReader.pushFileDiffs(fileDiffs, metadata);
         }
     }
@@ -343,6 +340,7 @@ export function activate(context: vscode.ExtensionContext) {
             stateReader.startInline(inlineStartInfo).catch((error) => {
                 vscode.window.showErrorMessage(`Failed to initialize extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
             });
+            context.workspaceState.update('lastInlineChatStart', inlineStartInfo);
             lastInlineChatStart = inlineStartInfo;
         }
         vscode.commands.executeCommand(startInlineCommand);
@@ -425,6 +423,9 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage('Gait context deactivated.');
         }
     });
+
+    // Make sure to clear the interval when the extension is deactivated
+
 
     try {
         const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);

@@ -5,3 +5,4 @@ dist
 /venv/
 gait_context.md
 .gait/custom-merge-driver.sh
+**/.DS_Store/**
