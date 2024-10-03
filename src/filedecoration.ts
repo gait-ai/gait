@@ -186,7 +186,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
         }];
 
         const existingDecoration = lineDecorations.get(line);
-        if (!existingDecoration || (timestamp < existingDecoration.timestamp)) {
+        if (!existingDecoration || (timestamp < existingDecoration.timestamp && type === 'inline') || (type === 'panel' && existingDecoration.type === 'panel')) {
             lineDecorations.set(line, { timestamp, decorationType, decorationOptions, type });
         }
     }
