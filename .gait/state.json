@@ -645,6 +645,67 @@
         }
       ],
       "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Overwriting System Keybindings in VS Code",
+      "id": "58eb7776-2f70-4961-b5d9-14d3826ba6c5",
+      "parent_id": null,
+      "created_on": "2024-10-03T07:35:14.181Z",
+      "messages": [
+        {
+          "id": "9558502f-be77-45a3-85fe-5c1fbbe1921a",
+          "messageText": "How do I overwrite a system keybinding?",
+          "responseText": "To overwrite a system keybinding in VS Code, you need to add a new keybinding with the same key combination but a different command, and use the `-` prefix for the command you want to overwrite. You've already done this in your `package.json` file for some keybindings. Here's an explanation of how to do it and where you've already implemented it:\n\n1. Identify the key combination and the command you want to overwrite.\n2. Add a new keybinding in the `keybindings` array of your `package.json` file.\n3. Use the same `key` as the system keybinding.\n4. Set the `command` to the new command you want to execute.\n5. Add another keybinding with the same `key`, but prefix the `command` with a `-` to remove the original keybinding.\n\nIn your current `package.json`, you've already done this for the `cmd+e` and `cmd+k` keybindings. Here's the relevant part of your configuration:\n\n```json:package.json\n\"keybindings\": [\n    {\n        \"key\": \"cmd+e\",\n        \"command\": \"aipopup.action.modal.generate\",\n        \"when\": \"editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible\"\n    },\n    {\n        \"key\": \"cmd+k\",\n        \"command\": \"-aipopup.action.modal.generate\",\n        \"when\": \"editorFocus && !composerBarIsVisible && !composerControlPanelIsVisible\"\n    },\n    {\n        \"key\": \"cmd+e\",\n        \"command\": \"composer.startComposerPrompt\",\n        \"when\": \"composerIsEnabled\"\n    },\n    {\n        \"key\": \"cmd+k\",\n        \"command\": \"-composer.startComposerPrompt\",\n        \"when\": \"composerIsEnabled\"\n    },\n    {\n        \"command\": \"gait-copilot.startInlineChat\",\n        \"key\": \"cmd+k\",\n        \"when\": \"editorFocus\"\n    },\n    // ...\n]\n```\n\nIn this configuration:\n- `cmd+e` is overwritten to trigger `aipopup.action.modal.generate` or `composer.startComposerPrompt` depending on the context.\n- `cmd+k` is overwritten to trigger `gait-copilot.startInlineChat` when the editor has focus.\n\nThe `-` prefix is used in the second and fourth keybindings to remove the original commands associated with `cmd+k`.\n\nIf you want to overwrite any other system keybinding, you can follow the same pattern:\n\n1. Add a new keybinding with your desired command.\n2. Add another keybinding with the same key, but prefix the command with `-` to remove the original binding.\n\nRemember to consider the `when` clause to specify the context in which the keybinding should be active.",
+          "model": "claude-3.5-sonnet",
+          "timestamp": "2024-10-03T07:35:14.181Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "d4cc37f4-ef49-4811-b4cd-eba18b7c4d13",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/package.json",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/package.json",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {
+            "file_paths": [
+              "package.json"
+            ]
+          }
+        },
+        {
+          "id": "731f9833-030d-429c-97bd-852f7b08f8c8",
+          "messageText": "I want to remap tab off of accept inline edit",
+          "responseText": "Certainly! To remap the \"Tab\" key so it no longer accepts inline edits, you'll need to override the existing keybinding for the `acceptSelectedSuggestion` command. Here's how you can do that in your `package.json` file:\n\n```json:package.json\n\"keybindings\": [\n  // ... existing keybindings ...\n  {\n    \"key\": \"tab\",\n    \"command\": \"-acceptSelectedSuggestion\",\n    \"when\": \"suggestWidgetVisible && textInputFocus\"\n  },\n  // ... other keybindings ...\n]\n```\n\nThis keybinding configuration does the following:\n\n1. It targets the \"Tab\" key with `\"key\": \"tab\"`.\n2. The `\"-\"` before the command name (`\"-acceptSelectedSuggestion\"`) tells VS Code to remove this specific keybinding.\n3. The `when` clause ensures this only applies when suggestions are visible and the text input has focus.\n\nAfter adding this to your `keybindings` array in `package.json`, the \"Tab\" key will no longer accept inline suggestions.\n\nIf you want to assign a different key for accepting suggestions, you can add another keybinding. For example, if you want to use \"Enter\" instead:\n\n```json:package.json\n\"keybindings\": [\n  // ... existing keybindings ...\n  {\n    \"key\": \"tab\",\n    \"command\": \"-acceptSelectedSuggestion\",\n    \"when\": \"suggestWidgetVisible && textInputFocus\"\n  },\n  {\n    \"key\": \"enter\",\n    \"command\": \"acceptSelectedSuggestion\",\n    \"when\": \"suggestWidgetVisible && textInputFocus\"\n  },\n  // ... other keybindings ...\n]\n```\n\nThis will remove the \"Tab\" keybinding for accepting suggestions and assign it to the \"Enter\" key instead.\n\nRemember to reload your VS Code window or restart the extension for these changes to take effect.",
+          "model": "claude-3.5-sonnet",
+          "timestamp": "2024-10-03T07:35:14.181Z",
+          "context": [],
+          "kv_store": {}
+        },
+        {
+          "id": "5455839f-84a9-4667-ac94-08420d79c287",
+          "messageText": "When testing this, the old commands that I ahve tried to remove are still in the view, and are called instead of the new commands, why?",
+          "responseText": "The issue you're experiencing, where the old commands are still being called instead of the new ones, could be due to a few reasons:\n\n1. Command precedence: VS Code has a complex system for determining which command to run when multiple are bound to the same key. System commands or commands from other extensions might take precedence.\n\n2. Incorrect `when` clause: The context in which the keybinding is active might not be exactly what you expect.\n\n3. Caching: VS Code might be caching the old keybindings.\n\n4. Extension not reloaded: If you're developing an extension, changes to `package.json` often require a full reload of VS Code.\n\nLet's try to address this systematically:\n\n1. First, let's modify your keybindings to be more specific and forceful:\n\n```json:package.json\n\"keybindings\": [\n  // ... other keybindings ...\n  {\n    \"key\": \"tab\",\n    \"command\": \"-editor.action.inlineEdit.accept\",\n    \"when\": \"inlineEditVisible || inlineSuggestionVisible\"\n  },\n  {\n    \"key\": \"tab\",\n    \"command\": \"-editor.action.inlineSuggest.commit\",\n    \"when\": \"inlineSuggestionVisible && !editorTabMovesFocus\"\n  },\n  {\n    \"key\": \"tab\",\n    \"command\": \"gait-copilot.stopAIAcceptEdit\",\n    \"when\": \"inlineEditVisible || inlineSuggestionVisible\"\n  },\n  {\n    \"key\": \"tab\",\n    \"command\": \"gait-copilot.stopAIAcceptSuggestion\",\n    \"when\": \"inlineSuggestionVisible && !editorTabMovesFocus\"\n  }\n  // ... other keybindings ...\n]\n```\n\nThese keybindings explicitly remove the default Tab behaviors for inline edits and suggestions, and then add your custom commands.\n\n2. After making these changes, try the following:\n\n   a. Completely close VS Code.\n   b. Delete the `.vscode` folder in your user directory (make sure to backup any custom settings first).\n   c. Reopen VS Code and your project.\n\n3. If the issue persists, you can check which command is actually being triggered by the Tab key:\n\n   a. Open the Command Palette (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux).\n   b. Type \"Developer: Toggle Keyboard Shortcuts Troubleshooting\".\n   c. Press Tab in the context where you expect your custom command to run.\n   d. Check the developer console (Help > Toggle Developer Tools) for logs about which command was triggered.\n\n4. If you're still having issues, you can try defining your keybindings in the user `keybindings.json` file instead of `package.json`:\n\n   a. Open the Command Palette.\n   b. Type \"Preferences: Open Keyboard Shortcuts (JSON)\".\n   c. Add your keybindings to this file.\n\nRemember, keybindings in `keybindings.json` take precedence over those in `package.json`.\n\nIf none of these steps resolve the issue, please provide more details about exactly what happens when you press Tab, and any relevant log messages from the developer console. This will help in further diagnosing the problem.",
+          "model": "claude-3.5-sonnet",
+          "timestamp": "2024-10-03T07:35:14.181Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "869aafd4-49bd-4c46-bddc-b97289fb4cc5",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/package.json",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/package.json",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {}
+        }
+      ],
+      "kv_store": {}
     }
   ],
   "inlineChats": [
@@ -2099,7 +2160,8 @@
     "deletedPanelChatIDs": [
       "a488df93-c80e-4a81-87ce-beec2330150e",
       "b218a37d-e155-4b81-aaa1-e6f58f48aadb",
-      "e7f59633-27d4-4a56-a3ae-237dc29c3772"
+      "e7f59633-27d4-4a56-a3ae-237dc29c3772",
+      "58eb7776-2f70-4961-b5d9-14d3826ba6c5"
     ]
   },
   "kv_store": {}

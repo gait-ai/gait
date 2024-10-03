@@ -28,7 +28,7 @@
             "activitybar": [
                 {
                     "id": "gait-copilot",
-                    "title": "Gait Copilot",
+                    "title": "Gait",
                     "icon": "resources/sidebar-icon.svg"
                 }
             ]
