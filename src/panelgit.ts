@@ -328,15 +328,10 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             }))
             .filter(pc => pc.messages.length > 0);
 
-        if (allCurrentPanelChats.length > 0) {
             uncommitted = {
                 panelChats: allCurrentPanelChats,
                 inlineChats: []
             };
-            log(`Found ${allCurrentPanelChats.length} uncommitted new panelChats.`, LogLevel.INFO);
-        } else {
-            log("No uncommitted new panelChats found.", LogLevel.INFO);
-        }
     } catch (error) {
         log(`Warning: Failed to read current uncommitted content: ${(error as Error).message}`, LogLevel.WARN);
     }

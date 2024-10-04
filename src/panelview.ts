@@ -51,7 +51,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     const uncommittedCommit: CommitData = {
                         commitHash: 'added',
                         author: 'You',
-                        commitMessage: 'Added Changes',
+                        commitMessage: 'Staged Chats',
                         date: new Date(), // Current date and time
                         panelChats: gitHistory.added.panelChats, // Updated to use panelChats
                         inlineChats: gitHistory.added.inlineChats
@@ -64,7 +64,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     const uncommittedCommit: CommitData = {
                         commitHash: 'uncommitted',
                         author: 'You',
-                        commitMessage: 'Unadded Changes',
+                        commitMessage: 'Unstaged Chats',
                         date: new Date(), // Current date and time
                         panelChats: gitHistory.uncommitted.panelChats, // Updated to use panelChats
                         inlineChats: gitHistory.uncommitted.inlineChats
@@ -88,7 +88,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     const uncommittedCommit: CommitData = {
                         commitHash: 'added',
                         author: 'You',
-                        commitMessage: 'Added Changes',
+                        commitMessage: 'Staged Chats',
                         date: new Date(), // Current date and time
                         panelChats: gitHistory.added.panelChats, // Updated to use panelChats
                         inlineChats: gitHistory.added.inlineChats
@@ -101,7 +101,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     const uncommittedCommit: CommitData = {
                         commitHash: 'uncommitted',
                         author: 'You',
-                        commitMessage: 'Unadded Changes',
+                        commitMessage: 'Unstaged Chats',
                         date: new Date(), // Current date and time
                         panelChats: gitHistory.uncommitted.panelChats,
                         inlineChats: gitHistory.uncommitted.inlineChats
@@ -756,6 +756,21 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             overflow-x: auto;
         }
 
+        .commit-delineator {
+            margin: 20px 0;
+        }
+
+        .commit-delineator hr {
+            border: none;
+            border-top: 1px solid var(--vscode-editorWidget-border);
+        }
+
+        .commit-delineator h3 {
+            text-align: center;
+            color: var(--vscode-descriptionForeground);
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
 
         /* Override Prism.js styles if necessary */
         /* Example: Adjusting code block background */
@@ -1277,11 +1292,13 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
                         const isRegularCommit = commit.commitHash !== 'added' && commit.commitHash !== 'uncommitted';
 
-                        const commitMessage = isRegularCommit
-                        ? \`\${escapeHtml(commit.commitMessage)}\`
-                        : \`\${escapeHtml(commit.commitMessage)}\`;
+                        if (!isRegularCommit) {
+                            commitDiv.style.backgroundColor = 'var(--vscode-titleBar-activeBackground)';
+                        }
 
+                        const commitMessage = commit.commitMessage;
 
+                        console.log("Commit Message: ", commitMessage);
                         commitHeader.innerHTML = \`
                             <h3>\${escapeHtml(commitMessage)}</h3>
                             <span class="commit-date">\${new Date(commit.date).toLocaleString()}</span>
@@ -1561,6 +1578,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         }
                         commitDiv.appendChild(commitDetails);
                         contentElement.appendChild(commitDiv);
+
+                        if (commit.commitHash === 'added') {
+                            const delineator = document.createElement('div');
+                            delineator.className = 'commit-delineator';
+                            delineator.innerHTML = \`
+                                <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Commit History</h3>
+                                <hr style="border: 1px solid var(--vscode-editorWidget-border);">
+                            \`;
+                            contentElement.appendChild(delineator);
+                        }
                     });
 
                     // Attach event listeners for collapsible commits
