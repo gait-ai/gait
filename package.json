@@ -60,8 +60,8 @@
                 "category": "gait"
             },
             {
-                "command": "gait.toggleDecorations",
-                "title": "Toggle Decorations",
+                "command": "gait.toggleHover",
+                "title": "Toggle Hover",
                 "category": "gait"
             },
             {
@@ -103,7 +103,7 @@
             },
             {
                 "key": "cmd+shift+g",
-                "command": "gait.toggleDecorations"
+                "command": "gait.toggleHover"
             }
         ]
     },

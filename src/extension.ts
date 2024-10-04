@@ -115,23 +115,17 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent) {
             timestamp,
             document_content: getFileContent(event.document.uri.fsPath),
         });
-
     }
     const file_path: string = getRelativePath(event.document);
     fileState[file_path] = event.document.getText();
 }
 
-function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContext) {
+async function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContext) {
     // Check if there are changes in the queue
     if (changeQueue.length > 0) {
         const lastChange = changeQueue[changeQueue.length - 1];
         const currentTime = Date.now();
         if (currentTime - lastChange.timestamp > 1500) {
-
-            // Display cursor positions using vscode.window.showInformationMessage
-            const cursorPositions = changeQueue.map((change, index) => 
-                `${change.cursor_position.line}:${change.cursor_position.character}`
-            );
             
             // Print out the changeQueue
             // Get the file content for each changed file
@@ -146,6 +140,8 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
             changeQueue = [];
             // Get the current file content for each changed file
             const afterFileContents: { [key: string]: string } = {};
+            // Wait for 1 second
+            await new Promise(resolve => setTimeout(resolve, 1000));
             changedFiles.forEach(filePath => {
                 const document = vscode.workspace.textDocuments.find(doc => getRelativePath(doc) === filePath);
                 if (document) {
@@ -383,7 +379,7 @@ export function activate(context: vscode.ExtensionContext) {
         debouncedRedecorate(context);
     });
 
-    const toggleDecorationsCommand = vscode.commands.registerCommand('gait.toggleDecorations', () => {
+    const toggleHoverCommand = vscode.commands.registerCommand('gait.toggleHover', () => {
         decorationsActive = !decorationsActive;
         if (decorationsActive) {
             posthog.capture('activate_decorations', {
@@ -391,7 +387,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
             timeOfLastDecorationChange = Date.now();
             debouncedRedecorate(context);
-            vscode.window.showInformationMessage('gait context activated.');
+            vscode.window.showInformationMessage('gait hover activated.');
         } else {
             posthog.capture('deactivate_decorations');
             if (disposibleDecorations) {
@@ -403,7 +399,7 @@ export function activate(context: vscode.ExtensionContext) {
                 disposibleDecorations.hoverProvider.dispose();
                 disposibleDecorations = undefined;
             }
-            vscode.window.showInformationMessage('gait context deactivated.');
+            vscode.window.showInformationMessage('gait hover deactivated.');
         }
     });
 
@@ -576,7 +572,7 @@ exit 0
         inlineChatStartOverride, 
         deleteInlineChatCommand, 
         openFileWithContentCommand,
-        toggleDecorationsCommand,
+        toggleHoverCommand,
         exportPanelChatsToMarkdownCommand,
     );
 
@@ -598,7 +594,7 @@ exit 0
     // Set up an interval to trigger accept every second
     const acceptInterval = setInterval(async () => {
         try {
-            triggerAccept(stateReader, context);
+            await triggerAccept(stateReader, context);
             triggerAcceptCount++;
             if (triggerAcceptCount % 3 === 0) {
                 stateReader.matchPromptsToDiff()
