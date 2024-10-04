@@ -105,7 +105,7 @@ function processCommit(
     if (Array.isArray(parsedContent.inlineChats)) {
         for (const inlineChat of parsedContent.inlineChats) {
             const inlineChatId = inlineChat.inline_chat_id;
-            if (currentInlineChatIds.has(inlineChatId)) {
+            if (!currentInlineChatIds.has(inlineChatId)) {
                 commitData.inlineChats.push(inlineChat);
             }
         }
@@ -266,12 +266,13 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
         }
 
+        // Process the commit's panelChats and inlineChats
+        processCommit(parsedContent, currentMessageIds, seenInlineChatIds, seenMessageIds, commitData, commitHash);
+
         // Add all inline chat ids from parsedContent to the seenInlineChats set
         parsedContent.inlineChats.forEach(inlineChat => {
             seenInlineChatIds.add(inlineChat.inline_chat_id);
         });
-        // Process the commit's panelChats and inlineChats
-        processCommit(parsedContent, currentMessageIds, currentInlineChatIds, seenMessageIds, commitData, commitHash);
     }
 
     // Convert the map to an array and filter out empty commits
@@ -280,7 +281,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
             ...commit,
             panelChats: commit.panelChats.filter(pc => pc.messages.length > 0)
         }))
-        .filter(commit => commit.panelChats.length > 0);
+        .filter(commit => commit.panelChats.length > 0 || commit.inlineChats.length > 0);
 
     log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
 
