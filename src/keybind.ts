@@ -14,7 +14,7 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
 
     const sharedKeybindings = [{
         key: "cmd+shift+g",
-        command: "gait.toggleDecorations",
+        command: "gait.toggleHover",
     }]
     if (tool === "Cursor") {
         newKeybindings = [{
