@@ -8,6 +8,7 @@ const SCHEMA_VERSION = '1.0';
 
 import { MessageEntry, PanelChat, PanelChatMode, StashedState, StateReader } from './types';
 import { readStashedState, readStashedStateFromFile, writeChatToStashedState } from './stashedState';
+import posthog from 'posthog-js';
 
 
 
@@ -68,20 +69,6 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       // Parse the current panelChats
       const incomingPanelChats = sanitizePanelChats(await stateReader.parsePanelChatAsync());
       // Check for new panel chats or messages
-      if (oldPanelChats && oldPanelChats.length !== incomingPanelChats.length) {
-        vscode.window.showInformationMessage('New panel chat detected!');
-      } 
-      if (oldPanelChats) {
-        const newMessageCount = incomingPanelChats.reduce((count, chat, index) => {
-          if (oldPanelChats[index] && chat.messages.length > oldPanelChats[index].messages.length) {
-            return count + (chat.messages.length - oldPanelChats[index].messages.length);
-          }
-          return count;
-        }, 0);
-        if (newMessageCount > 0) {
-          vscode.window.showInformationMessage(`${newMessageCount} new message${newMessageCount > 1 ? 's' : ''} detected!`);
-        }
-      }
       context.workspaceState.update('currentPanelChats', incomingPanelChats);
       const stashedState = readStashedStateFromFile();
       context.workspaceState.update('stashedState', stashedState);
@@ -89,6 +76,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
     } catch (error) {
       console.error(`Error monitoring and saving state:`, error);
       vscode.window.showErrorMessage(`Error monitoring and saving state: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      posthog.capture('error_monitoring_and_saving_state', { error: error instanceof Error ? error.message : 'Unknown error' });
     } finally {
       isAppending = false;
     }

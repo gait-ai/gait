@@ -14,10 +14,12 @@ export async function identifyUser(): Promise<void> {
             const hashedEmail = crypto.createHash('sha256').update(trimmedEmail).digest('hex');
             posthog.identify(hashedEmail, { email: trimmedEmail });
         } else {
-            console.log('No Git user email found');
+            // console.log('No Git user email found');
+            posthog.capture('no_git_user_email_found');
         }
     } catch (error) {
         console.error('Error identifying user:', error);
+        posthog.capture('error_identifying_user', { error: error });
     }
 }
 

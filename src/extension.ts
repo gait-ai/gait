@@ -90,7 +90,7 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent) {
 
 
     if (!filePath.startsWith(workspacePath)) {
-        console.log(`File ${filePath} is not in the workspace directory`);
+        // console.log(`File ${filePath} is not in the workspace directory`);
         return; // File is not in the workspace directory
     }
     if (!event.document.fileName || event.reason || !editor || changes.length === 0 || event.document.fileName.includes(path.join(GAIT_FOLDER_NAME)) || event.document.fileName.includes("rendererLog")){
@@ -114,11 +114,6 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent) {
             changes: [...changes],
             timestamp,
             document_content: getFileContent(event.document.uri.fsPath),
-        });
-        changes.forEach((change, index) => {
-            console.log(`Change ${index + 1}:`);
-            console.log(`  Range: ${change.range.start.line}:${change.range.start.character} - ${change.range.end.line}:${change.range.end.character}`);
-            console.log(`  Text: ${change.text}`);
         });
 
     }
@@ -175,17 +170,6 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                     console.error(`Error processing file ${filePath}: ${error}`);
                 }
             });
-            console.log("File Diffs:");
-            fileDiffs.forEach((diff, index) => {
-                console.log(`File ${index + 1}: ${diff.file_path}`);
-                console.log("Diffs:");
-                diff.diffs.forEach((change, changeIndex) => {
-                    if (change.added) {
-                        console.log(`  Added Change ${changeIndex + 1}:`);
-                        console.log(`    ${change.value.replace(/\n/g, "\n    ")}`);
-                    }
-                });
-            });
             // Extract the position where changes start if only one file is modified
             let changeStartPosition: vscode.Position | undefined;
             if (fileDiffs.length === 1) {
@@ -215,7 +199,6 @@ function triggerAccept(stateReader: StateReader, context: vscode.ExtensionContex
                 changeStartPosition: changeStartPosition,
                 inlineChatStartInfo: inlineChatStart,
             };
-            console.log("Accepting AI change: ", fileDiffs);
             stateReader.pushFileDiffs(fileDiffs, metadata);
         }
     }
@@ -294,13 +277,15 @@ export function activate(context: vscode.ExtensionContext) {
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('No workspace folder found. Extension activation failed.');
+        vscode.window.showInformationMessage('Open a workspace to use gait!');
         return;
     }
 
     try {
         createGaitFolderIfNotExists(workspaceFolder);
     } catch (error) {
+        vscode.window.showErrorMessage('fatal: unable to create gait folder!');
+        posthog.capture('fatal_unable_to_create_gait_folder');
         console.log("Error creating .gait folder", error);
     }
     identifyRepo(context);
@@ -321,7 +306,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     const inlineChatStartOverride = vscode.commands.registerCommand('gait-copilot.startInlineChat', () => {
         // Display an information message
-        vscode.window.showInformationMessage('Starting inline chat...');
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             const document = editor.document;
@@ -407,7 +391,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
             timeOfLastDecorationChange = Date.now();
             debouncedRedecorate(context);
-            vscode.window.showInformationMessage('Gait context activated.');
+            vscode.window.showInformationMessage('gait context activated.');
         } else {
             posthog.capture('deactivate_decorations');
             if (disposibleDecorations) {
@@ -419,7 +403,7 @@ export function activate(context: vscode.ExtensionContext) {
                 disposibleDecorations.hoverProvider.dispose();
                 disposibleDecorations = undefined;
             }
-            vscode.window.showInformationMessage('Gait context deactivated.');
+            vscode.window.showInformationMessage('gait context deactivated.');
         }
     });
 

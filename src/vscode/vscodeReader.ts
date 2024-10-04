@@ -125,6 +125,7 @@ export class VSCodeReader implements StateReader {
             if (!matchedDiff) {
                 console.error("error no file diffs");
                 vscode.window.showErrorMessage('No file diffs found for new prompts!');
+                posthog.capture('vscode_error_no_file_diffs_found_for_new_prompts');
                 return false;
             }
             const inlineChatInfoObj: InlineChatInfo = {

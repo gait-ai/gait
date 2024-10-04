@@ -58,9 +58,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     };
                     this._commits.unshift(uncommittedCommit); // Add to the beginning for visibility
                 }
-                else{
-                    console.log("No added changes");
-                }
 
                 // Handle uncommitted changes by appending them to the commits array
                 if (gitHistory.uncommitted) {
@@ -155,17 +152,17 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async handleRemovePanelChatFromStashedState(panelChatId: string) {
-        console.log(`Removing panelChat with ID ${panelChatId} from stashed state.`);
+        // console.log(`Removing panelChat with ID ${panelChatId} from stashed state.`);
         removePanelChatFromStashedState(this._context, panelChatId);
     }
 
     private async handleRemoveMessageFromStashedState(messageId: string) {
-        console.log(`Removing message with ID ${messageId} from stashed state.`);
+        // console.log(`Removing message with ID ${messageId} from stashed state.`);
         removeMessageFromStashedState(this._context, messageId);
     }
     
     private async handleDeleteInlineChat(inlineChatId: string) {
-        console.log(`Removing inlineChat with ID ${inlineChatId} from stashed state.`);
+        // console.log(`Removing inlineChat with ID ${inlineChatId} from stashed state.`);
         removeInlineChat(this._context, inlineChatId);
     }
 
@@ -384,7 +381,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * @param filePath - The path of the file to open.
      */
     private async handleOpenFile(filePath: string) {
-        console.log(`Opening file: ${filePath}`);
+        // console.log(`Opening file: ${filePath}`);
         try {
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
             if (!workspaceFolder) {
@@ -886,7 +883,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         } else {
                             details.style.display = 'block';
                             const codeBlocks = details.querySelectorAll('pre code');
-                            console.log('Found code blocks:', codeBlocks);
                             codeBlocks.forEach((block) => {
                                 Prism.highlightElement(block);
                             });
@@ -910,7 +906,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         } else {
                             details.style.display = 'block';
                             const codeBlocks = details.querySelectorAll('pre code');
-                            console.log('Found code blocks in panel chat:', codeBlocks);
                             codeBlocks.forEach((block) => {
                                 Prism.highlightElement(block);
                             });
@@ -928,7 +923,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     event.preventDefault();
                     const path = target.dataset.path;
                     if (path) {
-                        console.log('Context link clicked:', path);
                         vscode.postMessage({ command: 'openFile', path: path });
                     } else {
                         console.warn('Clicked link does not have a data-path attribute.');
@@ -968,7 +962,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                         } else {
                             details.style.display = 'block';
                             const codeBlocks = details.querySelectorAll('pre code');
-                            console.log('Found code blocks in inline chat:', codeBlocks);
                             codeBlocks.forEach((block) => {
                                 Prism.highlightElement(block);
                             });
@@ -1124,7 +1117,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
             // Handle "No" button click
             document.getElementById('confirmNo').onclick = function() {
-                console.log('Deletion cancelled by user.');
                 // Hide the modal
                 modal.classList.remove('visible');
                 modal.classList.add('hidden');
@@ -1428,7 +1420,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                     messageContainer.appendChild(messageDetails);
 
                                     // Optionally, display context if needed
-                                    console.log('Message Entry Context:', messageEntry.context);
                                     if (messageEntry.context && Array.isArray(messageEntry.context) && messageEntry.context.length > 0) {
                                         const contextDiv = document.createElement('div');
                                         contextDiv.className = 'context';

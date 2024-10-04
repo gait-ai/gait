@@ -49,12 +49,12 @@ function log(message: string, level: LogLevel = LogLevel.INFO) {
     if (level >= CURRENT_LOG_LEVEL) {
         switch (level) {
             case LogLevel.INFO:
-                console.log(message);
+                // console.log(message);
             case LogLevel.WARN:
-                console.warn(message);
+                // console.warn(message);
                 break;
             case LogLevel.ERROR:
-                console.error(message);
+                // console.error(message);
                 break;
         }
     }

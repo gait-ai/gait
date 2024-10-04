@@ -242,7 +242,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
         }
         const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
         if (already_associated) {
-            console.log("Already associated: ", message.id);
+            // console.log("Already associated: ", message.id);
         }
         const codeBlocks = extractCodeBlocks(message.responseText);
         for (const code of codeBlocks) {
