@@ -45,7 +45,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     date: new Date(commit.date),
                     panelChats: commit.panelChats,
                     inlineChats: commit.inlineChats
-                })).sort((a, b) => b.date.getTime() - a.date.getTime());
+                })).filter(commit => commit.panelChats.length > 0).sort((a, b) => b.date.getTime() - a.date.getTime());
 
                 if (gitHistory.added) {
                     const uncommittedCommit: CommitData = {
@@ -82,7 +82,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     date: new Date(commit.date),
                     panelChats: commit.panelChats,
                     inlineChats: commit.inlineChats
-                })).sort((a, b) => b.date.getTime() - a.date.getTime());
+                })).filter(commit => commit.panelChats.length > 0).sort((a, b) => b.date.getTime() - a.date.getTime());
 
                 if (gitHistory.added) {
                     const uncommittedCommit: CommitData = {

@@ -203,7 +203,6 @@ export class VSCodeReader implements StateReader {
             const interactiveSessions = await readVSCodeState(getDBPath(this.context), 'interactive.sessions');
 
             if (!interactiveSessions) {
-                vscode.window.showErrorMessage('Interactive sessions data is not available.');
                 return [];
             }
             
