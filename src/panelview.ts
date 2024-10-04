@@ -1324,12 +1324,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                 panelChatHeader.setAttribute('data-panel-chat-id', \`\${commit.commitHash}-\${panelChat.id}\`); // Add data attribute for identification
                                 panelChatHeader.innerHTML = \`
                                     Title: \${escapeHtml(panelChat.customTitle)}
-                                    <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete PanelChat">🗑️</button>
+                                    <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete Chat">🗑️</button>
                                     <button 
                                         class="append-context-button" 
                                         data-commit="\${escapeHtml(commit.commitHash)}" 
                                         data-id="\${escapeHtml(panelChat.id)}" 
-                                        title="Append to context"
+                                        title="Add Chat to LLM Context"
                                     >
                                         ▶️
                                     </button>
@@ -1344,7 +1344,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         <button 
                                             class="write-chat-button" 
                                             data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
-                                            title="Write PanelChat to Stashed State"
+                                            title="Stage Chat"
                                         >
                                             ➕
                                         </button>
@@ -1355,7 +1355,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         <button 
                                             class="remove-chat-button" 
                                             data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
-                                            title="Remove PanelChat from Stashed State"
+                                            title="Unstage Chat"
                                         >
                                             ➖
                                         </button>
