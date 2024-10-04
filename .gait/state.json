@@ -787,6 +787,54 @@
         }
       ],
       "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Merging Inline Chats with Unique IDs",
+      "id": "0e0e20e0-9553-40dd-abc7-6a2725e790ea",
+      "parent_id": null,
+      "created_on": "2024-10-04T18:51:53.755Z",
+      "messages": [
+        {
+          "id": "6489896e-6c4c-4b4f-b061-5d56be8b96a5",
+          "messageText": "What does this do?",
+          "responseText": "This line is part of the `mergeStashedStates` function in the jq script used for merging JSON data. Let's break it down:\n\n```jq\ninlineChats: (ourState.inlineChats + theirState.inlineChats | group_by(.inline_chat_id) | map(.[0])),\n```\n\nHere's what this line does:\n\n1. `ourState.inlineChats + theirState.inlineChats`: This concatenates the `inlineChats` arrays from both the current state (`ourState`) and the other state (`theirState`).\n\n2. `| group_by(.inline_chat_id)`: This groups the combined array of inline chats by their `inline_chat_id`. This creates an array of arrays, where each inner array contains items with the same `inline_chat_id`.\n\n3. `| map(.[0])`: This maps over the grouped arrays and selects only the first item (`.[0]`) from each group.\n\nThe overall effect of this operation is to merge the `inlineChats` from both states while removing duplicates based on the `inline_chat_id`. If there are multiple entries with the same `inline_chat_id`, only the first one encountered is kept.\n\nThis approach ensures that:\n1. All unique `inlineChats` from both states are included.\n2. In case of conflicts (same `inline_chat_id` in both states), it keeps only one version, giving preference to the entries from `ourState` since they come first in the concatenation.\n\nThis merge strategy prioritizes maintaining unique `inline_chat_id` values while combining data from both states.",
+          "model": "claude-3.5-sonnet",
+          "timestamp": "2024-10-04T18:51:53.755Z",
+          "context": [
+            {
+              "context_type": "selection",
+              "key": "9cd83dc6-bd3c-4bb9-bd7d-bcd71932d80b",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/.gait/custom-merge-driver.sh",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/.gait/custom-merge-driver.sh",
+                "range": {
+                  "startLine": 66,
+                  "startColumn": 1,
+                  "endLine": 66,
+                  "endColumn": 106
+                },
+                "text": "    inlineChats: (ourState.inlineChats + theirState.inlineChats | group_by(.inline_chat_id) | map(.[0])),"
+              }
+            },
+            {
+              "context_type": "file",
+              "key": "07178402-c0d0-4dc9-90c0-76437207f7c4",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/.gait/custom-merge-driver.sh",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/.gait/custom-merge-driver.sh",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {
+            "file_paths": [
+              ".gait/custom-merge-driver.sh"
+            ]
+          }
+        }
+      ],
+      "kv_store": {}
     }
   ],
   "inlineChats": [

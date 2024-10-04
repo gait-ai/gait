@@ -479,7 +479,7 @@ def mergePanelChats(ourChats; theirChats):
 def mergeStashedStates(ourState; theirState):
   {
     panelChats: mergePanelChats(ourState.panelChats; theirState.panelChats),
-    inlineChats: (ourState.inlineChats + theirState.inlineChats),
+    inlineChats: (ourState.inlineChats + theirState.inlineChats | group_by(.inline_chat_id) | map(.[0])),
     schemaVersion: ourState.schemaVersion,
     deletedChats: {
       deletedMessageIDs: (ourState.deletedChats.deletedMessageIDs + theirState.deletedChats.deletedMessageIDs) | unique,
