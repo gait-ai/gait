@@ -622,4 +622,6 @@ exit 0
 /**
  * Deactivates the extension.
  */
-export function deactivate() {}
+export function deactivate() {
+    posthog.capture('deactivate');
+}
