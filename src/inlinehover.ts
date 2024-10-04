@@ -65,7 +65,7 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
     }
     // Add action buttons at the end of the hover content
     markdown.appendMarkdown(`\n\n`);
-    const deleteCommand = vscode.Uri.parse(`command:gait-copilot.removeInlineChat?${encodeURIComponent(JSON.stringify({
+    const deleteCommand = vscode.Uri.parse(`command:gait.removeInlineChat?${encodeURIComponent(JSON.stringify({
         filePath: vscode.workspace.asRelativePath(document.uri),
         inline_chat_id: inlineChat.inline_chat_id
     }))}`);

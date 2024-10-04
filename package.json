@@ -1,7 +1,7 @@
 {
-    "name": "gait-copilot",
-    "displayName": "gait copilot",
-    "description": "Store and share your copilot conversations",
+    "name": "gait",
+    "displayName": "gait",
+    "description": "Store and share your cursor and copilot conversations",
     "version": "0.0.1",
     "engines": {
         "vscode": "^1.91.0"
@@ -27,62 +27,62 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "gait-copilot",
+                    "id": "gait",
                     "title": "Gait",
                     "icon": "resources/sidebar-icon.svg"
                 }
             ]
         },
         "views": {
-            "gait-copilot": [
+            "gait": [
                 {
                     "type": "webview",
-                    "id": "gait-copilot.panelView",
+                    "id": "gait.panelView",
                     "name": "Panel View"
                 }
             ]
         },
         "commands": [
             {
-                "command": "gait-copilot.startInlineChat",
+                "command": "gait.startInlineChat",
                 "title": "Start Inline Chat",
                 "category": "gait"
             },
             {
-                "command": "gait-copilot.updateSidebar",
+                "command": "gait.updateSidebar",
                 "title": "Update Sidebar",
                 "category": "gait"
             },
             {
-                "command": "gait-copilot.removeInlineChat",
+                "command": "gait.removeInlineChat",
                 "title": "Remove Inline Chat",
                 "category": "gait"
             },
             {
-                "command": "gait-copilot.toggleDecorations",
+                "command": "gait.toggleDecorations",
                 "title": "Toggle Decorations",
                 "category": "gait"
             },
             {
-                "command": "gait-copilot.deletePanelChat",
+                "command": "gait.deletePanelChat",
                 "title": "Delete Panel Chat",
                 "category": "gait"
             },
             {
-                "command": "gait-copilot.handleMerge",
+                "command": "gait.handleMerge",
                 "title": "Handle Merge",
                 "category": "Gait"
             }
         ],
         "keybindings": [
             {
-                "command": "gait-copilot.startInlineChat",
+                "command": "gait.startInlineChat",
                 "key": "cmd+i",
                 "when": "editorFocus && inlineChatHasProvider && !editorReadonly"
             },
             {
                 "key": "cmd+shift+g",
-                "command": "gait-copilot.toggleDecorations"
+                "command": "gait.toggleDecorations"
             }
         ]
     },

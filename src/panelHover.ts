@@ -63,10 +63,10 @@ export async function createPanelHover(context: vscode.ExtensionContext, matched
     const markdownData = [{commit: commitInfo, panelChat: panelChat}];
     const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
  
-    const continueCommand = vscode.Uri.parse(`command:gait-copilot.exportPanelChatsToMarkdown?${encodeURIComponent(
+    const continueCommand = vscode.Uri.parse(`command:gait.exportPanelChatsToMarkdown?${encodeURIComponent(
         JSON.stringify({data: encodedData, continue_chat: false}))}`);
     markdown.appendMarkdown(`[Continue Chat](${continueCommand})  |  `);
-    const deleteCommand = vscode.Uri.parse(`command:gait-copilot.removePanelChat?${encodeURIComponent(JSON.stringify({
+    const deleteCommand = vscode.Uri.parse(`command:gait.removePanelChat?${encodeURIComponent(JSON.stringify({
         panelChatId: panelChat.id,
     }))}`);
     markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);

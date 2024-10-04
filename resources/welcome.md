@@ -1,6 +1,6 @@
 # Getting Started with gait
 
-Welcome to Gait Copilot, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!
+Welcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!
 
 ## Features
 
@@ -13,8 +13,7 @@ Welcome to Gait Copilot, your intelligent companion for storing and sharing copi
 ## Usage
 
 ### Managing Panel Chats
-
-1. Open the Gait Copilot side view by clicking on the Gait Copilot icon in the Activity Bar.
+1. Open the gait side view by clicking on the gait icon in the Activity Bar.
 2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.
 
 ### Viewing AI-Generated Code Prompts
@@ -27,7 +26,7 @@ Use the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.
 
 ### Adding or Removing Chats
 
-Utilize the Gait Copilot side view to add new chats or remove existing ones.
+Utilize the gait side view to add new chats or remove existing ones.
 
 ### Continuing a Chat
 

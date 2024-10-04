@@ -12,7 +12,7 @@ import { identifyUser } from './identify_user';
 import { InlineChatInfo, removeInlineChat } from './inline'; 
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'gait-copilot.panelView';
+    public static readonly viewType = 'gait.panelView';
 
     private _view?: vscode.WebviewView;
     private _commits: CommitData[] = [];

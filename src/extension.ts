@@ -304,7 +304,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     //console.log('WebviewViewProvider registered for', PanelViewProvider.viewType);
 
-    const inlineChatStartOverride = vscode.commands.registerCommand('gait-copilot.startInlineChat', () => {
+    const inlineChatStartOverride = vscode.commands.registerCommand('gait.startInlineChat', () => {
         // Display an information message
         const editor = vscode.window.activeTextEditor;
         if (editor) {
@@ -329,7 +329,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand(startInlineCommand);
     });
 
-    const openFileWithContentCommand = vscode.commands.registerCommand('gait-copilot.openFileWithContent', async (args) => {
+    const openFileWithContentCommand = vscode.commands.registerCommand('gait.openFileWithContent', async (args) => {
         try {
             // Create a new untitled document
             vscode.workspace.openTextDocument({
@@ -346,7 +346,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Register the deleteInlineChat command
-    const deleteInlineChatCommand = vscode.commands.registerCommand('gait-copilot.removeInlineChat', (args) => {
+    const deleteInlineChatCommand = vscode.commands.registerCommand('gait.removeInlineChat', (args) => {
         //console.log("Removing inline chat", args);
         Inline.removeInlineChat(context, args.inline_chat_id);
         vscode.window.showInformationMessage("removed inline chat.");
@@ -354,7 +354,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Register command to convert PanelChats to markdown and open in a new file
-    const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait-copilot.exportPanelChatsToMarkdown', async (args) => {
+    const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait.exportPanelChatsToMarkdown', async (args) => {
         try {
             const decodedArgs = Buffer.from(args.data, 'base64').toString('utf-8');
             const markdownData = JSON.parse(decodedArgs);
@@ -375,7 +375,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    const removePanelChatCommand = vscode.commands.registerCommand('gait-copilot.removePanelChat', (args) => {
+    const removePanelChatCommand = vscode.commands.registerCommand('gait.removePanelChat', (args) => {
         const stashedState = readStashedState(context);
         stashedState.deletedChats.deletedPanelChatIDs.push(args.panelChatId);        
         writeStashedState(context, stashedState);
@@ -383,7 +383,7 @@ export function activate(context: vscode.ExtensionContext) {
         debouncedRedecorate(context);
     });
 
-    const toggleDecorationsCommand = vscode.commands.registerCommand('gait-copilot.toggleDecorations', () => {
+    const toggleDecorationsCommand = vscode.commands.registerCommand('gait.toggleDecorations', () => {
         decorationsActive = !decorationsActive;
         if (decorationsActive) {
             posthog.capture('activate_decorations', {

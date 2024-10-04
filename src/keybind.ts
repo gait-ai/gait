@@ -14,7 +14,7 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
 
     const sharedKeybindings = [{
         key: "cmd+shift+g",
-        command: "gait-copilot.toggleDecorations",
+        command: "gait.toggleDecorations",
     }]
     if (tool === "Cursor") {
         newKeybindings = [{
@@ -38,7 +38,7 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
                 when: "composerIsEnabled"
             },
             {
-                command: "gait-copilot.startInlineChat",
+                command: "gait.startInlineChat",
                 key: "cmd+k",
                 when: "editorFocus"
             }
@@ -47,7 +47,7 @@ export function generateKeybindings(context: vscode.ExtensionContext, tool: TOOL
     else {
         newKeybindings = [
             {
-                command: "gait-copilot.startInlineChat",
+                command: "gait.startInlineChat",
                 key: "cmd+i",
                 when: "editorFocus && inlineChatHasProvider && !editorReadonly"
             }
