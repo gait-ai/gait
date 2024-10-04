@@ -295,7 +295,6 @@ export function activate(context: vscode.ExtensionContext) {
     context.workspaceState.update('stashedState', readStashedStateFromFile());
     setTimeout(() => {
         monitorPanelChatAsync(stateReader, context);
-        debouncedRedecorate(context);
     }, 3000); // Delay to ensure initial setup
 
     const provider = new PanelViewProvider(context);
@@ -602,9 +601,8 @@ exit 0
             triggerAccept(stateReader, context);
             triggerAcceptCount++;
             if (triggerAcceptCount % 3 === 0) {
-                if (await stateReader.matchPromptsToDiff()) {
-                    debouncedRedecorate(context);
-                }
+                stateReader.matchPromptsToDiff()
+                debouncedRedecorate(context);
             }
             if (triggerAcceptCount % 4000 === 0) {
                 identifyUser();
