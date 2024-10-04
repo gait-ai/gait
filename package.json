@@ -1,6 +1,7 @@
 {
     "name": "gait",
     "displayName": "gait",
+    "publisher": "gait",
     "description": "Store and share your cursor and copilot conversations",
     "version": "0.0.1",
     "engines": {
