@@ -70,9 +70,15 @@ const execFileAsync = promisify(execFile);
  */
 async function gitShowString(args: string[], repoPath: string): Promise<string> {
     try {
-        const { stdout } = await execFileAsync('git', args, { cwd: repoPath });
+        const { stdout } = await execFileAsync('git', args, {
+            cwd: repoPath,
+            maxBuffer: 1024 * 1024 * 1024 // 1 GB buffer
+        });
         return stdout;
     } catch (error) {
+        if ((error as any).code === 'ENOBUFS') {
+            throw new Error('Git command failed: Output exceeded buffer size. The file might be too large.');
+        }
         throw new Error(`Git command failed: ${(error as Error).message}`);
     }
 }
