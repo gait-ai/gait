@@ -295,6 +295,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.workspaceState.update('stashedState', readStashedStateFromFile());
     setTimeout(() => {
         monitorPanelChatAsync(stateReader, context);
+        debouncedRedecorate(context);
     }, 3000); // Delay to ensure initial setup
 
     const provider = new PanelViewProvider(context);

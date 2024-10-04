@@ -57,8 +57,15 @@ function isValidInteractiveSession(obj: any): obj is InteractiveSession {
  * Retrieves a single new editor text from the sessions.
  */
 function getSingleNewEditorText(oldSessions: InteractiveSession, newSessions: InteractiveSession): string[] {
-
-    const oldEditorTexts = new Set(oldSessions.history.editor.map(entry => entry.text));
+    let oldEditorTexts;
+    if (!oldSessions.history.editor) {
+        oldEditorTexts = new Set();
+    } else {
+        oldEditorTexts = new Set(oldSessions.history.editor.map(entry => entry.text));
+    }
+    if (!newSessions.history.editor) {
+        return [];
+    }
     const newEditorTexts = newSessions.history.editor.map(entry => entry.text).filter(text => !oldEditorTexts.has(text)); 
 
     return newEditorTexts;
