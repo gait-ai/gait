@@ -774,6 +774,99 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             margin: 10px 0;
         }
 
+        /* Dark mode syntax highlighting */
+        .vscode-dark pre[class*="language-"],
+        .vscode-dark code[class*="language-"] {
+            color: #f8f8f2;
+            background: none;
+            text-shadow: 0 1px rgba(0, 0, 0, 0.3);
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+            font-size: 1em;
+            text-align: left;
+            white-space: pre;
+            word-spacing: normal;
+            word-break: normal;
+            word-wrap: normal;
+            line-height: 1.5;
+            tab-size: 4;
+            hyphens: none;
+        }
+
+        .vscode-dark .token.comment,
+        .vscode-dark .token.prolog,
+        .vscode-dark .token.doctype,
+        .vscode-dark .token.cdata {
+            color: #8292a2;
+        }
+
+        .vscode-dark .token.punctuation {
+            color: #f8f8f2;
+        }
+
+        .vscode-dark .token.namespace {
+            opacity: .7;
+        }
+
+        .vscode-dark .token.property,
+        .vscode-dark .token.tag,
+        .vscode-dark .token.constant,
+        .vscode-dark .token.symbol,
+        .vscode-dark .token.deleted {
+            color: #ff79c6;
+        }
+
+        .vscode-dark .token.boolean,
+        .vscode-dark .token.number {
+            color: #bd93f9;
+        }
+
+        .vscode-dark .token.selector,
+        .vscode-dark .token.attr-name,
+        .vscode-dark .token.string,
+        .vscode-dark .token.char,
+        .vscode-dark .token.builtin,
+        .vscode-dark .token.inserted {
+            color: #50fa7b;
+        }
+
+        .vscode-dark .token.operator,
+        .vscode-dark .token.entity,
+        .vscode-dark .token.url,
+        .vscode-dark .language-css .token.string,
+        .vscode-dark .style .token.string,
+        .vscode-dark .token.variable {
+            color: #f8f8f2;
+        }
+
+        .vscode-dark .token.atrule,
+        .vscode-dark .token.attr-value,
+        .vscode-dark .token.function,
+        .vscode-dark .token.class-name {
+            color: #f1fa8c;
+        }
+
+        .vscode-dark .token.keyword {
+            color: #8be9fd;
+        }
+
+        .vscode-dark .token.regex,
+        .vscode-dark .token.important {
+            color: #ffb86c;
+        }
+
+        .vscode-dark .token.important,
+        .vscode-dark .token.bold {
+            font-weight: bold;
+        }
+
+        .vscode-dark .token.italic {
+            font-style: italic;
+        }
+
+        .vscode-dark .token.entity {
+            cursor: help;
+        }
+
         /* Override Prism.js styles if necessary */
         /* Example: Adjusting code block background */
         pre[class*="language-"] {
@@ -946,6 +1039,18 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     }
                 }
             });
+        }
+
+        function updatePrismTheme() {
+            const isDarkMode = document.body.classList.contains('vscode-dark');
+            document.querySelectorAll('pre[class*="language-"], code[class*="language-"]').forEach(element => {
+                if (isDarkMode) {
+                    element.classList.add('vscode-dark');
+                } else {
+                    element.classList.remove('vscode-dark');
+                }
+            });
+            Prism.highlightAll();
         }
 
        /**
@@ -1267,6 +1372,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 }
             }
         }
+
+        window.addEventListener('vscode.theme-changed', () => {
+            updatePrismTheme();
+        });
 
         /**
          * Handles incoming messages from the extension backend.
@@ -1617,7 +1726,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 restoreExpandedInlineChats();
                 restoreInlineChatsExpandedState(); // Restore expanded inline chats state
                 restoreScrollPosition();
-                Prism.highlightAll();
+                updatePrismTheme();
             }
         });
 
@@ -1626,6 +1735,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
          */
         // Notify the extension that the Webview is ready
         vscode.postMessage({ command: 'webviewReady' });
+        updatePrismTheme(); 
         //console.log('Webview is ready.');
     </script>
 </body>

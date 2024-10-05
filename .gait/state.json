@@ -864,6 +864,39 @@
         }
       ],
       "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Improving Prism.js Syntax Highlighting for Dark Mode",
+      "id": "c86cbe6b-cf5f-425b-af1b-2ff09c3ecd39",
+      "parent_id": null,
+      "created_on": "2024-10-05T05:06:43.158Z",
+      "messages": [
+        {
+          "id": "3651ce39-6e2b-439d-8f6f-c681fda85227",
+          "messageText": "Is there a way to update this so prism.js highlights the code nicely in dark mode as well?",
+          "responseText": "Certainly! To ensure Prism.js highlights code nicely in both light and dark modes, we can make a few adjustments to the CSS and JavaScript. Here's how we can update the code to achieve better syntax highlighting in dark mode:\n\n1. First, let's add a custom CSS class for dark mode syntax highlighting. Add this to the `<style>` section of your HTML:\n\n```typescript:src/panelview.ts\n// ... existing styles ...\n\n/* Dark mode syntax highlighting */\n.vscode-dark pre[class*=\"language-\"],\n.vscode-dark code[class*=\"language-\"] {\n    color: #f8f8f2;\n    background: none;\n    text-shadow: 0 1px rgba(0, 0, 0, 0.3);\n    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;\n    font-size: 1em;\n    text-align: left;\n    white-space: pre;\n    word-spacing: normal;\n    word-break: normal;\n    word-wrap: normal;\n    line-height: 1.5;\n    tab-size: 4;\n    hyphens: none;\n}\n\n.vscode-dark .token.comment,\n.vscode-dark .token.prolog,\n.vscode-dark .token.doctype,\n.vscode-dark .token.cdata {\n    color: #8292a2;\n}\n\n.vscode-dark .token.punctuation {\n    color: #f8f8f2;\n}\n\n.vscode-dark .token.namespace {\n    opacity: .7;\n}\n\n.vscode-dark .token.property,\n.vscode-dark .token.tag,\n.vscode-dark .token.constant,\n.vscode-dark .token.symbol,\n.vscode-dark .token.deleted {\n    color: #ff79c6;\n}\n\n.vscode-dark .token.boolean,\n.vscode-dark .token.number {\n    color: #bd93f9;\n}\n\n.vscode-dark .token.selector,\n.vscode-dark .token.attr-name,\n.vscode-dark .token.string,\n.vscode-dark .token.char,\n.vscode-dark .token.builtin,\n.vscode-dark .token.inserted {\n    color: #50fa7b;\n}\n\n.vscode-dark .token.operator,\n.vscode-dark .token.entity,\n.vscode-dark .token.url,\n.vscode-dark .language-css .token.string,\n.vscode-dark .style .token.string,\n.vscode-dark .token.variable {\n    color: #f8f8f2;\n}\n\n.vscode-dark .token.atrule,\n.vscode-dark .token.attr-value,\n.vscode-dark .token.function,\n.vscode-dark .token.class-name {\n    color: #f1fa8c;\n}\n\n.vscode-dark .token.keyword {\n    color: #8be9fd;\n}\n\n.vscode-dark .token.regex,\n.vscode-dark .token.important {\n    color: #ffb86c;\n}\n\n.vscode-dark .token.important,\n.vscode-dark .token.bold {\n    font-weight: bold;\n}\n\n.vscode-dark .token.italic {\n    font-style: italic;\n}\n\n.vscode-dark .token.entity {\n    cursor: help;\n}\n\n// ... rest of the styles ...\n```\n\n2. Next, we need to modify the JavaScript to apply these styles dynamically based on the current VS Code theme. Add this function to your script section:\n\n```typescript:src/panelview.ts\n// ... existing script ...\n\nfunction updatePrismTheme() {\n    const isDarkMode = document.body.classList.contains('vscode-dark');\n    document.querySelectorAll('pre[class*=\"language-\"], code[class*=\"language-\"]').forEach(element => {\n        if (isDarkMode) {\n            element.classList.add('vscode-dark');\n        } else {\n            element.classList.remove('vscode-dark');\n        }\n    });\n    Prism.highlightAll();\n}\n\n// ... rest of the script ...\n```\n\n3. Now, we need to call this function whenever the content is updated and when the VS Code theme changes. Modify your `window.addEventListener('message', ...)` handler:\n\n```typescript:src/panelview.ts\nwindow.addEventListener('message', event => {\n    const message = event.data;\n    if (message.type === 'update') {\n        // ... existing update logic ...\n\n        // After updating the content\n        restoreExpandedCommits();\n        restoreExpandedPanelChats();\n        restoreExpandedInlineChats();\n        restoreInlineChatsExpandedState();\n        restoreScrollPosition();\n        updatePrismTheme(); // Call this instead of Prism.highlightAll()\n    }\n});\n\n// Add a new event listener for theme changes\nwindow.addEventListener('vscode.theme-changed', () => {\n    updatePrismTheme();\n});\n\n// ... rest of the script ...\n```\n\n4. Finally, make sure to call `updatePrismTheme()` when the webview is first loaded:\n\n```typescript:src/panelview.ts\n// Notify the extension that the Webview is ready\nvscode.postMessage({ command: 'webviewReady' });\nupdatePrismTheme(); // Add this line\n```\n\nThese changes will apply a dark theme to the Prism.js syntax highlighting when VS Code is in dark mode, and revert to the default light theme when VS Code is in light mode. The syntax highlighting will update dynamically if the user switches between light and dark themes in VS Code.\n\nRemember to test these changes in both light and dark modes to ensure they work as expected. You may need to fine-tune the colors in the CSS to match your preferred color scheme for dark mode.",
+          "model": "claude-3.5-sonnet",
+          "timestamp": "2024-10-05T05:06:43.158Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "3116fa37-b423-4486-b74c-cd30b234c5a3",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {
+            "file_paths": [
+              "src/panelview.ts"
+            ]
+          }
+        }
+      ],
+      "kv_store": {}
     }
   ],
   "inlineChats": [
