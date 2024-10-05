@@ -1752,6 +1752,120 @@
       "timestamp": "2024-10-04T00:36:42.185Z",
       "prompt": "is it possible to make this a map from inline_chat_id to InlineChatInfo?",
       "parent_inline_chat_id": null
+    },
+    {
+      "inline_chat_id": "d2e7c418-ce3e-4808-a0b1-af955df327b2",
+      "file_diff": [
+        {
+          "file_path": "resources/welcome.md",
+          "diffs": [
+            {
+              "count": 15,
+              "added": false,
+              "removed": false,
+              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Usage\n\n### Managing Panel Chats\n"
+            },
+            {
+              "count": 8,
+              "added": true,
+              "removed": false,
+              "value": "\n\n### Managing Panel Chats\n\n![Panel Demo](paneldemo.gif)\n\n\n\n"
+            },
+            {
+              "count": 26,
+              "added": false,
+              "removed": false,
+              "value": "1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n\n### Viewing AI-Generated Code Prompts\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Adding or Removing Chats\n\nUtilize the gait side view to add new chats or remove existing ones.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Choose the option to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
+            }
+          ]
+        }
+      ],
+      "selection": null,
+      "timestamp": "2024-10-05T00:53:12.704Z",
+      "prompt": "can you embed paneldemo.gif in here?",
+      "parent_inline_chat_id": null
+    },
+    {
+      "inline_chat_id": "516bdc71-0271-403e-bcca-db2e1b0d7a74",
+      "file_diff": [
+        {
+          "file_path": "resources/welcome.md",
+          "diffs": [
+            {
+              "count": 15,
+              "added": false,
+              "removed": false,
+              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Usage\n\n### Managing Panel Chats\n"
+            },
+            {
+              "count": 1,
+              "added": true,
+              "removed": false,
+              "value": "<img src=\"paneldemo.gif\" alt=\"Panel Demo\" width=\"400\"/>\n"
+            },
+            {
+              "count": 1,
+              "added": false,
+              "removed": false,
+              "value": "\n"
+            },
+            {
+              "count": 2,
+              "added": false,
+              "removed": true,
+              "value": "![Panel Demo](paneldemo.gif)\n\n"
+            },
+            {
+              "count": 28,
+              "added": false,
+              "removed": false,
+              "value": "1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n\n### Viewing AI-Generated Code Prompts\n\n![Hover Demo](hoverdemo.gif)\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Adding or Removing Chats\n\nUtilize the gait side view to add new chats or remove existing ones.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Choose the option to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
+            }
+          ]
+        }
+      ],
+      "selection": null,
+      "timestamp": "2024-10-05T00:54:12.828Z",
+      "prompt": "can you make the gif smaller?",
+      "parent_inline_chat_id": null
+    },
+    {
+      "inline_chat_id": "cc880a96-6c78-45fe-a323-2d127e6c6999",
+      "file_diff": [
+        {
+          "file_path": "resources/welcome.md",
+          "diffs": [
+            {
+              "count": 21,
+              "added": false,
+              "removed": false,
+              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Usage\n\n### gait Automatically Records Chats\n\nNo work on your end. There might be some delay! \n\n### Viewing AI-Generated Code Prompts\n\n![Hover Demo](hoverdemo.gif)\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Stage, Unstage, and Delete Chats\n<img src=\"paneldemo.gif\" alt=\"Panel Demo\" width=\"400\"/>\n\n1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n"
+            },
+            {
+              "count": 1,
+              "added": false,
+              "removed": true,
+              "value": "3. ** Add the .gait/state.json when you commit **.\n"
+            },
+            {
+              "count": 1,
+              "added": true,
+              "removed": false,
+              "value": "3. **Add the .gait/state.json when you commit**.\n"
+            },
+            {
+              "count": 26,
+              "added": false,
+              "removed": false,
+              "value": "\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Click the \"resume\" button to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
+            }
+          ]
+        }
+      ],
+      "selection": null,
+      "timestamp": "2024-10-05T00:59:55.747Z",
+      "prompt": "how do i bold this",
+      "parent_inline_chat_id": null
     }
   ],
   "schemaVersion": "1.0",
@@ -1769,7 +1883,9 @@
       "d8c44101-9702-428a-8eb6-f6bcd1cec633",
       "dab5a383-1eb5-4348-8591-40a62f4423f7",
       "e2671102-ea50-446e-b3e1-57636a14f35d",
-      "e7f59633-27d4-4a56-a3ae-237dc29c3772"
+      "e7f59633-27d4-4a56-a3ae-237dc29c3772",
+      "675ad9a3-91eb-439f-926e-11b130d1ead5",
+      "2fdda614-a7cd-42aa-b922-3025ce89bcfb"
     ]
   },
   "kv_store": {}
