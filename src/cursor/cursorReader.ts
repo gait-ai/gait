@@ -61,6 +61,7 @@ export class CursorReader implements StateReader {
     private inlineChats: CursorInlines[] | null = null;
     private inlineStartInfo: Inline.InlineStartInfo | null = null;
     private timedFileDiffs: TimedFileDiffs[] = [];
+    private fileDiffCutoff: number  = 60000;
 
     public pushFileDiffs(file_diffs: FileDiff[], metadata: AIChangeMetadata): void {
         this.timedFileDiffs.push({
@@ -81,7 +82,7 @@ export class CursorReader implements StateReader {
         const newChats =  getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4));
         this.inlineChats = newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
         if (newChats.length === 0) {
-            const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+            const oneMinuteAgo = new Date(Date.now() - this.fileDiffCutoff).toISOString();
             while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
                 this.timedFileDiffs.shift();
             }
@@ -103,6 +104,7 @@ export class CursorReader implements StateReader {
                 matchedDiff = this.timedFileDiffs.pop();
             }
             if (!matchedDiff) {
+                this.fileDiffCutoff = Math.min(this.fileDiffCutoff+ 10000, 60000);
                 vscode.window.showErrorMessage('Error: failed to match prompts to diffs!');
                 posthog.capture('no_file_diffs_for_new_prompts');
                 return false;
