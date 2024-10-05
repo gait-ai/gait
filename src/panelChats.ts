@@ -69,6 +69,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       // Parse the current panelChats
       const incomingPanelChats = sanitizePanelChats(await stateReader.parsePanelChatAsync());
       // Check for new panel chats or messages
+      context.workspaceState.update('panelChatNum', incomingPanelChats.length);
       context.workspaceState.update('currentPanelChats', incomingPanelChats);
       const stashedState = readStashedStateFromFile();
       context.workspaceState.update('stashedState', stashedState);
@@ -120,7 +121,6 @@ export async function associateFileWithMessage(context: vscode.ExtensionContext,
         if (message.messageText.length > 50) {
             truncatedMessage += '...';
         }
-        vscode.window.showInformationMessage(`Match prompt "${truncatedMessage}" to ${filePath} - adding to stashed state.`);
         // Find the message in newPanelChat with the matching messageId
         const targetMessage = newPanelChat.messages.find(message => message.id === messageId);
         if (targetMessage) {

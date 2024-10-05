@@ -19,6 +19,7 @@ import * as child_process from 'child_process';
 import posthog from 'posthog-js';
 import { identifyRepo, identifyUser } from './identify_user';
 import simpleGit from 'simple-git';
+import { addGaitSearchExclusion } from './setup/exclude_search';
 
 posthog.init('phc_vosMtvFFxCN470e8uHGDYCD6YuuSRSoFoZeLuciujry',
     {
@@ -41,6 +42,7 @@ let changeQueue: { cursor_position: vscode.Position,
     document_content: string | null }[] = [];
 let triggerAcceptCount = 0;
 let lastInlineChatStart: Inline.InlineStartInfo | null = null;
+let lastPanelChatNum: number = 0;
 
 let fileState: { [key: string]: string } = {};
 
@@ -408,7 +410,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     try {
         const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-
+        addGaitSearchExclusion();
         // Define the custom merge driver script content
         const customMergeDriverScript = `#!/bin/bash
 
@@ -597,12 +599,16 @@ exit 0
             await triggerAccept(stateReader, context);
             triggerAcceptCount++;
             if (triggerAcceptCount % 3 === 0) {
-                stateReader.matchPromptsToDiff()
-                debouncedRedecorate(context);
+                if (await stateReader.matchPromptsToDiff()) {
+                    debouncedRedecorate(context);
+                }
             }
             if (triggerAcceptCount % 4000 === 0) {
-                identifyUser();
                 triggerAcceptCount = 0;
+            }
+            if (lastPanelChatNum !== context.workspaceState.get('panelChatNum')) {
+                lastPanelChatNum = context.workspaceState.get('panelChatNum') || 0;
+                debouncedRedecorate(context);
             }
         } catch (error) {
             console.log("Error in accept interval", error);

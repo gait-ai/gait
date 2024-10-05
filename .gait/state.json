@@ -627,6 +627,48 @@
     },
     {
       "ai_editor": "cursor",
+      "customTitle": "Adding Gait Search Exclusion to Settings File",
+      "id": "a31186a3-7da8-4fca-9c3b-86faeeb155e3",
+      "parent_id": null,
+      "created_on": "2024-10-05T17:29:13.680Z",
+      "messages": [
+        {
+          "id": "be2b37f1-5faa-4b51-94cc-a08ce1b42455",
+          "messageText": "write a function that writes the gait search exclusion to the workspace .vscode settings.json if it exists",
+          "responseText": "Certainly! I'll write a function that adds the `.gait` search exclusion to the workspace's `.vscode/settings.json` file if it exists. Here's the function:\n\n```typescript:src/setup/exclude_search.ts\nimport * as vscode from 'vscode';\nimport * as fs from 'fs';\nimport * as path from 'path';\n\nexport async function addGaitSearchExclusion(): Promise<void> {\n    const workspaceFolders = vscode.workspace.workspaceFolders;\n    if (!workspaceFolders || workspaceFolders.length === 0) {\n        return;\n    }\n\n    const workspaceRoot = workspaceFolders[0].uri.fsPath;\n    const settingsPath = path.join(workspaceRoot, '.vscode', 'settings.json');\n\n    if (!fs.existsSync(settingsPath)) {\n        return;\n    }\n\n    try {\n        const settingsContent = fs.readFileSync(settingsPath, 'utf8');\n        const settings = JSON.parse(settingsContent);\n\n        if (!settings['search.exclude']) {\n            settings['search.exclude'] = {};\n        }\n\n        if (!settings['search.exclude']['**/.gait']) {\n            settings['search.exclude']['**/.gait'] = true;\n            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));\n            vscode.window.showInformationMessage('Added .gait to search exclusions in settings.json');\n        }\n    } catch (error) {\n        console.error('Error updating settings.json:', error);\n        vscode.window.showErrorMessage('Failed to update settings.json');\n    }\n}\n```\n\nThis function does the following:\n\n1. Checks if there's an active workspace.\n2. Constructs the path to the `.vscode/settings.json` file.\n3. Checks if the settings file exists.\n4. If it exists, reads and parses the file.\n5. Adds the `**/.gait` exclusion to the `search.exclude` section if it's not already present.\n6. Writes the updated settings back to the file.\n7. Shows an information message if the exclusion was added successfully.\n\nYou can call this function when you want to add the `.gait` exclusion to the workspace settings. For example, you might call it when your extension is activated or when a specific command is executed.",
+          "model": "claude-3.5-sonnet",
+          "timestamp": "2024-10-05T17:29:13.680Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "90d520bf-6fb2-49b6-bbfc-960762771dc0",
+              "value": {
+                "human_readable": "/Users/kylel1/Documents/GitHub/gait-copilot/src/setup/exclude_search.ts",
+                "uri": "/Users/kylel1/Documents/GitHub/gait-copilot/src/setup/exclude_search.ts",
+                "isCurrentFile": true
+              }
+            },
+            {
+              "context_type": "file",
+              "key": "919ef0c5-a8f0-4c5e-97bd-869d051e26f9",
+              "value": {
+                "human_readable": "/Users/kylel1/Documents/GitHub/gait-copilot/.vscode/settings.json",
+                "uri": "/Users/kylel1/Documents/GitHub/gait-copilot/.vscode/settings.json",
+                "isCurrentFile": false
+              }
+            }
+          ],
+          "kv_store": {
+            "file_paths": [
+              "src/setup/exclude_search.ts"
+            ]
+          }
+        }
+      ],
+      "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
       "id": "b562addf-7575-449f-b1a0-e5b896f60332",
       "customTitle": "Changing Commit Container Color Based on Type",
       "parent_id": null,
@@ -700,6 +742,39 @@
           "kv_store": {
             "file_paths": [
               "src/panelview.ts",
+              "src/panelview.ts"
+            ]
+          }
+        }
+      ],
+      "kv_store": {}
+    },
+    {
+      "ai_editor": "cursor",
+      "customTitle": "Improving Prism.js Syntax Highlighting for Dark Mode",
+      "id": "c86cbe6b-cf5f-425b-af1b-2ff09c3ecd39",
+      "parent_id": null,
+      "created_on": "2024-10-05T05:06:43.158Z",
+      "messages": [
+        {
+          "id": "3651ce39-6e2b-439d-8f6f-c681fda85227",
+          "messageText": "Is there a way to update this so prism.js highlights the code nicely in dark mode as well?",
+          "responseText": "Certainly! To ensure Prism.js highlights code nicely in both light and dark modes, we can make a few adjustments to the CSS and JavaScript. Here's how we can update the code to achieve better syntax highlighting in dark mode:\n\n1. First, let's add a custom CSS class for dark mode syntax highlighting. Add this to the `<style>` section of your HTML:\n\n```typescript:src/panelview.ts\n// ... existing styles ...\n\n/* Dark mode syntax highlighting */\n.vscode-dark pre[class*=\"language-\"],\n.vscode-dark code[class*=\"language-\"] {\n    color: #f8f8f2;\n    background: none;\n    text-shadow: 0 1px rgba(0, 0, 0, 0.3);\n    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;\n    font-size: 1em;\n    text-align: left;\n    white-space: pre;\n    word-spacing: normal;\n    word-break: normal;\n    word-wrap: normal;\n    line-height: 1.5;\n    tab-size: 4;\n    hyphens: none;\n}\n\n.vscode-dark .token.comment,\n.vscode-dark .token.prolog,\n.vscode-dark .token.doctype,\n.vscode-dark .token.cdata {\n    color: #8292a2;\n}\n\n.vscode-dark .token.punctuation {\n    color: #f8f8f2;\n}\n\n.vscode-dark .token.namespace {\n    opacity: .7;\n}\n\n.vscode-dark .token.property,\n.vscode-dark .token.tag,\n.vscode-dark .token.constant,\n.vscode-dark .token.symbol,\n.vscode-dark .token.deleted {\n    color: #ff79c6;\n}\n\n.vscode-dark .token.boolean,\n.vscode-dark .token.number {\n    color: #bd93f9;\n}\n\n.vscode-dark .token.selector,\n.vscode-dark .token.attr-name,\n.vscode-dark .token.string,\n.vscode-dark .token.char,\n.vscode-dark .token.builtin,\n.vscode-dark .token.inserted {\n    color: #50fa7b;\n}\n\n.vscode-dark .token.operator,\n.vscode-dark .token.entity,\n.vscode-dark .token.url,\n.vscode-dark .language-css .token.string,\n.vscode-dark .style .token.string,\n.vscode-dark .token.variable {\n    color: #f8f8f2;\n}\n\n.vscode-dark .token.atrule,\n.vscode-dark .token.attr-value,\n.vscode-dark .token.function,\n.vscode-dark .token.class-name {\n    color: #f1fa8c;\n}\n\n.vscode-dark .token.keyword {\n    color: #8be9fd;\n}\n\n.vscode-dark .token.regex,\n.vscode-dark .token.important {\n    color: #ffb86c;\n}\n\n.vscode-dark .token.important,\n.vscode-dark .token.bold {\n    font-weight: bold;\n}\n\n.vscode-dark .token.italic {\n    font-style: italic;\n}\n\n.vscode-dark .token.entity {\n    cursor: help;\n}\n\n// ... rest of the styles ...\n```\n\n2. Next, we need to modify the JavaScript to apply these styles dynamically based on the current VS Code theme. Add this function to your script section:\n\n```typescript:src/panelview.ts\n// ... existing script ...\n\nfunction updatePrismTheme() {\n    const isDarkMode = document.body.classList.contains('vscode-dark');\n    document.querySelectorAll('pre[class*=\"language-\"], code[class*=\"language-\"]').forEach(element => {\n        if (isDarkMode) {\n            element.classList.add('vscode-dark');\n        } else {\n            element.classList.remove('vscode-dark');\n        }\n    });\n    Prism.highlightAll();\n}\n\n// ... rest of the script ...\n```\n\n3. Now, we need to call this function whenever the content is updated and when the VS Code theme changes. Modify your `window.addEventListener('message', ...)` handler:\n\n```typescript:src/panelview.ts\nwindow.addEventListener('message', event => {\n    const message = event.data;\n    if (message.type === 'update') {\n        // ... existing update logic ...\n\n        // After updating the content\n        restoreExpandedCommits();\n        restoreExpandedPanelChats();\n        restoreExpandedInlineChats();\n        restoreInlineChatsExpandedState();\n        restoreScrollPosition();\n        updatePrismTheme(); // Call this instead of Prism.highlightAll()\n    }\n});\n\n// Add a new event listener for theme changes\nwindow.addEventListener('vscode.theme-changed', () => {\n    updatePrismTheme();\n});\n\n// ... rest of the script ...\n```\n\n4. Finally, make sure to call `updatePrismTheme()` when the webview is first loaded:\n\n```typescript:src/panelview.ts\n// Notify the extension that the Webview is ready\nvscode.postMessage({ command: 'webviewReady' });\nupdatePrismTheme(); // Add this line\n```\n\nThese changes will apply a dark theme to the Prism.js syntax highlighting when VS Code is in dark mode, and revert to the default light theme when VS Code is in light mode. The syntax highlighting will update dynamically if the user switches between light and dark themes in VS Code.\n\nRemember to test these changes in both light and dark modes to ensure they work as expected. You may need to fine-tune the colors in the CSS to match your preferred color scheme for dark mode.",
+          "model": "claude-3.5-sonnet",
+          "timestamp": "2024-10-05T05:06:43.158Z",
+          "context": [
+            {
+              "context_type": "file",
+              "key": "3116fa37-b423-4486-b74c-cd30b234c5a3",
+              "value": {
+                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
+                "uri": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
+                "isCurrentFile": true
+              }
+            }
+          ],
+          "kv_store": {
+            "file_paths": [
               "src/panelview.ts"
             ]
           }
@@ -858,39 +933,6 @@
           "kv_store": {
             "file_paths": [
               "src/panelview.ts",
-              "src/panelview.ts"
-            ]
-          }
-        }
-      ],
-      "kv_store": {}
-    },
-    {
-      "ai_editor": "cursor",
-      "customTitle": "Improving Prism.js Syntax Highlighting for Dark Mode",
-      "id": "c86cbe6b-cf5f-425b-af1b-2ff09c3ecd39",
-      "parent_id": null,
-      "created_on": "2024-10-05T05:06:43.158Z",
-      "messages": [
-        {
-          "id": "3651ce39-6e2b-439d-8f6f-c681fda85227",
-          "messageText": "Is there a way to update this so prism.js highlights the code nicely in dark mode as well?",
-          "responseText": "Certainly! To ensure Prism.js highlights code nicely in both light and dark modes, we can make a few adjustments to the CSS and JavaScript. Here's how we can update the code to achieve better syntax highlighting in dark mode:\n\n1. First, let's add a custom CSS class for dark mode syntax highlighting. Add this to the `<style>` section of your HTML:\n\n```typescript:src/panelview.ts\n// ... existing styles ...\n\n/* Dark mode syntax highlighting */\n.vscode-dark pre[class*=\"language-\"],\n.vscode-dark code[class*=\"language-\"] {\n    color: #f8f8f2;\n    background: none;\n    text-shadow: 0 1px rgba(0, 0, 0, 0.3);\n    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;\n    font-size: 1em;\n    text-align: left;\n    white-space: pre;\n    word-spacing: normal;\n    word-break: normal;\n    word-wrap: normal;\n    line-height: 1.5;\n    tab-size: 4;\n    hyphens: none;\n}\n\n.vscode-dark .token.comment,\n.vscode-dark .token.prolog,\n.vscode-dark .token.doctype,\n.vscode-dark .token.cdata {\n    color: #8292a2;\n}\n\n.vscode-dark .token.punctuation {\n    color: #f8f8f2;\n}\n\n.vscode-dark .token.namespace {\n    opacity: .7;\n}\n\n.vscode-dark .token.property,\n.vscode-dark .token.tag,\n.vscode-dark .token.constant,\n.vscode-dark .token.symbol,\n.vscode-dark .token.deleted {\n    color: #ff79c6;\n}\n\n.vscode-dark .token.boolean,\n.vscode-dark .token.number {\n    color: #bd93f9;\n}\n\n.vscode-dark .token.selector,\n.vscode-dark .token.attr-name,\n.vscode-dark .token.string,\n.vscode-dark .token.char,\n.vscode-dark .token.builtin,\n.vscode-dark .token.inserted {\n    color: #50fa7b;\n}\n\n.vscode-dark .token.operator,\n.vscode-dark .token.entity,\n.vscode-dark .token.url,\n.vscode-dark .language-css .token.string,\n.vscode-dark .style .token.string,\n.vscode-dark .token.variable {\n    color: #f8f8f2;\n}\n\n.vscode-dark .token.atrule,\n.vscode-dark .token.attr-value,\n.vscode-dark .token.function,\n.vscode-dark .token.class-name {\n    color: #f1fa8c;\n}\n\n.vscode-dark .token.keyword {\n    color: #8be9fd;\n}\n\n.vscode-dark .token.regex,\n.vscode-dark .token.important {\n    color: #ffb86c;\n}\n\n.vscode-dark .token.important,\n.vscode-dark .token.bold {\n    font-weight: bold;\n}\n\n.vscode-dark .token.italic {\n    font-style: italic;\n}\n\n.vscode-dark .token.entity {\n    cursor: help;\n}\n\n// ... rest of the styles ...\n```\n\n2. Next, we need to modify the JavaScript to apply these styles dynamically based on the current VS Code theme. Add this function to your script section:\n\n```typescript:src/panelview.ts\n// ... existing script ...\n\nfunction updatePrismTheme() {\n    const isDarkMode = document.body.classList.contains('vscode-dark');\n    document.querySelectorAll('pre[class*=\"language-\"], code[class*=\"language-\"]').forEach(element => {\n        if (isDarkMode) {\n            element.classList.add('vscode-dark');\n        } else {\n            element.classList.remove('vscode-dark');\n        }\n    });\n    Prism.highlightAll();\n}\n\n// ... rest of the script ...\n```\n\n3. Now, we need to call this function whenever the content is updated and when the VS Code theme changes. Modify your `window.addEventListener('message', ...)` handler:\n\n```typescript:src/panelview.ts\nwindow.addEventListener('message', event => {\n    const message = event.data;\n    if (message.type === 'update') {\n        // ... existing update logic ...\n\n        // After updating the content\n        restoreExpandedCommits();\n        restoreExpandedPanelChats();\n        restoreExpandedInlineChats();\n        restoreInlineChatsExpandedState();\n        restoreScrollPosition();\n        updatePrismTheme(); // Call this instead of Prism.highlightAll()\n    }\n});\n\n// Add a new event listener for theme changes\nwindow.addEventListener('vscode.theme-changed', () => {\n    updatePrismTheme();\n});\n\n// ... rest of the script ...\n```\n\n4. Finally, make sure to call `updatePrismTheme()` when the webview is first loaded:\n\n```typescript:src/panelview.ts\n// Notify the extension that the Webview is ready\nvscode.postMessage({ command: 'webviewReady' });\nupdatePrismTheme(); // Add this line\n```\n\nThese changes will apply a dark theme to the Prism.js syntax highlighting when VS Code is in dark mode, and revert to the default light theme when VS Code is in light mode. The syntax highlighting will update dynamically if the user switches between light and dark themes in VS Code.\n\nRemember to test these changes in both light and dark modes to ensure they work as expected. You may need to fine-tune the colors in the CSS to match your preferred color scheme for dark mode.",
-          "model": "claude-3.5-sonnet",
-          "timestamp": "2024-10-05T05:06:43.158Z",
-          "context": [
-            {
-              "context_type": "file",
-              "key": "3116fa37-b423-4486-b74c-cd30b234c5a3",
-              "value": {
-                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
-                "uri": "/Users/alex/Documents/GitHub/gait-copilot/src/panelview.ts",
-                "isCurrentFile": true
-              }
-            }
-          ],
-          "kv_store": {
-            "file_paths": [
               "src/panelview.ts"
             ]
           }
@@ -1096,6 +1138,50 @@
       "selection": null,
       "timestamp": "2024-10-03T03:20:58.553Z",
       "prompt": "run git rev-list --parents HEAD | tail -1 using simplegit\n",
+      "parent_inline_chat_id": null
+    },
+    {
+      "inline_chat_id": "516bdc71-0271-403e-bcca-db2e1b0d7a74",
+      "file_diff": [
+        {
+          "file_path": "resources/welcome.md",
+          "diffs": [
+            {
+              "count": 15,
+              "added": false,
+              "removed": false,
+              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Usage\n\n### Managing Panel Chats\n"
+            },
+            {
+              "count": 1,
+              "added": true,
+              "removed": false,
+              "value": "<img src=\"paneldemo.gif\" alt=\"Panel Demo\" width=\"400\"/>\n"
+            },
+            {
+              "count": 1,
+              "added": false,
+              "removed": false,
+              "value": "\n"
+            },
+            {
+              "count": 2,
+              "added": false,
+              "removed": true,
+              "value": "![Panel Demo](paneldemo.gif)\n\n"
+            },
+            {
+              "count": 28,
+              "added": false,
+              "removed": false,
+              "value": "1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n\n### Viewing AI-Generated Code Prompts\n\n![Hover Demo](hoverdemo.gif)\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Adding or Removing Chats\n\nUtilize the gait side view to add new chats or remove existing ones.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Choose the option to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
+            }
+          ]
+        }
+      ],
+      "selection": null,
+      "timestamp": "2024-10-05T00:54:12.828Z",
+      "prompt": "can you make the gif smaller?",
       "parent_inline_chat_id": null
     },
     {
@@ -1341,6 +1427,44 @@
       "parent_inline_chat_id": null
     },
     {
+      "inline_chat_id": "cc880a96-6c78-45fe-a323-2d127e6c6999",
+      "file_diff": [
+        {
+          "file_path": "resources/welcome.md",
+          "diffs": [
+            {
+              "count": 21,
+              "added": false,
+              "removed": false,
+              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Usage\n\n### gait Automatically Records Chats\n\nNo work on your end. There might be some delay! \n\n### Viewing AI-Generated Code Prompts\n\n![Hover Demo](hoverdemo.gif)\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Stage, Unstage, and Delete Chats\n<img src=\"paneldemo.gif\" alt=\"Panel Demo\" width=\"400\"/>\n\n1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n"
+            },
+            {
+              "count": 1,
+              "added": false,
+              "removed": true,
+              "value": "3. ** Add the .gait/state.json when you commit **.\n"
+            },
+            {
+              "count": 1,
+              "added": true,
+              "removed": false,
+              "value": "3. **Add the .gait/state.json when you commit**.\n"
+            },
+            {
+              "count": 26,
+              "added": false,
+              "removed": false,
+              "value": "\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Click the \"resume\" button to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
+            }
+          ]
+        }
+      ],
+      "selection": null,
+      "timestamp": "2024-10-05T00:59:55.747Z",
+      "prompt": "how do i bold this",
+      "parent_inline_chat_id": null
+    },
+    {
       "inline_chat_id": "d04a42b3-5d37-44d0-9736-5cfcc17affd2",
       "file_diff": [
         {
@@ -1530,6 +1654,38 @@
       "selection": null,
       "timestamp": "2024-10-03T05:51:02.124Z",
       "prompt": "Change this function so that single lines are added only if they uniquely match one single line in the file",
+      "parent_inline_chat_id": null
+    },
+    {
+      "inline_chat_id": "d2e7c418-ce3e-4808-a0b1-af955df327b2",
+      "file_diff": [
+        {
+          "file_path": "resources/welcome.md",
+          "diffs": [
+            {
+              "count": 15,
+              "added": false,
+              "removed": false,
+              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Usage\n\n### Managing Panel Chats\n"
+            },
+            {
+              "count": 8,
+              "added": true,
+              "removed": false,
+              "value": "\n\n### Managing Panel Chats\n\n![Panel Demo](paneldemo.gif)\n\n\n\n"
+            },
+            {
+              "count": 26,
+              "added": false,
+              "removed": false,
+              "value": "1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n\n### Viewing AI-Generated Code Prompts\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Adding or Removing Chats\n\nUtilize the gait side view to add new chats or remove existing ones.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Choose the option to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
+            }
+          ]
+        }
+      ],
+      "selection": null,
+      "timestamp": "2024-10-05T00:53:12.704Z",
+      "prompt": "can you embed paneldemo.gif in here?",
       "parent_inline_chat_id": null
     },
     {
@@ -1785,127 +1941,15 @@
       "timestamp": "2024-10-04T00:36:42.185Z",
       "prompt": "is it possible to make this a map from inline_chat_id to InlineChatInfo?",
       "parent_inline_chat_id": null
-    },
-    {
-      "inline_chat_id": "d2e7c418-ce3e-4808-a0b1-af955df327b2",
-      "file_diff": [
-        {
-          "file_path": "resources/welcome.md",
-          "diffs": [
-            {
-              "count": 15,
-              "added": false,
-              "removed": false,
-              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Usage\n\n### Managing Panel Chats\n"
-            },
-            {
-              "count": 8,
-              "added": true,
-              "removed": false,
-              "value": "\n\n### Managing Panel Chats\n\n![Panel Demo](paneldemo.gif)\n\n\n\n"
-            },
-            {
-              "count": 26,
-              "added": false,
-              "removed": false,
-              "value": "1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n\n### Viewing AI-Generated Code Prompts\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Adding or Removing Chats\n\nUtilize the gait side view to add new chats or remove existing ones.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Choose the option to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
-            }
-          ]
-        }
-      ],
-      "selection": null,
-      "timestamp": "2024-10-05T00:53:12.704Z",
-      "prompt": "can you embed paneldemo.gif in here?",
-      "parent_inline_chat_id": null
-    },
-    {
-      "inline_chat_id": "516bdc71-0271-403e-bcca-db2e1b0d7a74",
-      "file_diff": [
-        {
-          "file_path": "resources/welcome.md",
-          "diffs": [
-            {
-              "count": 15,
-              "added": false,
-              "removed": false,
-              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Usage\n\n### Managing Panel Chats\n"
-            },
-            {
-              "count": 1,
-              "added": true,
-              "removed": false,
-              "value": "<img src=\"paneldemo.gif\" alt=\"Panel Demo\" width=\"400\"/>\n"
-            },
-            {
-              "count": 1,
-              "added": false,
-              "removed": false,
-              "value": "\n"
-            },
-            {
-              "count": 2,
-              "added": false,
-              "removed": true,
-              "value": "![Panel Demo](paneldemo.gif)\n\n"
-            },
-            {
-              "count": 28,
-              "added": false,
-              "removed": false,
-              "value": "1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n\n### Viewing AI-Generated Code Prompts\n\n![Hover Demo](hoverdemo.gif)\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Adding or Removing Chats\n\nUtilize the gait side view to add new chats or remove existing ones.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Choose the option to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
-            }
-          ]
-        }
-      ],
-      "selection": null,
-      "timestamp": "2024-10-05T00:54:12.828Z",
-      "prompt": "can you make the gif smaller?",
-      "parent_inline_chat_id": null
-    },
-    {
-      "inline_chat_id": "cc880a96-6c78-45fe-a323-2d127e6c6999",
-      "file_diff": [
-        {
-          "file_path": "resources/welcome.md",
-          "diffs": [
-            {
-              "count": 21,
-              "added": false,
-              "removed": false,
-              "value": "# Getting Started with gait\n\nWelcome to gait, your intelligent companion for storing and sharing copilot conversations in VS Code or Cursor!\n\n## Usage\n\n### gait Automatically Records Chats\n\nNo work on your end. There might be some delay! \n\n### Viewing AI-Generated Code Prompts\n\n![Hover Demo](hoverdemo.gif)\n\nHover over AI-generated code to see the prompt that led to that particular code snippet.\n\n### Stage, Unstage, and Delete Chats\n<img src=\"paneldemo.gif\" alt=\"Panel Demo\" width=\"400\"/>\n\n1. Open the gait side view by clicking on the gait icon in the Activity Bar.\n2. Use the Panel View to stage or unstage chats, similar to managing files in a Git commit.\n"
-            },
-            {
-              "count": 1,
-              "added": false,
-              "removed": true,
-              "value": "3. ** Add the .gait/state.json when you commit **.\n"
-            },
-            {
-              "count": 1,
-              "added": true,
-              "removed": false,
-              "value": "3. **Add the .gait/state.json when you commit**.\n"
-            },
-            {
-              "count": 26,
-              "added": false,
-              "removed": false,
-              "value": "\n\n### Toggling Annotations (Hover and Highlight)\n\nUse the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.\n\n### Continuing a Chat\n\n1. Select a previous chat from the Panel View.\n2. Click the \"resume\" button to continue the chat.\n3. Gait will provide all necessary context, including prompts and context files, in a markdown file.\n\n\n## Features\n\n1. **Automatic Chat Capture**: Gait automatically captures your inline chats and panel chats.\n2. **Chat Management**: Manage panel chats in the UI - stage and unstage them like files in a commit.\n3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.\n4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.\n5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.\n\n## Support\n\nIf you encounter any issues or have questions, text me or call me at 408-680-6718 or email founders@getgait.com\n\nHappy coding with gait!"
-            }
-          ]
-        }
-      ],
-      "selection": null,
-      "timestamp": "2024-10-05T00:59:55.747Z",
-      "prompt": "how do i bold this",
-      "parent_inline_chat_id": null
     }
   ],
   "schemaVersion": "1.0",
   "deletedChats": {
     "deletedMessageIDs": [],
     "deletedPanelChatIDs": [
+      "2fdda614-a7cd-42aa-b922-3025ce89bcfb",
       "58eb7776-2f70-4961-b5d9-14d3826ba6c5",
+      "675ad9a3-91eb-439f-926e-11b130d1ead5",
       "6c2a5a56-1f60-49d0-a68f-b05a15576f6d",
       "7d943210-bd29-47ab-88b8-facadd6cc441",
       "970cc79d-df04-4088-b2c1-2b0caad5dba0",
@@ -1916,9 +1960,7 @@
       "d8c44101-9702-428a-8eb6-f6bcd1cec633",
       "dab5a383-1eb5-4348-8591-40a62f4423f7",
       "e2671102-ea50-446e-b3e1-57636a14f35d",
-      "e7f59633-27d4-4a56-a3ae-237dc29c3772",
-      "675ad9a3-91eb-439f-926e-11b130d1ead5",
-      "2fdda614-a7cd-42aa-b922-3025ce89bcfb"
+      "e7f59633-27d4-4a56-a3ae-237dc29c3772"
     ]
   },
   "kv_store": {}
