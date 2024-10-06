@@ -245,6 +245,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
             // console.log("Already associated: ", message.id);
         }
         const codeBlocks = extractCodeBlocks(message.responseText);
+        decorationIndex += 1;
         for (const code of codeBlocks) {
             const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
             if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
@@ -254,7 +255,6 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
                 });
             }
             if (currentRanges.length > 0) {
-                decorationIndex += 1;
                 const color = generateColors(decorationIndex);
 
                 function lineInRangesToPanel(line: number) {

@@ -235,7 +235,11 @@
               }
             }
           ],
-          "kv_store": {}
+          "kv_store": {
+            "file_paths": [
+              "src/tools/dbReader.ts"
+            ]
+          }
         }
       ],
       "kv_store": {}
