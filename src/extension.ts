@@ -235,8 +235,8 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
         ? fs.readFileSync(gitAttributesPath, 'utf-8')
         : '';
 
-    if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/ -diff`)) {
-        fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/ -diff\n`);
+    if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true`)) {
+        fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true\n`);
         vscode.window.showInformationMessage('.gitattributes updated successfully');
     }
 }
@@ -539,7 +539,7 @@ exit 0
             const gitConfigDriverCmd = `git config --local merge.custom-stashed-state.driver "${customMergeDriverPath} %O %A %B"`;
             child_process.execSync(gitConfigDriverCmd, { cwd: workspaceFolder.uri.fsPath });
 
-            vscode.window.showInformationMessage('Git merge driver configured successfully.');
+            // vscode.window.showInformationMessage('Git merge driver configured successfully.');
         } catch (error) {
             console.error('Error configuring git merge driver:', error);
             vscode.window.showErrorMessage('Failed to configure git merge driver.');
