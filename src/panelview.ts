@@ -493,6 +493,22 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             margin: 0;
             font-size: 1.2em;
         }
+
+        details {
+              margin-top: 10px;
+              margin-bottom: 10px;
+          }
+
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+            color: blue;
+        }
+
+        summary:hover {
+            text-decoration: underline;
+        }
+
         .commit-details {
             display: none;
             margin-top: 10px;
@@ -964,7 +980,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 console.warn('Code', JSON.stringify(code)); // Debugging log
 
                 // Append the formatted code block
-                formattedText += \`<pre><code class="language-\${language}">\${code}</code></pre>\`;
+                formattedText += \`
+<details>
+    <summary>Show Code</summary>
+    <pre><code class="language-\${language}">\${code}</code></pre>
+</details>
+\`;
 
                 lastIndex = index + match[0].length;
             }
@@ -1276,7 +1297,36 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         let expandedPanelChats = new Set(); // New Set to track expanded panel chats
         let expandedInlineChats = new Set(); // New Set to track expanded inline chats
         let isInlineChatsExpanded = false; // New flag to track the expanded state of inline chats
+        let expandedCodeBlocks = new Set();
 
+        function saveExpandedCodeBlocks() {
+            expandedCodeBlocks.clear();
+            document.querySelectorAll('details').forEach((details, index) => {
+                if (details.open) {
+                    expandedCodeBlocks.add(index);
+                }
+            });
+        }
+
+        function restoreExpandedCodeBlocks() {
+            document.querySelectorAll('details').forEach((details, index) => {
+                if (expandedCodeBlocks.has(index)) {
+                    details.open = true;
+                }
+            });
+        }
+
+        function attachCodeBlockListeners() {
+            document.querySelectorAll('details').forEach((details, index) => {
+                details.addEventListener('toggle', () => {
+                    if (details.open) {
+                        expandedCodeBlocks.add(index);
+                    } else {
+                        expandedCodeBlocks.delete(index);
+                    }
+                });
+            });
+        }
 
         function saveScrollPosition() {
             scrollPosition = document.scrollingElement.scrollTop;
@@ -1387,6 +1437,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 saveExpandedCommits();
                 saveExpandedPanelChats(); // Save expanded panel chats
                 saveExpandedInlineChats(); // Save expanded inline chats
+                saveExpandedCodeBlocks();
 
                 const contentElement = document.getElementById('content');
                 contentElement.innerHTML = ''; // Clear existing content
@@ -1713,6 +1764,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     attachLinkListeners();
 
                     attachInlineChatToggleListeners();
+
+                    attachCodeBlockListeners();
                 } else {
                     const noCommits = document.createElement('div');
                     noCommits.className = 'no-commits';
@@ -1725,6 +1778,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 restoreExpandedPanelChats(); // Restore expanded panel chats
                 restoreExpandedInlineChats();
                 restoreInlineChatsExpandedState(); // Restore expanded inline chats state
+                restoreExpandedCodeBlocks();
                 restoreScrollPosition();
                 updatePrismTheme();
             }
