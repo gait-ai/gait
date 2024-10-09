@@ -627,8 +627,8 @@
     },
     {
       "ai_editor": "cursor",
-      "customTitle": "Adding Gait Search Exclusion to Settings File",
       "id": "a31186a3-7da8-4fca-9c3b-86faeeb155e3",
+      "customTitle": "Adding Gait Search Exclusion to Settings File",
       "parent_id": null,
       "created_on": "2024-10-05T17:29:13.680Z",
       "messages": [
@@ -751,8 +751,8 @@
     },
     {
       "ai_editor": "cursor",
-      "customTitle": "Improving Prism.js Syntax Highlighting for Dark Mode",
       "id": "c86cbe6b-cf5f-425b-af1b-2ff09c3ecd39",
+      "customTitle": "Improving Prism.js Syntax Highlighting for Dark Mode",
       "parent_id": null,
       "created_on": "2024-10-05T05:06:43.158Z",
       "messages": [
