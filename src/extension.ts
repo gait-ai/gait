@@ -225,11 +225,11 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
 /**
  * Creates the .gait folder and necessary files if they don't exist.
  */
-function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
+async function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
     const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
     if (!fs.existsSync(gaitFolderPath)) {
         fs.mkdirSync(gaitFolderPath);
-        vscode.window.showInformationMessage(`${GAIT_FOLDER_NAME} folder created successfully`);
+        vscode.window.showInformationMessage(`${GAIT_FOLDER_NAME} folder created successfully. Please commit this folderto save your chats.`);
     }
 
 
@@ -241,6 +241,14 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
     if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true`)) {
         fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true\n`);
         vscode.window.showInformationMessage('.gitattributes updated successfully');
+    }
+    // Add .gait folder to Git
+    try {
+        const git = simpleGit(workspaceFolder.uri.fsPath);
+        await git.add(GAIT_FOLDER_NAME);
+    } catch (error) {
+        console.error('Error adding .gait folder to Git:', error);
+        vscode.window.showErrorMessage('Failed to add .gait folder to Git tracking');
     }
 }
 
@@ -283,7 +291,9 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     try {
-        createGaitFolderIfNotExists(workspaceFolder);
+        setTimeout(async () => {
+            await createGaitFolderIfNotExists(workspaceFolder);
+        }, 1);
     } catch (error) {
         vscode.window.showErrorMessage('fatal: unable to create gait folder!');
         posthog.capture('fatal_unable_to_create_gait_folder');
@@ -628,7 +638,8 @@ exit 0
     }, 1000);
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('gait.showIndividualPanelChat', async (panelChatId?: string) => {
+        vscode.commands.registerCommand('gait.showIndividualPanelChat', async (args) => {
+            let panelChatId = args.panelChatId;
             if (!panelChatId) {
                 // If no panelChatId is provided, prompt the user to enter one
                 panelChatId = await vscode.window.showInputBox({

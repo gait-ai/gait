@@ -38,6 +38,14 @@ export function createHoverContent(context: vscode.ExtensionContext, markdown: v
     //markdown.supportHtml = true; // Allows HTML in the Markdown
     markdown.isTrusted = true; // Allows advanced Markdown features
 
+    // Add action buttons at the end of the hover content
+    const deleteCommand = vscode.Uri.parse(`command:gait.removeInlineChat?${encodeURIComponent(JSON.stringify({
+        filePath: vscode.workspace.asRelativePath(document.uri),
+        inline_chat_id: inlineChat.inline_chat_id
+    }))}`);
+    
+    markdown.appendMarkdown(`[Delete Inline Chat ](${deleteCommand})`);
+    markdown.appendMarkdown(`\n\n`);
     const timeAgo = getTimeAgo(timestamp);
     markdown.appendMarkdown(`### ${author ?? "You"}: ${prompt} (${new Date(timestamp).toISOString().split('T')[0]}) (${timeAgo}) \n\n---\n`);
     markdown.appendMarkdown(`**Commit**: ${commitMessage} (${commitHash}) \n\n---\n`);
@@ -66,14 +74,6 @@ export function createHoverContent(context: vscode.ExtensionContext, markdown: v
         }).join('\n');
         markdown.appendCodeblock('\n'+diffText, 'diff');
     }
-    // Add action buttons at the end of the hover content
-    markdown.appendMarkdown(`\n\n`);
-    const deleteCommand = vscode.Uri.parse(`command:gait.removeInlineChat?${encodeURIComponent(JSON.stringify({
-        filePath: vscode.workspace.asRelativePath(document.uri),
-        inline_chat_id: inlineChat.inline_chat_id
-    }))}`);
-    
-    markdown.appendMarkdown(`[Delete This Inline Chat Annotation](${deleteCommand})`);
     if (parent_inline_chat_id) {
         // Load the parent inline chat
         const parentInlineChat = getInlineParent(context, parent_inline_chat_id);

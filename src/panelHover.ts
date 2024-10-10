@@ -19,12 +19,34 @@ function getTimeAgo(timestamp: string): string {
 export function createPanelHover(context: vscode.ExtensionContext, matchedRange: PanelMatchedRange, document: vscode.TextDocument, idToCommitInfo: Map<String, CommitData>): vscode.MarkdownString {
     let markdown = new vscode.MarkdownString();
     const { panelChat, message_id } = matchedRange;
-
-    // Find the message that resulted in the matched range
     const message = panelChat.messages.find(msg => msg.id === message_id);
     if (!message) {
         return new vscode.MarkdownString();
     }
+    const commitInfo = idToCommitInfo?.get(message.id);
+
+    if (commitInfo) {
+        commitInfo.inlineChats =[];
+        commitInfo.panelChats =[];
+    }
+
+    const markdownData = [{commit: commitInfo, panelChat: panelChat}];
+    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
+ 
+    const continueCommand = vscode.Uri.parse(`command:gait.exportPanelChatsToMarkdown?${encodeURIComponent(
+        JSON.stringify({data: encodedData, continue_chat: false}))}`);
+    markdown.appendMarkdown(`[Continue Chat](${continueCommand})  |  `);
+    const deleteCommand = vscode.Uri.parse(`command:gait.removePanelChat?${encodeURIComponent(JSON.stringify({
+        panelChatId: panelChat.id,
+    }))}`);
+    markdown.appendMarkdown(`[Delete Panel Chat](${deleteCommand})`);
+
+    const viewFullChatCommand = vscode.Uri.parse(`command:gait.showIndividualPanelChat?${encodeURIComponent(JSON.stringify({
+        panelChatId: panelChat.id,
+    }))}`);
+    markdown.appendMarkdown(`  |  [View Full Chat](${viewFullChatCommand}) \n\n`);
+    
+    // Find the message that resulted in the matched range
     // Append previous messages in small text
     if (panelChat.messages.length > 1) {
         markdown.appendMarkdown('#### Previous messages:\n\n');
@@ -40,7 +62,6 @@ export function createPanelHover(context: vscode.ExtensionContext, matchedRange:
         markdown.appendMarkdown('---\n\n');
     }
 
-    const commitInfo = idToCommitInfo?.get(message.id);
     const author = commitInfo?.author ?? "You";
     const commitMessage = commitInfo?.commitMessage ?? "Uncommited changes";
 
@@ -63,21 +84,7 @@ export function createPanelHover(context: vscode.ExtensionContext, matchedRange:
 
     markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\n\n`);
 
-    if (commitInfo) {
-        commitInfo.inlineChats =[];
-        commitInfo.panelChats =[];
-    }
 
-    const markdownData = [{commit: commitInfo, panelChat: panelChat}];
-    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
- 
-    const continueCommand = vscode.Uri.parse(`command:gait.exportPanelChatsToMarkdown?${encodeURIComponent(
-        JSON.stringify({data: encodedData, continue_chat: false}))}`);
-    markdown.appendMarkdown(`[Continue Chat](${continueCommand})  |  `);
-    const deleteCommand = vscode.Uri.parse(`command:gait.removePanelChat?${encodeURIComponent(JSON.stringify({
-        panelChatId: panelChat.id,
-    }))}`);
-    markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);
     return markdown;
 }
 
