@@ -2702,6 +2702,50 @@
       "timestamp": "2024-10-04T00:36:42.185Z",
       "prompt": "is it possible to make this a map from inline_chat_id to InlineChatInfo?",
       "parent_inline_chat_id": null
+    },
+    {
+      "inline_chat_id": "07795881-41bb-4e01-bd64-37e614d4089b",
+      "file_diff": [
+        {
+          "file_path": "src/panelHover.ts",
+          "diffs": [
+            {
+              "count": 27,
+              "added": false,
+              "removed": false,
+              "value": "import * as vscode from 'vscode';\nimport { PanelChat, PanelMatchedRange } from './types';\nimport { CommitData, getIdToCommitInfo, getMessageFromGitHistory, GitHistoryData } from './panelgit';\nimport { STASHED_GAIT_STATE_FILE_NAME } from './constants';\n\nfunction getTimeAgo(timestamp: string): string {\n    const timeDiffMs = new Date().getTime() - new Date(timestamp).getTime();\n    const hoursSinceEdit = Math.floor(timeDiffMs / (1000 * 3600));\n    const daysSinceEdit = Math.floor(timeDiffMs / (1000 * 3600 * 24));\n    return daysSinceEdit === 0 ? `${hoursSinceEdit} hours ago` : daysSinceEdit === 1 ? 'yesterday' : `${daysSinceEdit} days ago`;\n}\n\n/**\n * Creates hover content for a matched panel chat range.\n * @param matchedRange The matched range containing the panel chat and message information.\n * @param document The VSCode text document.\n * @returns A promise that resolves to a VSCode Hover object.\n */\nexport function createPanelHover(context: vscode.ExtensionContext, matchedRange: PanelMatchedRange, document: vscode.TextDocument, idToCommitInfo: Map<String, CommitData>): vscode.MarkdownString {\n    let markdown = new vscode.MarkdownString();\n    const { panelChat, message_id } = matchedRange;\n\n    // Find the message that resulted in the matched range\n    const message = panelChat.messages.find(msg => msg.id === message_id);\n    if (!message) {\n        return new vscode.MarkdownString();\n    }\n"
+            },
+            {
+              "count": 10,
+              "added": true,
+              "removed": false,
+              "value": "    // Append previous messages in small text\n    if (panelChat.messages.length > 1) {\n        markdown.appendMarkdown('#### Previous messages:\\n\\n');\n        for (let i = 0; i < panelChat.messages.length; i++) {\n            const prevMessage = panelChat.messages[i];\n            if (prevMessage.id === message_id) {\n                break;\n            }\n            const prevCommitInfo = idToCommitInfo?.get(prevMessage.id);\n            const prevAuthor = prevCommitInfo?.author ?? \"You\";\n"
+            },
+            {
+              "count": 1,
+              "added": false,
+              "removed": false,
+              "value": "\n"
+            },
+            {
+              "count": 1,
+              "added": true,
+              "removed": false,
+              "value": "\n"
+            },
+            {
+              "count": 62,
+              "added": false,
+              "removed": false,
+              "value": "    const commitInfo = idToCommitInfo?.get(message.id);\n    const author = commitInfo?.author ?? \"You\";\n    const commitMessage = commitInfo?.commitMessage ?? \"Uncommited changes\";\n\n    markdown.isTrusted = true;\n\n    // Display the message text and response\n    const messageAuthor = commitInfo?.author ?? \"You\";\n    markdown.appendMarkdown(`### ${messageAuthor}: ${message.messageText}\\n\\n`);\n    // Escape backticks and newlines in the response text\n    markdown.appendMarkdown(`**Response**: ${message.responseText}\\n\\n`);\n\n    // Display the context information in small text\n    if (message.context && message.context.length > 0) {\n        markdown.appendMarkdown(`**Context**: ${message.context[0].value.human_readable}`);\n        if (message.context.length > 1) {\n            markdown.appendMarkdown(` (and ${message.context.length - 1} more)`);\n        }\n        markdown.appendMarkdown(`\\n\\n`);\n    }\n\n    markdown.appendMarkdown(`**Commit**: ${commitMessage} by ${author}\\n\\n`);\n\n    if (commitInfo) {\n        commitInfo.inlineChats =[];\n        commitInfo.panelChats =[];\n    }\n\n    const markdownData = [{commit: commitInfo, panelChat: panelChat}];\n    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');\n \n    const continueCommand = vscode.Uri.parse(`command:gait.exportPanelChatsToMarkdown?${encodeURIComponent(\n        JSON.stringify({data: encodedData, continue_chat: false}))}`);\n    markdown.appendMarkdown(`[Continue Chat](${continueCommand})  |  `);\n    const deleteCommand = vscode.Uri.parse(`command:gait.removePanelChat?${encodeURIComponent(JSON.stringify({\n        panelChatId: panelChat.id,\n    }))}`);\n    markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);\n    return markdown;\n}\n\n\nexport function getAfterText(panelChat: PanelChat, messageId: string, gitHistory: Map<string, CommitData>): string {\n    let afterText = '';\n    const message = panelChat.messages.find(msg => msg.id === messageId);\n    if (!message) {\n        return '';\n    }\n    let author = \"You\";\n    let timeAgo = \"\";\n    if (gitHistory && gitHistory.get(messageId)) {\n        const commitData = gitHistory.get(messageId);\n        if (commitData) {\n            const { date } = commitData;\n            timeAgo = getTimeAgo(date.toISOString());\n            author = commitData.author;\n        }\n    }\n    afterText += ` ${author}: ${timeAgo} - ${message.messageText.slice(0, 30)}${message.messageText.length > 30 ? '...' : ''}`;\n\n    return afterText.trim();\n}\n"
+            }
+          ]
+        }
+      ],
+      "selection": null,
+      "timestamp": "2024-10-10T06:01:28.598Z",
+      "prompt": "can we append previous messages at the beginning in small text?",
+      "parent_inline_chat_id": null
     }
   ],
   "schemaVersion": "1.0",
