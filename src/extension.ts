@@ -20,6 +20,8 @@ import posthog from 'posthog-js';
 import { identifyRepo, identifyUser } from './identify_user';
 import simpleGit from 'simple-git';
 import { addGaitSearchExclusion } from './setup/exclude_search';
+import { getGitHistory, GitHistoryData } from './panelgit';
+import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 
 posthog.init('phc_vosMtvFFxCN470e8uHGDYCD6YuuSRSoFoZeLuciujry',
     {
@@ -30,8 +32,8 @@ posthog.init('phc_vosMtvFFxCN470e8uHGDYCD6YuuSRSoFoZeLuciujry',
 
 const GAIT_FOLDER_NAME = '.gait';
 
-let disposibleDecorations: { decorationTypes: vscode.Disposable[], hoverProvider: vscode.Disposable } | undefined;
-let decorationsActive = true;
+let disposibleDecorations: vscode.Disposable[] = [];
+let decorationsActive = false;
 let timeOfLastDecorationChange = Date.now();
 
 let isRedecorating = false;
@@ -45,6 +47,8 @@ let lastInlineChatStart: Inline.InlineStartInfo | null = null;
 let lastPanelChatNum: number = 0;
 
 let fileState: { [key: string]: string } = {};
+let gitHistory: GitHistoryData | null = null;
+let hoverDecorationTypes: vscode.Disposable[] = [];
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
     let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -210,8 +214,7 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
     isRedecorating = true;
 
     if (disposibleDecorations) {
-        disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
-        disposibleDecorations.hoverProvider.dispose();
+        disposibleDecorations.forEach(decoration => decoration.dispose());
     }
 
     disposibleDecorations = InlineDecoration.decorateActive(context, decorationsActive);
@@ -235,8 +238,8 @@ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
         ? fs.readFileSync(gitAttributesPath, 'utf-8')
         : '';
 
-    if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/ -diff`)) {
-        fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/ -diff\n`);
+    if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true`)) {
+        fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true\n`);
         vscode.window.showInformationMessage('.gitattributes updated successfully');
     }
 }
@@ -291,8 +294,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     writeStashedState(context, readStashedStateFromFile());
     context.workspaceState.update('stashedState', readStashedStateFromFile());
-    setTimeout(() => {
+    setTimeout(async () => {
         monitorPanelChatAsync(stateReader, context);
+        const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`;
+        gitHistory = await getGitHistory(context, workspaceFolder.uri.fsPath, filePath);
     }, 3000); // Delay to ensure initial setup
 
     const provider = new PanelViewProvider(context);
@@ -397,9 +402,8 @@ export function activate(context: vscode.ExtensionContext) {
                 posthog.capture('deactivate_decorations', {
                     time_activated: Date.now() - timeOfLastDecorationChange,
                 });
-                disposibleDecorations.decorationTypes.forEach(decoration => decoration.dispose());
-                disposibleDecorations.hoverProvider.dispose();
-                disposibleDecorations = undefined;
+                disposibleDecorations.forEach(decoration => decoration.dispose());
+                disposibleDecorations = [];
             }
             vscode.window.showInformationMessage('gait hover deactivated.');
         }
@@ -539,7 +543,7 @@ exit 0
             const gitConfigDriverCmd = `git config --local merge.custom-stashed-state.driver "${customMergeDriverPath} %O %A %B"`;
             child_process.execSync(gitConfigDriverCmd, { cwd: workspaceFolder.uri.fsPath });
 
-            vscode.window.showInformationMessage('Git merge driver configured successfully.');
+            // vscode.window.showInformationMessage('Git merge driver configured successfully.');
         } catch (error) {
             console.error('Error configuring git merge driver:', error);
             vscode.window.showErrorMessage('Failed to configure git merge driver.');
@@ -587,6 +591,12 @@ exit 0
         debouncedRedecorate(context);
     });
 
+    vscode.window.onDidChangeTextEditorSelection((event) => {
+        if (gitHistory) {
+            hoverDecorationTypes = InlineDecoration.addDecorationForLine(context, event.textEditor, event.selections[0].active.line, hoverDecorationTypes, gitHistory);
+        }
+    });
+
     // Add a new event listener for text changes
     vscode.workspace.onDidChangeTextDocument((event) => {
         handleFileChange(event);
@@ -599,6 +609,8 @@ exit 0
             await triggerAccept(stateReader, context);
             triggerAcceptCount++;
             if (triggerAcceptCount % 3 === 0) {
+                const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`;
+                gitHistory = await getGitHistory(context, workspaceFolder.uri.fsPath, filePath);
                 if (await stateReader.matchPromptsToDiff()) {
                     debouncedRedecorate(context);
                 }

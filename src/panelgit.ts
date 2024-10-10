@@ -422,6 +422,10 @@ export async function getGitHistoryThatTouchesFile(
  */
 export async function getIdToCommitInfo(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
     const gitHistory = await getGitHistory(context, repoPath, filePath);
+    return getMessageFromGitHistory(gitHistory);
+}
+
+export function getMessageFromGitHistory(gitHistory: GitHistoryData): Map<string, CommitData> {
     const idToCommitInfo = new Map<string, CommitData>();
 
     for (const commit of gitHistory.commits) {
@@ -444,6 +448,10 @@ export async function getIdToCommitInfo(context: vscode.ExtensionContext, repoPa
  */
 export async function getInlineChatIdToCommitInfo(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<Map<string, CommitData>> {
     const gitHistory = await getGitHistory(context, repoPath, filePath);
+    return getInlineChatFromGitHistory(gitHistory);
+}
+
+export function getInlineChatFromGitHistory(gitHistory: GitHistoryData): Map<string, CommitData> {
     const idToCommitInfo = new Map<string, CommitData>();
 
     for (const commit of gitHistory.commits) {

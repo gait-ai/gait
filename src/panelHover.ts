@@ -1,7 +1,14 @@
 import * as vscode from 'vscode';
-import { PanelMatchedRange } from './types';
-import { getIdToCommitInfo } from './panelgit';
+import { PanelChat, PanelMatchedRange } from './types';
+import { CommitData, getIdToCommitInfo, getMessageFromGitHistory, GitHistoryData } from './panelgit';
 import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
+
+function getTimeAgo(timestamp: string): string {
+    const timeDiffMs = new Date().getTime() - new Date(timestamp).getTime();
+    const hoursSinceEdit = Math.floor(timeDiffMs / (1000 * 3600));
+    const daysSinceEdit = Math.floor(timeDiffMs / (1000 * 3600 * 24));
+    return daysSinceEdit === 0 ? `${hoursSinceEdit} hours ago` : daysSinceEdit === 1 ? 'yesterday' : `${daysSinceEdit} days ago`;
+}
 
 /**
  * Creates hover content for a matched panel chat range.
@@ -9,27 +16,14 @@ import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
  * @param document The VSCode text document.
  * @returns A promise that resolves to a VSCode Hover object.
  */
-export async function createPanelHover(context: vscode.ExtensionContext, matchedRange: PanelMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
+export function createPanelHover(context: vscode.ExtensionContext, matchedRange: PanelMatchedRange, document: vscode.TextDocument, idToCommitInfo: Map<String, CommitData>): vscode.MarkdownString {
     let markdown = new vscode.MarkdownString();
-    let idToCommitInfo = undefined;
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-        console.warn('No workspace folder found.');
-    } else {
-        try {
-            const repoPath = workspaceFolder.uri.fsPath;
-            const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`; // Replace with your actual file path relative to repo
-            idToCommitInfo = await getIdToCommitInfo(context, repoPath, filePath);
-        } catch (error) {
-            console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
-        }
-    }
     const { panelChat, message_id } = matchedRange;
 
     // Find the message that resulted in the matched range
     const message = panelChat.messages.find(msg => msg.id === message_id);
     if (!message) {
-        return undefined;
+        return new vscode.MarkdownString();
     }
 
     const commitInfo = idToCommitInfo?.get(message.id);
@@ -70,5 +64,27 @@ export async function createPanelHover(context: vscode.ExtensionContext, matched
         panelChatId: panelChat.id,
     }))}`);
     markdown.appendMarkdown(`[Delete This Panel Chat Annotation](${deleteCommand})`);
-    return new vscode.Hover(markdown);
+    return markdown;
+}
+
+
+export function getAfterText(panelChat: PanelChat, messageId: string, gitHistory: Map<string, CommitData>): string {
+    let afterText = '';
+    const message = panelChat.messages.find(msg => msg.id === messageId);
+    if (!message) {
+        return '';
+    }
+    let author = "You";
+    let timeAgo = "";
+    if (gitHistory && gitHistory.get(messageId)) {
+        const commitData = gitHistory.get(messageId);
+        if (commitData) {
+            const { date } = commitData;
+            timeAgo = getTimeAgo(date.toISOString());
+            author = commitData.author;
+        }
+    }
+    afterText += ` ${author}: ${timeAgo} - ${message.messageText.slice(0, 30)}${message.messageText.length > 30 ? '...' : ''}`;
+
+    return afterText.trim();
 }
