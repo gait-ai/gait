@@ -1450,7 +1450,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             }
         };
 
-
         /**
          * Attaches an event listener to the refresh button to update commit history.
          */
@@ -1731,6 +1730,30 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             attachCodeBlockListeners();
         }
 
+        function getCommitDateHtml(commit) {
+            if (commit.commitHash === 'added' || commit.commitHash === 'uncommitted') {
+                const mostRecentTimestamp = getMostRecentMessageTimestamp(commit.panelChats);
+                if (mostRecentTimestamp) {
+                    return \`<span class="commit-date">\${new Date(mostRecentTimestamp).toLocaleString()}</span>\`;
+                }
+                return ''; // Don't display time if there are no messages
+            }
+            return \`<span class="commit-date">\${new Date(commit.date).toLocaleString()}</span>\`;
+        }
+
+        function getMostRecentMessageTimestamp(panelChats) {
+            let mostRecentTimestamp = null;
+                panelChats.forEach(panelChat => {
+                panelChat.messages.forEach(message => {
+                const messageTimestamp = new Date(message.timestamp).getTime();
+                if (!mostRecentTimestamp || messageTimestamp > mostRecentTimestamp) {
+                    mostRecentTimestamp = messageTimestamp;
+                }
+            });
+        });
+            return mostRecentTimestamp;
+        }
+
         window.addEventListener('vscode.theme-changed', () => {
             updatePrismTheme();
         });
@@ -1786,7 +1809,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                             console.log("Commit Message: ", commitMessage);
                             commitHeader.innerHTML = \`
                                 <h3>\${escapeHtml(commitMessage)}</h3>
-                                <span class="commit-date">\${new Date(commit.date).toLocaleString()}</span>
+                                \${getCommitDateHtml(commit)}
                             \`;
 
                             commitDiv.appendChild(commitHeader);
