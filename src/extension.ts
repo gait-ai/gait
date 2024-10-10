@@ -225,7 +225,7 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
 /**
  * Creates the .gait folder and necessary files if they don't exist.
  */
-async function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
+ function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFolder) {
     const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
     if (!fs.existsSync(gaitFolderPath)) {
         fs.mkdirSync(gaitFolderPath);
@@ -241,14 +241,6 @@ async function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFold
     if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true`)) {
         fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true\n`);
         vscode.window.showInformationMessage('.gitattributes updated successfully');
-    }
-    // Add .gait folder to Git
-    try {
-        const git = simpleGit(workspaceFolder.uri.fsPath);
-        await git.add(GAIT_FOLDER_NAME);
-    } catch (error) {
-        console.error('Error adding .gait folder to Git:', error);
-        vscode.window.showErrorMessage('Failed to add .gait folder to Git tracking');
     }
 }
 
@@ -300,8 +292,15 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     try {
+        createGaitFolderIfNotExists(workspaceFolder);
         setTimeout(async () => {
-            await createGaitFolderIfNotExists(workspaceFolder);
+            try {
+                const git = simpleGit(workspaceFolder.uri.fsPath);
+                await git.add(GAIT_FOLDER_NAME);
+            } catch (error) {
+                console.error('Error adding .gait folder to Git:', error);
+                vscode.window.showErrorMessage('Failed to add .gait folder to Git tracking');
+            }
         }, 1);
     } catch (error) {
         vscode.window.showErrorMessage('fatal: unable to create gait folder!');
