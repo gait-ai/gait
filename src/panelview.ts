@@ -2165,6 +2165,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     document.getElementById('individualView').style.display = 'block';
                     updateIndividualView(message.panelChat);
                     restoreExpandedCodeBlocks();
+                    updatePrismTheme();
                 }
             }
         });
