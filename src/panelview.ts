@@ -19,6 +19,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _commits: CommitData[] = [];
     private _isFilteredView: boolean = false; // New state to track view type
+    private _currentViewMode: 'list' | 'individual' = 'list';
+    private _currentPanelChat: PanelChat | null = null;
 
     /**
      * Loads commits and integrates uncommitted changes into the commits array.
@@ -121,7 +123,15 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * Updates the webview content by loading commits and integrating uncommitted changes.
      */
     public async updateContent() {
+        if (this._currentViewMode === 'list') {
+            await this.updateListView();
+        } else {
+            this.updateIndividualView();
+        }
+    }
 
+    private async updateListView() {
+        // This is the existing updateContent logic
         if (this._isFilteredView) {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
@@ -136,9 +146,45 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 type: 'update',
                 commits: this._commits,
+                viewMode: 'list'
             });
         }
     }
+
+    private updateIndividualView() {
+        if (this._view && this._currentPanelChat) {
+            this._view.webview.postMessage({
+                type: 'update',
+                panelChat: this._currentPanelChat,
+                viewMode: 'individual'
+            });
+        }
+    }
+
+    public handleSwitchToIndividualView(panelChatId: string) {
+        const panelChat = this.findPanelChatById(panelChatId);
+        if (panelChat) {
+            this._currentViewMode = 'individual';
+            this._currentPanelChat = panelChat;
+            this.updateContent();
+            vscode.commands.executeCommand('gait.panelView.focus');
+        }
+    }
+
+    private findPanelChatById(panelChatId: string): PanelChat | undefined {
+        const stashedState = readStashedState(this._context);
+        const currentPanelChats = stashedState.panelChats;
+        const currentUncommittedPanelChats = this._context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
+        const allPanelChats = [...currentPanelChats, ...currentUncommittedPanelChats];
+        return allPanelChats.find(pc => pc.id === panelChatId);
+    }
+
+    private handleSwitchToListView() {
+        this._currentViewMode = 'list';
+        this._currentPanelChat = null;
+        this.updateContent();
+    }
+
 
     constructor(private readonly _context: vscode.ExtensionContext) {
         // Initialize by loading commits and chats
@@ -291,6 +337,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'openFile':
                     this.handleOpenFile(message.path);
+                    break;
+                case 'switchToIndividualView':
+                    this.handleSwitchToIndividualView(message.panelChatId);
+                    break;
+                case 'switchToListView':
+                    this.handleSwitchToListView();
                     break;
                 default:
                     break;
@@ -491,7 +543,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         }
         .commit-header h3 {
             margin: 0;
-            font-size: 1.2em;
+            font-size: 1.1em;
         }
 
         details {
@@ -883,6 +935,111 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             cursor: help;
         }
 
+        .info-icon {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: rgba(0, 122, 204, 0.6);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 10px;
+            font-size: 8px;
+            cursor: help;
+            margin-left: 3px;
+            position: relative;
+            vertical-align: middle;
+        }
+
+        .info-icon:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            white-space: normal;
+            max-width: 200px;
+            width: max-content;
+            z-index: 1;
+            font-size: 12px;
+            line-height: 14px;
+            text-align: center;
+        }
+        
+        .individual-view {
+            display: none;
+        }
+
+        .individual-view.active {
+            display: block;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            color: var(--vscode-editor-foreground);
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .individual-panel-chat {
+            margin-top: 40px;
+        }
+
+        .individual-panel-chat h3 {
+            margin-bottom: 10px;
+        }
+
+        .individual-panel-chat .panel-chat-info {
+            font-size: 0.9em;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 10px;
+        }
+
+        .individual-panel-chat .messages {
+            border: 1px solid var(--vscode-editorWidget-border);
+            border-radius: 5px;
+            padding: 10px;
+            background-color: var(--vscode-editor-background);
+        }
+
+        .individual-panel-chat .message-container {
+            margin-bottom: 15px;
+            position: relative;
+            border: 1px solid var(--vscode-editorWidget-border);
+            border-radius: 5px;
+            padding: 10px;
+            background-color: var(--vscode-editor-background);
+        }
+
+        .individual-panel-chat .delete-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            color: red;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        /* Ensure the tooltip doesn't go off-screen */
+        @media (max-width: 220px) {
+            .info-icon:hover::after {
+                left: auto;
+                right: 0;
+                transform: none;
+            }
+        }
+
         /* Override Prism.js styles if necessary */
         /* Example: Adjusting code block background */
         pre[class*="language-"] {
@@ -892,6 +1049,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
     <div class="container">
+        <div id="listView">
         <div class="header">
             <h2>Git Commit History</h2>
             <button id="refreshButton" title="Refresh Commit History">🔄</button>
@@ -908,6 +1066,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
         <div id="content">
             <div class="no-commits">Loading commit history...</div>
+        </div>
+        </div>
+        <div id="individualView" class="individual-view">
+            <button id="backButton" class="back-button" title="Back to List View">×</button>
+            <div id="individualPanelChat"></div>
         </div>
     </div>
 
@@ -926,6 +1089,18 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     <script src="${prismJsUri}" nonce="${nonce}"> </script>
 
     <script nonce="${nonce}">
+
+        let currentViewMode = 'list';
+
+        function switchToIndividualView(panelChatId) {
+            vscode.postMessage({ command: 'switchToIndividualView', panelChatId: panelChatId });
+        }
+
+        function switchToListView() {
+            vscode.postMessage({ command: 'switchToListView' });
+        }
+
+        document.getElementById('backButton').addEventListener('click', switchToListView);
 
         setInterval(() => {
             vscode.postMessage({ command: 'refresh' });
@@ -1423,6 +1598,139 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             }
         }
 
+        function updateIndividualView(panelChat) {
+            const individualPanelChatElement = document.getElementById('individualPanelChat');
+            individualPanelChatElement.innerHTML = '';
+
+            // Create Title
+            const titleElement = document.createElement('h3');
+            titleElement.textContent = panelChat.customTitle;
+            individualPanelChatElement.appendChild(titleElement);
+
+            // Panel Chat Info
+            const panelChatInfo = document.createElement('div');
+            panelChatInfo.className = 'panel-chat-info';
+            panelChatInfo.innerHTML = \`
+                <strong>Author:</strong> \${escapeHtml(panelChat.author || 'Unknown')}<br>
+                <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
+                <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
+            \`;
+            individualPanelChatElement.appendChild(panelChatInfo);
+
+            // Messages Container
+            const messagesContainer = document.createElement('div');
+            messagesContainer.className = 'messages';
+
+            // Iterate through messages
+            panelChat.messages.forEach(messageEntry => {
+                const messageContainer = document.createElement('div');
+                messageContainer.className = 'message-container';
+
+                // Delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-button';
+                deleteBtn.setAttribute('data-id', messageEntry.id);
+                deleteBtn.title = 'Delete Message';
+                deleteBtn.textContent = '×';
+                messageContainer.appendChild(deleteBtn);
+
+                // Delete button event
+                deleteBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    showConfirmationModal('message', messageEntry.id);
+                });
+
+                // Message Text
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                messageDiv.innerHTML = escapeHtml(messageEntry.messageText);
+                messageContainer.appendChild(messageDiv);
+
+                // Response Text
+                const responseDiv = document.createElement('div');
+                responseDiv.className = 'response';
+                responseDiv.innerHTML = formatResponse(messageEntry.responseText);
+                messageContainer.appendChild(responseDiv);
+
+                // Additional Message Details
+                const messageDetails = document.createElement('div');
+                messageDetails.className = 'message-details';
+                messageDetails.style.fontSize = '0.8em';
+                messageDetails.style.color = 'var(--vscode-descriptionForeground)';
+                messageDetails.innerHTML = \`
+                    <strong>Model:</strong> \${escapeHtml(messageEntry.model)}<br>
+                    <strong>Timestamp:</strong> \${new Date(messageEntry.timestamp).toLocaleString()}
+                \`;
+                messageContainer.appendChild(messageDetails);
+
+                // Context Links if any
+                if (messageEntry.context && Array.isArray(messageEntry.context) && messageEntry.context.length > 0) {
+                    const contextDiv = document.createElement('div');
+                    contextDiv.className = 'context';
+                    contextDiv.style.fontSize = '0.8em';
+                    contextDiv.style.color = 'var(--vscode-descriptionForeground)';
+                    const humanReadableContext = messageEntry.context
+                    .filter(item => item && typeof item === 'object' && item.value && typeof item.value.human_readable === 'string')
+                    .map(item => {
+                        const fullPath = item.value.human_readable;
+                        let relativePath = fullPath;
+                        
+                        if (workspaceFolderPath && fullPath.startsWith(workspaceFolderPath)) {
+                            relativePath = fullPath.slice(workspaceFolderPath.length + 1);
+                        }
+
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.textContent = escapeHtml(relativePath);
+                        link.dataset.path = relativePath;
+                        link.classList.add('context-link'); 
+                        return link.outerHTML;
+                    })
+                    .join(', ');
+                    if (humanReadableContext) {
+                        contextDiv.innerHTML = \`<strong>Context:</strong> \${humanReadableContext}\`;
+                        messageContainer.appendChild(contextDiv);
+                    }
+                }
+
+                // Associated File Paths if any
+                if (messageEntry.kv_store && 'file_paths' in messageEntry.kv_store) {
+                    const contextDiv = document.createElement('div');
+                    contextDiv.className = 'context';
+                    contextDiv.style.fontSize = '0.8em';
+                    contextDiv.style.color = 'var(--vscode-descriptionForeground)';
+                    const associatedFilePaths = messageEntry.kv_store.file_paths
+                    .map(filePath => {
+                        let relativePath = filePath;
+                        
+                        if (workspaceFolderPath && filePath.startsWith(workspaceFolderPath)) {
+                            relativePath = filePath.slice(workspaceFolderPath.length + 1);
+                        }
+
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.textContent = escapeHtml(relativePath);
+                        link.dataset.path = relativePath;
+                        link.classList.add('context-link'); 
+                        return link.outerHTML;
+                    })
+                    .join(', ');
+                    if (associatedFilePaths) {
+                        contextDiv.innerHTML = \`<strong>Associated Files:</strong> \${associatedFilePaths}\`;
+                        messageContainer.appendChild(contextDiv);
+                    }
+                }
+
+                messagesContainer.appendChild(messageContainer);
+            });
+
+            individualPanelChatElement.appendChild(messagesContainer);
+
+            // Attach link listeners for context links
+            attachLinkListeners();
+            attachCodeBlockListeners();
+        }
+
         window.addEventListener('vscode.theme-changed', () => {
             updatePrismTheme();
         });
@@ -1433,354 +1741,380 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         window.addEventListener('message', event => {
             const message = event.data;
             if (message.type === 'update') {
-                saveScrollPosition();
-                saveExpandedCommits();
-                saveExpandedPanelChats(); // Save expanded panel chats
-                saveExpandedInlineChats(); // Save expanded inline chats
-                saveExpandedCodeBlocks();
+                if (message.viewMode === 'list') {
+                    // Show the list view and hide the individual view
+                    document.getElementById('listView').style.display = 'block';
+                    document.getElementById('individualView').style.display = 'none';
 
-                const contentElement = document.getElementById('content');
-                contentElement.innerHTML = ''; // Clear existing content
+                    saveScrollPosition();
+                    saveExpandedCommits();
+                    saveExpandedPanelChats(); // Save expanded panel chats
+                    saveExpandedInlineChats(); // Save expanded inline chats
+                    saveExpandedCodeBlocks();
 
-                if (message.commits && message.commits.length > 0) {
-                    message.commits.forEach(commit => {
-                        // Create commit container
-                        const commitDiv = document.createElement('div');
-                        commitDiv.className = 'commit';
+                    const contentElement = document.getElementById('content');
+                    contentElement.innerHTML = ''; // Clear existing content
 
-                        // Create commit header
-                        const commitHeader = document.createElement('div');
-                        commitHeader.className = 'commit-header';
+                    const delineator = document.createElement('div');
+                    delineator.className = 'commit-delineator';
+                    delineator.innerHTML = \`
+                        <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Uncommited Chats
+                                            <span class="info-icon" data-tooltip="These are your uncommited chats. Staged chats will be commited to your repo, unstaged chats will not">i</span>
+                        </h3>
+                        <hr style="border: 1px solid var(--vscode-editorWidget-border);">
+                    \`;
+                    contentElement.appendChild(delineator);
 
-                        const isRegularCommit = commit.commitHash !== 'added' && commit.commitHash !== 'uncommitted';
+                    if (message.commits && message.commits.length > 0) {
+                        message.commits.forEach(commit => {
+                            // Create commit container
+                            const commitDiv = document.createElement('div');
+                            commitDiv.className = 'commit';
 
-                        if (!isRegularCommit) {
-                            commitDiv.style.backgroundColor = 'var(--vscode-titleBar-activeBackground)';
-                        }
+                            // Create commit header
+                            const commitHeader = document.createElement('div');
+                            commitHeader.className = 'commit-header';
 
-                        const commitMessage = commit.commitMessage;
+                            const isRegularCommit = commit.commitHash !== 'added' && commit.commitHash !== 'uncommitted';
 
-                        console.log("Commit Message: ", commitMessage);
-                        commitHeader.innerHTML = \`
-                            <h3>\${escapeHtml(commitMessage)}</h3>
-                            <span class="commit-date">\${new Date(commit.date).toLocaleString()}</span>
-                        \`;
+                            if (!isRegularCommit) {
+                                commitDiv.style.backgroundColor = 'var(--vscode-titleBar-activeBackground)';
+                            }
 
-                        commitDiv.appendChild(commitHeader);
+                            const commitMessage = commit.commitMessage;
 
-                        // Create commit details container
-                        const commitDetails = document.createElement('div');
-                        commitDetails.className = 'commit-details';
+                            console.log("Commit Message: ", commitMessage);
+                            commitHeader.innerHTML = \`
+                                <h3>\${escapeHtml(commitMessage)}</h3>
+                                <span class="commit-date">\${new Date(commit.date).toLocaleString()}</span>
+                            \`;
 
-                        // Populate panelChats
-                        if (commit.panelChats && commit.panelChats.length > 0) {
-                            commit.panelChats.forEach(panelChat => {
-                                // Create panelChat container
-                                const panelChatDiv = document.createElement('div');
-                                panelChatDiv.className = 'panel-chat';
+                            commitDiv.appendChild(commitHeader);
 
-                                // PanelChat header with delete and append buttons
-                                const panelChatHeader = document.createElement('div');
-                                panelChatHeader.className = 'panel-chat-header';
-                                // When setting the data attribute for panelChat headers
-                                panelChatHeader.setAttribute('data-panel-chat-id', \`\${commit.commitHash}-\${panelChat.id}\`); // Add data attribute for identification
-                                panelChatHeader.innerHTML = \`
-                                    Title: \${escapeHtml(panelChat.customTitle)}
-                                    <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete Chat">🗑️</button>
-                                    <button 
-                                        class="append-context-button" 
-                                        data-commit="\${escapeHtml(commit.commitHash)}" 
-                                        data-id="\${escapeHtml(panelChat.id)}" 
-                                        title="Add Chat to LLM Context"
-                                    >
-                                        ▶️
-                                    </button>
-                                \`;
+                            // Create commit details container
+                            const commitDetails = document.createElement('div');
+                            commitDetails.className = 'commit-details';
 
-                                // Determine if the commit is an uncommitted change
-                                const isUnadded = commit.commitHash === 'uncommitted';
+                            // Populate panelChats
+                            if (commit.panelChats && commit.panelChats.length > 0) {
+                                commit.panelChats.forEach(panelChat => {
+                                    // Create panelChat container
+                                    const panelChatDiv = document.createElement('div');
+                                    panelChatDiv.className = 'panel-chat';
 
-                                if (isUnadded) {
-                                    // Add Write Chat Button for Uncommitted Changes
-                                    panelChatHeader.innerHTML += \`
+                                    // PanelChat header with delete and append buttons
+                                    const panelChatHeader = document.createElement('div');
+                                    panelChatHeader.className = 'panel-chat-header';
+                                    // When setting the data attribute for panelChat headers
+                                    panelChatHeader.setAttribute('data-panel-chat-id', \`\${commit.commitHash}-\${panelChat.id}\`); // Add data attribute for identification
+                                    panelChatHeader.innerHTML = \`
+                                        Title: \${escapeHtml(panelChat.customTitle)}
+                                        <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete Chat">🗑️</button>
                                         <button 
-                                            class="write-chat-button" 
-                                            data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
-                                            title="Stage Chat"
+                                            class="append-context-button" 
+                                            data-commit="\${escapeHtml(commit.commitHash)}" 
+                                            data-id="\${escapeHtml(panelChat.id)}" 
+                                            title="Add Chat to LLM Context"
                                         >
-                                            ➕
+                                            ▶️
                                         </button>
                                     \`;
-                                } else if (commit.commitHash === 'added') {
-                                    // Add Remove Chat Button for Added Changes
-                                    panelChatHeader.innerHTML += \`
-                                        <button 
-                                            class="remove-chat-button" 
-                                            data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
-                                            title="Unstage Chat"
-                                        >
-                                            ➖
-                                        </button>
-                                    \`;
-                                }
-
-                                panelChatDiv.appendChild(panelChatHeader);
-
-                                // Create panel-chat-details container
-                                const panelChatDetails = document.createElement('div');
-                                panelChatDetails.className = 'panel-chat-details';
-
-                                // PanelChat info (customTitle, ai_editor, etc.)
-                                const panelChatInfo = document.createElement('div');
-                                panelChatInfo.className = 'panel-chat-info';
-                                panelChatInfo.innerHTML = \`
-                                    <strong>Author:</strong> \${escapeHtml(commit.author || 'Unknown')}<br>
-                                    <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
-                                    <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
-                                \`;
-                                panelChatDetails.appendChild(panelChatInfo);
-
-                                // Messages in panelChat
-                                panelChat.messages.forEach(messageEntry => {
-                                    const messageContainer = document.createElement('div');
-                                    messageContainer.className = 'message-container';
-
-                                    // Delete button
-                                    const deleteBtn = document.createElement('button');
-                                    deleteBtn.className = 'delete-button';
-                                    deleteBtn.setAttribute('data-id', messageEntry.id);
-                                    deleteBtn.title = 'Delete Message';
-                                    deleteBtn.textContent = '×';
-                                    messageContainer.appendChild(deleteBtn);
 
                                     // Determine if the commit is an uncommitted change
-                                    const isUnaddedMessage = commit.commitHash === 'uncommitted';
+                                    const isUnadded = commit.commitHash === 'uncommitted';
 
-                                    // Conditionally add Write or Remove Chat Buttons
-                                    if (isUnaddedMessage) {
-                                        // Add Write Chat Button for Messages
-                                        const writeBtn = document.createElement('button');
-                                        writeBtn.className = 'write-chat-button';
-                                        writeBtn.setAttribute('data-message-id', messageEntry.id); // Changed to 'data-message-id'
-                                        writeBtn.title = 'Write Message to Stashed State';
-                                        writeBtn.textContent = '➕';
-                                        messageContainer.appendChild(writeBtn);
+                                    if (isUnadded) {
+                                        // Add Write Chat Button for Uncommitted Changes
+                                        panelChatHeader.innerHTML += \`
+                                            <button 
+                                                class="write-chat-button" 
+                                                data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
+                                                title="Stage Chat"
+                                            >
+                                                ➕
+                                            </button>
+                                        \`;
                                     } else if (commit.commitHash === 'added') {
-                                        // Add Remove Chat Button for Messages
-                                        const removeBtn = document.createElement('button');
-                                        removeBtn.className = 'remove-chat-button';
-                                        removeBtn.setAttribute('data-message-id', messageEntry.id); // Changed to 'data-message-id'
-                                        removeBtn.title = 'Remove Message from Stashed State';
-                                        removeBtn.textContent = '➖';
-                                        messageContainer.appendChild(removeBtn);
+                                        // Add Remove Chat Button for Added Changes
+                                        panelChatHeader.innerHTML += \`
+                                            <button 
+                                                class="remove-chat-button" 
+                                                data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
+                                                title="Unstage Chat"
+                                            >
+                                                ➖
+                                            </button>
+                                        \`;
                                     }
 
-                                    // Message Text
-                                    const messageDiv = document.createElement('div');
-                                    messageDiv.className = 'message';
-                                    messageDiv.innerHTML = escapeHtml(messageEntry.messageText);
-                                    messageContainer.appendChild(messageDiv);
+                                    panelChatDiv.appendChild(panelChatHeader);
 
-                                    // Response Text
-                                    const responseDiv = document.createElement('div');
-                                    responseDiv.className = 'response';
-                                    responseDiv.innerHTML = formatResponse(messageEntry.responseText);
-                                    messageContainer.appendChild(responseDiv);
+                                    // Create panel-chat-details container
+                                    const panelChatDetails = document.createElement('div');
+                                    panelChatDetails.className = 'panel-chat-details';
 
-                                    // Additional Message Details
-                                    const messageDetails = document.createElement('div');
-                                    messageDetails.className = 'message-details';
-                                    messageDetails.style.fontSize = '0.8em';
-                                    messageDetails.style.color = 'var(--vscode-descriptionForeground)';
-                                    messageDetails.innerHTML = \`
-                                        <strong>Model:</strong> \${escapeHtml(messageEntry.model)}<br>
-                                        <strong>Timestamp:</strong> \${new Date(messageEntry.timestamp).toLocaleString()}
+                                    // PanelChat info (customTitle, ai_editor, etc.)
+                                    const panelChatInfo = document.createElement('div');
+                                    panelChatInfo.className = 'panel-chat-info';
+                                    panelChatInfo.innerHTML = \`
+                                        <strong>Author:</strong> \${escapeHtml(commit.author || 'Unknown')}<br>
+                                        <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
+                                        <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
                                     \`;
-                                    messageContainer.appendChild(messageDetails);
+                                    panelChatDetails.appendChild(panelChatInfo);
 
-                                    // Optionally, display context if needed
-                                    if (messageEntry.context && Array.isArray(messageEntry.context) && messageEntry.context.length > 0) {
-                                        const contextDiv = document.createElement('div');
-                                        contextDiv.className = 'context';
-                                        contextDiv.style.fontSize = '0.8em';
-                                        contextDiv.style.color = 'var(--vscode-descriptionForeground)';
-                                        const humanReadableContext = messageEntry.context
-                                        .filter(item => item && typeof item === 'object' && item.value && typeof item.value === 'object' && typeof item.value.human_readable === 'string')
-                                        .map(item => {
-                                            // Get the relative path
-                                            const fullPath = item.value.human_readable;
-                                            let relativePath = fullPath;
-                                            
-                                            if (workspaceFolderPath && fullPath.startsWith(workspaceFolderPath)) {
-                                                relativePath = fullPath.slice(workspaceFolderPath.length + 1);
-                                            }
+                                    // Messages in panelChat
+                                    panelChat.messages.forEach(messageEntry => {
+                                        const messageContainer = document.createElement('div');
+                                        messageContainer.className = 'message-container';
 
-                                            const link = document.createElement('a');
-                                            link.href = '#';
-                                            link.textContent = escapeHtml(relativePath);
-                                            link.dataset.path = relativePath;
-                                            link.classList.add('context-link'); 
-                                            return link.outerHTML;
-                                        })
-                                        .join(', ');
-                                        if (humanReadableContext) {
-                                            contextDiv.innerHTML = \`<strong>Context:</strong> \${humanReadableContext}\`;
-                                            messageContainer.appendChild(contextDiv);
+                                        // Delete button
+                                        const deleteBtn = document.createElement('button');
+                                        deleteBtn.className = 'delete-button';
+                                        deleteBtn.setAttribute('data-id', messageEntry.id);
+                                        deleteBtn.title = 'Delete Message';
+                                        deleteBtn.textContent = '×';
+                                        messageContainer.appendChild(deleteBtn);
+
+                                        // Determine if the commit is an uncommitted change
+                                        const isUnaddedMessage = commit.commitHash === 'uncommitted';
+
+                                        // Conditionally add Write or Remove Chat Buttons
+                                        if (isUnaddedMessage) {
+                                            // Add Write Chat Button for Messages
+                                            const writeBtn = document.createElement('button');
+                                            writeBtn.className = 'write-chat-button';
+                                            writeBtn.setAttribute('data-message-id', messageEntry.id); // Changed to 'data-message-id'
+                                            writeBtn.title = 'Write Message to Stashed State';
+                                            writeBtn.textContent = '➕';
+                                            messageContainer.appendChild(writeBtn);
+                                        } else if (commit.commitHash === 'added') {
+                                            // Add Remove Chat Button for Messages
+                                            const removeBtn = document.createElement('button');
+                                            removeBtn.className = 'remove-chat-button';
+                                            removeBtn.setAttribute('data-message-id', messageEntry.id); // Changed to 'data-message-id'
+                                            removeBtn.title = 'Remove Message from Stashed State';
+                                            removeBtn.textContent = '➖';
+                                            messageContainer.appendChild(removeBtn);
                                         }
+
+                                        // Message Text
+                                        const messageDiv = document.createElement('div');
+                                        messageDiv.className = 'message';
+                                        messageDiv.innerHTML = escapeHtml(messageEntry.messageText);
+                                        messageContainer.appendChild(messageDiv);
+
+                                        // Response Text
+                                        const responseDiv = document.createElement('div');
+                                        responseDiv.className = 'response';
+                                        responseDiv.innerHTML = formatResponse(messageEntry.responseText);
+                                        messageContainer.appendChild(responseDiv);
+
+                                        // Additional Message Details
+                                        const messageDetails = document.createElement('div');
+                                        messageDetails.className = 'message-details';
+                                        messageDetails.style.fontSize = '0.8em';
+                                        messageDetails.style.color = 'var(--vscode-descriptionForeground)';
+                                        messageDetails.innerHTML = \`
+                                            <strong>Model:</strong> \${escapeHtml(messageEntry.model)}<br>
+                                            <strong>Timestamp:</strong> \${new Date(messageEntry.timestamp).toLocaleString()}
+                                        \`;
+                                        messageContainer.appendChild(messageDetails);
+
+                                        // Optionally, display context if needed
+                                        if (messageEntry.context && Array.isArray(messageEntry.context) && messageEntry.context.length > 0) {
+                                            const contextDiv = document.createElement('div');
+                                            contextDiv.className = 'context';
+                                            contextDiv.style.fontSize = '0.8em';
+                                            contextDiv.style.color = 'var(--vscode-descriptionForeground)';
+                                            const humanReadableContext = messageEntry.context
+                                            .filter(item => item && typeof item === 'object' && item.value && typeof item.value === 'object' && typeof item.value.human_readable === 'string')
+                                            .map(item => {
+                                                // Get the relative path
+                                                const fullPath = item.value.human_readable;
+                                                let relativePath = fullPath;
+                                                
+                                                if (workspaceFolderPath && fullPath.startsWith(workspaceFolderPath)) {
+                                                    relativePath = fullPath.slice(workspaceFolderPath.length + 1);
+                                                }
+
+                                                const link = document.createElement('a');
+                                                link.href = '#';
+                                                link.textContent = escapeHtml(relativePath);
+                                                link.dataset.path = relativePath;
+                                                link.classList.add('context-link'); 
+                                                return link.outerHTML;
+                                            })
+                                            .join(', ');
+                                            if (humanReadableContext) {
+                                                contextDiv.innerHTML = \`<strong>Context:</strong> \${humanReadableContext}\`;
+                                                messageContainer.appendChild(contextDiv);
+                                            }
+                                        }
+
+                                        if (messageEntry.kv_store && 'file_paths' in messageEntry.kv_store) {
+                                            const contextDiv = document.createElement('div');
+                                            contextDiv.className = 'context';
+                                            contextDiv.style.fontSize = '0.8em';
+                                            contextDiv.style.color = 'var(--vscode-descriptionForeground)';
+                                            const associatedFilePaths = messageEntry.kv_store.file_paths
+                                            .map(filePath => {
+                                                let relativePath = filePath;
+                                                
+                                                if (workspaceFolderPath && filePath.startsWith(workspaceFolderPath)) {
+                                                    relativePath = filePath.slice(workspaceFolderPath.length + 1);
+                                                }
+
+                                                const link = document.createElement('a');
+                                                link.href = '#';
+                                                link.textContent = escapeHtml(relativePath);
+                                                link.dataset.path = relativePath;
+                                                link.classList.add('context-link'); 
+                                                return link.outerHTML;
+                                            })
+                                            .join(', ');
+                                            if (associatedFilePaths) {
+                                                contextDiv.innerHTML = \`<strong>Associated Files:</strong> \${associatedFilePaths}\`;
+                                                messageContainer.appendChild(contextDiv);
+                                            }
+                                        }
+
+                                        panelChatDetails.appendChild(messageContainer);
+                                    });
+
+                                    commitDetails.appendChild(panelChatDetails);
+                                    panelChatDiv.appendChild(panelChatDetails);
+
+                                    commitDetails.appendChild(panelChatDiv);
+                                });
+                            } else {
+                                const noPanelChats = document.createElement('div');
+                                noPanelChats.className = 'no-messages';
+                                noPanelChats.textContent = 'No panelChats in this commit.';
+                                commitDetails.appendChild(noPanelChats);
+                            }
+
+                            // Populate Inline Chats
+                            if (commit.inlineChats && commit.inlineChats.length > 0 && commit.commitHash === 'added') {
+                                // Create Inline Chats Container
+                                const inlineChatsContainer = document.createElement('div');
+                                inlineChatsContainer.className = 'inline-chats-container';
+
+                                // Inline Chats Header
+                                const inlineChatsHeader = document.createElement('div');
+                                inlineChatsHeader.className = 'inline-chats-header';
+                                inlineChatsHeader.innerHTML = \`
+                                    <h4>Inline Chats</h4>
+                                \`;
+                                inlineChatsContainer.appendChild(inlineChatsHeader);
+
+                                // Inline Chats Details
+                                const inlineChatsDetails = document.createElement('div');
+                                inlineChatsDetails.className = 'inline-chats-details';
+                                inlineChatsDetails.style.display = 'none'; // Initially collapsed
+                                inlineChatsContainer.appendChild(inlineChatsDetails);
+
+                                // Iterate through each inline chat
+                                commit.inlineChats.forEach(inlineChat => {
+                                    // Create Inline Chat Container
+                                    const inlineChatDiv = document.createElement('div');
+                                    inlineChatDiv.className = 'inline-chat';
+
+                                    // Inline Chat Header
+                                    const inlineChatHeader = document.createElement('div');
+                                    inlineChatHeader.className = 'inline-chat-header';
+                                    inlineChatHeader.setAttribute('data-id', \`\${inlineChat.inline_chat_id}\`);
+                                    inlineChatHeader.innerHTML = \`
+                                        <span>\${escapeHtml(inlineChat.prompt)}</span>
+                                        <div>
+                                            <button class="delete-inlinechat-button" data-id="\${escapeHtml(inlineChat.inline_chat_id)}" title="Delete Inline Chat">🗑️</button>
+                                        </div>
+                                    \`;
+                                    inlineChatDiv.appendChild(inlineChatHeader);
+
+                                    // Inline Chat Details
+                                    const inlineChatDetails = document.createElement('div');
+                                    inlineChatDetails.className = 'inline-chat-details';
+
+                                    // Prompt
+                                    const promptDiv = document.createElement('div');
+                                    promptDiv.className = 'inline-chat-prompt';
+                                    promptDiv.innerHTML = \`<strong>Prompt:</strong> \${escapeHtml(inlineChat.prompt)}\`;
+                                    inlineChatDetails.appendChild(promptDiv);
+
+                                    // File Diffs
+                                    if (inlineChat.file_diff && inlineChat.file_diff.length > 0) {
+                                        inlineChat.file_diff.forEach(file_diff => {
+                                            const diffDiv = document.createElement('div');
+                                            diffDiv.className = 'file-diff';
+                                            diffDiv.innerHTML = \`
+                                                <strong>File:</strong> \${escapeHtml(file_diff.file_path)}<br>
+                                                <pre><code class="language-diff">\${file_diff.diffs.map(diff => escapeHtml(diff.value)).join('')}</code></pre>
+                                            \`;
+                                            inlineChatDetails.appendChild(diffDiv);
+                                        });
                                     }
 
-                                    if (messageEntry.kv_store && 'file_paths' in messageEntry.kv_store) {
-                                        const contextDiv = document.createElement('div');
-                                        contextDiv.className = 'context';
-                                        contextDiv.style.fontSize = '0.8em';
-                                        contextDiv.style.color = 'var(--vscode-descriptionForeground)';
-                                        const associatedFilePaths = messageEntry.kv_store.file_paths
-                                        .map(filePath => {
-                                            let relativePath = filePath;
-                                            
-                                            if (workspaceFolderPath && filePath.startsWith(workspaceFolderPath)) {
-                                                relativePath = filePath.slice(workspaceFolderPath.length + 1);
-                                            }
-
-                                            const link = document.createElement('a');
-                                            link.href = '#';
-                                            link.textContent = escapeHtml(relativePath);
-                                            link.dataset.path = relativePath;
-                                            link.classList.add('context-link'); 
-                                            return link.outerHTML;
-                                        })
-                                        .join(', ');
-                                        if (associatedFilePaths) {
-                                            contextDiv.innerHTML = \`<strong>Associated Files:</strong> \${associatedFilePaths}\`;
-                                            messageContainer.appendChild(contextDiv);
-                                        }
-                                    }
-
-                                    panelChatDetails.appendChild(messageContainer);
+                                    inlineChatDiv.appendChild(inlineChatDetails);
+                                    inlineChatsDetails.appendChild(inlineChatDiv);
                                 });
 
-                                commitDetails.appendChild(panelChatDetails);
-                                panelChatDiv.appendChild(panelChatDetails);
+                                commitDetails.appendChild(inlineChatsContainer);
+                            }
+                            commitDiv.appendChild(commitDetails);
+                            contentElement.appendChild(commitDiv);
 
-                                commitDetails.appendChild(panelChatDiv);
-                            });
-                        } else {
-                            const noPanelChats = document.createElement('div');
-                            noPanelChats.className = 'no-messages';
-                            noPanelChats.textContent = 'No panelChats in this commit.';
-                            commitDetails.appendChild(noPanelChats);
-                        }
-
-                        // Populate Inline Chats
-                        if (commit.inlineChats && commit.inlineChats.length > 0 && commit.commitHash === 'added') {
-                            // Create Inline Chats Container
-                            const inlineChatsContainer = document.createElement('div');
-                            inlineChatsContainer.className = 'inline-chats-container';
-
-                            // Inline Chats Header
-                            const inlineChatsHeader = document.createElement('div');
-                            inlineChatsHeader.className = 'inline-chats-header';
-                            inlineChatsHeader.innerHTML = \`
-                                <h4>Inline Chats</h4>
-                            \`;
-                            inlineChatsContainer.appendChild(inlineChatsHeader);
-
-                            // Inline Chats Details
-                            const inlineChatsDetails = document.createElement('div');
-                            inlineChatsDetails.className = 'inline-chats-details';
-                            inlineChatsDetails.style.display = 'none'; // Initially collapsed
-                            inlineChatsContainer.appendChild(inlineChatsDetails);
-
-                            // Iterate through each inline chat
-                            commit.inlineChats.forEach(inlineChat => {
-                                // Create Inline Chat Container
-                                const inlineChatDiv = document.createElement('div');
-                                inlineChatDiv.className = 'inline-chat';
-
-                                // Inline Chat Header
-                                const inlineChatHeader = document.createElement('div');
-                                inlineChatHeader.className = 'inline-chat-header';
-                                inlineChatHeader.setAttribute('data-id', \`\${inlineChat.inline_chat_id}\`);
-                                inlineChatHeader.innerHTML = \`
-                                    <span>\${escapeHtml(inlineChat.prompt)}</span>
-                                    <div>
-                                        <button class="delete-inlinechat-button" data-id="\${escapeHtml(inlineChat.inline_chat_id)}" title="Delete Inline Chat">🗑️</button>
-                                    </div>
+                            if (commit.commitHash === 'added') {
+                                const delineator = document.createElement('div');
+                                delineator.className = 'commit-delineator';
+                                delineator.innerHTML = \`
+                                    <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Committed Chats
+                                                        <span class="info-icon" data-tooltip="These are the chats that happened with previous commits">i</span>
+                                    </h3>
+                                    <hr style="border: 1px solid var(--vscode-editorWidget-border);">
                                 \`;
-                                inlineChatDiv.appendChild(inlineChatHeader);
+                                contentElement.appendChild(delineator);
+                            }
+                        });
 
-                                // Inline Chat Details
-                                const inlineChatDetails = document.createElement('div');
-                                inlineChatDetails.className = 'inline-chat-details';
+                        // Attach event listeners for collapsible commits
+                        attachCommitToggleListeners();
 
-                                // Prompt
-                                const promptDiv = document.createElement('div');
-                                promptDiv.className = 'inline-chat-prompt';
-                                promptDiv.innerHTML = \`<strong>Prompt:</strong> \${escapeHtml(inlineChat.prompt)}\`;
-                                inlineChatDetails.appendChild(promptDiv);
+                        // Attach event listeners for collapsible panel chats
+                        attachPanelChatToggleListeners(); // New function call
 
-                                // File Diffs
-                                if (inlineChat.file_diff && inlineChat.file_diff.length > 0) {
-                                    inlineChat.file_diff.forEach(file_diff => {
-                                        const diffDiv = document.createElement('div');
-                                        diffDiv.className = 'file-diff';
-                                        diffDiv.innerHTML = \`
-                                            <strong>File:</strong> \${escapeHtml(file_diff.file_path)}<br>
-                                            <pre><code class="language-diff">\${file_diff.diffs.map(diff => escapeHtml(diff.value)).join('')}</code></pre>
-                                        \`;
-                                        inlineChatDetails.appendChild(diffDiv);
-                                    });
-                                }
+                        // Attach event listeners for delete, write, and remove buttons
+                        attachButtonListeners();
 
-                                inlineChatDiv.appendChild(inlineChatDetails);
-                                inlineChatsDetails.appendChild(inlineChatDiv);
-                            });
+                        attachLinkListeners();
 
-                            commitDetails.appendChild(inlineChatsContainer);
-                        }
-                        commitDiv.appendChild(commitDetails);
-                        contentElement.appendChild(commitDiv);
+                        attachInlineChatToggleListeners();
 
-                        if (commit.commitHash === 'added') {
-                            const delineator = document.createElement('div');
-                            delineator.className = 'commit-delineator';
-                            delineator.innerHTML = \`
-                                <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Commit History</h3>
-                                <hr style="border: 1px solid var(--vscode-editorWidget-border);">
-                            \`;
-                            contentElement.appendChild(delineator);
-                        }
-                    });
+                        attachCodeBlockListeners();
+                    } else {
+                        const noCommits = document.createElement('div');
+                        noCommits.className = 'no-commits';
+                        noCommits.textContent = 'No commits found.';
+                        contentElement.appendChild(noCommits);
+                    }
 
-                    // Attach event listeners for collapsible commits
-                    attachCommitToggleListeners();
-
-                    // Attach event listeners for collapsible panel chats
-                    attachPanelChatToggleListeners(); // New function call
-
-                    // Attach event listeners for delete, write, and remove buttons
-                    attachButtonListeners();
-
-                    attachLinkListeners();
-
-                    attachInlineChatToggleListeners();
-
-                    attachCodeBlockListeners();
-                } else {
-                    const noCommits = document.createElement('div');
-                    noCommits.className = 'no-commits';
-                    noCommits.textContent = 'No commits found.';
-                    contentElement.appendChild(noCommits);
+                    // After updating the content
+                    restoreExpandedCommits();
+                    restoreExpandedPanelChats(); // Restore expanded panel chats
+                    restoreExpandedInlineChats();
+                    restoreInlineChatsExpandedState(); // Restore expanded inline chats state
+                    restoreExpandedCodeBlocks();
+                    restoreScrollPosition();
+                    updatePrismTheme();
                 }
-
-                // After updating the content
-                restoreExpandedCommits();
-                restoreExpandedPanelChats(); // Restore expanded panel chats
-                restoreExpandedInlineChats();
-                restoreInlineChatsExpandedState(); // Restore expanded inline chats state
-                restoreExpandedCodeBlocks();
-                restoreScrollPosition();
-                updatePrismTheme();
+                else if (message.viewMode === 'individual') {
+                    currentViewMode = 'individual';
+                    saveExpandedCodeBlocks();
+                    document.getElementById('listView').style.display = 'none';
+                    document.getElementById('individualView').style.display = 'block';
+                    updateIndividualView(message.panelChat);
+                    restoreExpandedCodeBlocks();
+                }
             }
         });
 

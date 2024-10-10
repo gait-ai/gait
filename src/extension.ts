@@ -615,10 +615,28 @@ exit 0
         }
     }, 1000);
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gait.showIndividualPanelChat', async (panelChatId?: string) => {
+            if (!panelChatId) {
+                // If no panelChatId is provided, prompt the user to enter one
+                panelChatId = await vscode.window.showInputBox({
+                    prompt: 'Enter the Panel Chat ID',
+                    placeHolder: 'e.g., panel-chat-123'
+                });
+            }
+
+            if (panelChatId) {
+                provider.handleSwitchToIndividualView(panelChatId);
+            } else {
+                vscode.window.showErrorMessage('No Panel Chat ID provided.');
+            }
+        })
+    );
     // Make sure to clear the interval when the extension is deactivated
     context.subscriptions.push({
         dispose: () => clearInterval(acceptInterval)
     });
+
 }
 
 /**
