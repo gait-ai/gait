@@ -185,9 +185,15 @@ export function generateDecorationMap(context: vscode.ExtensionContext, editor: 
         if (message.kv_store && 'file_paths' in message.kv_store && !message.kv_store.file_paths.includes(baseName)) {
             continue;
         }
+        const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
         const codeBlocks = extractCodeBlocks(message.responseText);
         for (const code of codeBlocks) {
             const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
+            if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
+                associateFileWithMessage(context, message, baseName, panelChat).catch(error => {
+                    console.error(`Failed to associate file with message: ${error}`);
+                });
+            }
             currentRanges.forEach(range => {
                 for (let line = range.start.line; line <= range.end.line; line++) {
                     if (!decorationMap.has(line)) {
