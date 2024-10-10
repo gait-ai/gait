@@ -25,6 +25,20 @@ export function createPanelHover(context: vscode.ExtensionContext, matchedRange:
     if (!message) {
         return new vscode.MarkdownString();
     }
+    // Append previous messages in small text
+    if (panelChat.messages.length > 1) {
+        markdown.appendMarkdown('#### Previous messages:\n\n');
+        for (let i = 0; i < panelChat.messages.length; i++) {
+            const prevMessage = panelChat.messages[i];
+            if (prevMessage.id === message_id) {
+                break;
+            }
+            const prevCommitInfo = idToCommitInfo?.get(prevMessage.id);
+            const prevAuthor = prevCommitInfo?.author ?? "You";
+            markdown.appendMarkdown(`<small>**${prevAuthor}**: ${prevMessage.messageText.substring(0, 50)}${prevMessage.messageText.length > 50 ? '...' : ''}</small>\n\n`);
+        }
+        markdown.appendMarkdown('---\n\n');
+    }
 
     const commitInfo = idToCommitInfo?.get(message.id);
     const author = commitInfo?.author ?? "You";
