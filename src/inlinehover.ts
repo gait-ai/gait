@@ -2,12 +2,19 @@ import * as vscode from 'vscode';
 import * as Inline from './inline';
 import * as Diff from 'diff';
 import * as path from 'path';
-import { CommitData, getInlineChatIdToCommitInfo } from './panelgit';
+import { CommitData, getInlineChatFromGitHistory, getInlineChatIdToCommitInfo, GitHistoryData } from './panelgit';
 import { getRelativePath } from './utils';
 import { getInlineParent } from './stashedState';
 import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 
-export async function createHoverContent(context: vscode.ExtensionContext, markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, CommitData> | undefined): Promise<vscode.MarkdownString> {
+function getTimeAgo(timestamp: string): string {
+    const timeDiffMs = new Date().getTime() - new Date(timestamp).getTime();
+    const hoursSinceEdit = Math.floor(timeDiffMs / (1000 * 3600));
+    const daysSinceEdit = Math.floor(timeDiffMs / (1000 * 3600 * 24));
+    return daysSinceEdit === 0 ? `${hoursSinceEdit} hours ago` : daysSinceEdit === 1 ? 'yesterday' : `${daysSinceEdit} days ago`;
+}
+
+export function createHoverContent(context: vscode.ExtensionContext, markdown: vscode.MarkdownString, inlineChat: Inline.InlineChatInfo, document: vscode.TextDocument, matchedRange: Inline.InlineMatchedRange | null = null, idToCommitInfo: Map<String, CommitData> | undefined): vscode.MarkdownString {
     const { prompt, timestamp, parent_inline_chat_id } = inlineChat;
 
     // Find the diff that matches the current document's file path
@@ -31,11 +38,7 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
     //markdown.supportHtml = true; // Allows HTML in the Markdown
     markdown.isTrusted = true; // Allows advanced Markdown features
 
-    // Display the prompt with a smaller, circular user icon
-    const timeDiffMs = new Date().getTime() - new Date(timestamp).getTime();
-    const hoursSinceEdit = Math.floor(timeDiffMs / (1000 * 3600));
-    const daysSinceEdit = Math.floor(timeDiffMs / (1000 * 3600 * 24));
-    const timeAgo = daysSinceEdit === 0 ? `${hoursSinceEdit} hours ago` : daysSinceEdit === 1 ? 'yesterday' : `${daysSinceEdit} days ago`;
+    const timeAgo = getTimeAgo(timestamp);
     markdown.appendMarkdown(`### ${author ?? "You"}: ${prompt} (${new Date(timestamp).toISOString().split('T')[0]}) (${timeAgo}) \n\n---\n`);
     markdown.appendMarkdown(`**Commit**: ${commitMessage} (${commitHash}) \n\n---\n`);
     // Flatten the diffs into individual lines
@@ -84,22 +87,28 @@ export async function createHoverContent(context: vscode.ExtensionContext, markd
     return markdown;
 }
 
-export async function createHover(context: vscode.ExtensionContext, matchedRange: Inline.InlineMatchedRange, document: vscode.TextDocument): Promise<vscode.ProviderResult<vscode.Hover>> {
+export function createHover(context: vscode.ExtensionContext, matchedRange: Inline.InlineMatchedRange, document: vscode.TextDocument, idToCommitInfo: Map<String, CommitData>): vscode.MarkdownString {
     let markdown = new vscode.MarkdownString();
 
-    let idToCommitInfo = undefined;
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`; // Replace with your actual file path relative to repo
+    markdown = createHoverContent(context, markdown, matchedRange.inlineChat, document, matchedRange, idToCommitInfo);
+    return markdown;
+}
 
-    if (!workspaceFolder) {
-        console.warn('No workspace folder found.');
-    } else {
-        try {
-            idToCommitInfo = await getInlineChatIdToCommitInfo(context, workspaceFolder.uri.fsPath, filePath);
-        } catch (error) {
-            console.warn(`Error getting commit info for ${document.fileName}: ${error}`);
+export function getAfterText(inlineChat: Inline.InlineChatInfo, gitHistory: Map<string, CommitData>): string {
+    let afterText = '';
+
+    if (inlineChat.prompt) {
+        afterText += `"${inlineChat.prompt.slice(0, 30)}${inlineChat.prompt.length > 30 ? '...' : ''}"`;
+    }
+    if (gitHistory && gitHistory.get(inlineChat.inline_chat_id)) {
+        const commitData = gitHistory.get(inlineChat.inline_chat_id);
+        if (commitData) {
+            const { author, date } = commitData;
+            const timeAgo = getTimeAgo(date.toISOString());
+
+            afterText += ` - ${author}: ${timeAgo} - ${inlineChat.prompt.slice(0, 30)}${inlineChat.prompt.length > 30 ? '...' : ''}`;
         }
     }
-    markdown = await createHoverContent(context, markdown, matchedRange.inlineChat, document, matchedRange, idToCommitInfo);
-    return new vscode.Hover(markdown);
+
+    return afterText.trim();
 }

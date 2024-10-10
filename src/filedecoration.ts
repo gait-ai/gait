@@ -9,6 +9,7 @@ import { MessageEntry, PanelChat, PanelMatchedRange, StashedState } from './type
 import { readStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
 import posthog from 'posthog-js';
+import { getInlineChatFromGitHistory, getInlineChatIdToCommitInfo, getMessageFromGitHistory, GitHistoryData } from './panelgit';
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
 const colorHueMap: Record<ColorType, number> = {
@@ -27,7 +28,7 @@ function generateColors(index: number): string {
     const hue = colorHueMap[colorTypes[index % colorTypes.length]];
     const saturation = 30;
     const lightness = 75;
-    return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.5)`;
+    return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.2)`;  // Reduced opacity for shadow effect
 }
 
 /**
@@ -136,88 +137,34 @@ export function matchDiffToCurrentFile(
     return multiLineRanges;
 }
 
+type LineDecoration = { type: 'inline' | 'panel', inlineChat: Inline.InlineChatInfo | undefined, panelChat: PanelChat | undefined, messageId?: string, id: string }
 
-
-export function decorateActive(context: vscode.ExtensionContext, decorations_active: boolean) {
-    const editor = vscode.window.activeTextEditor;
-    
-    if (!editor) {
-        return;
-    }
+export function generateDecorationMap(context: vscode.ExtensionContext, editor: vscode.TextEditor): Map<number, LineDecoration> {
+    const decorationMap = new Map<number, LineDecoration>();
 
     const baseName = vscode.workspace.asRelativePath(editor.document.uri);
     if (baseName === 'gait_context.md' || baseName === '.gait/state.json') {
-        return;
-    }
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-        console.error('No workspace folder found');
-        return;
+        return decorationMap;
     }
 
     const stashedState: StashedState = readStashedState(context);
     const inlineChats = stashedState.inlineChats;
-    if (inlineChats === undefined) {
-        vscode.window.showErrorMessage('No inline chats found');
-        return;
-    }
-    const rangesToPanel: PanelMatchedRange[] = [];
-    interface LineDecoration {
-        timestamp: number;
-        type: 'inline' | 'panel';
-        decorationType: vscode.TextEditorDecorationType;
-        decorationOptions: vscode.DecorationOptions[];
-    }
 
-    const lineDecorations: Map<number, LineDecoration> = new Map();
-
-    function addDecorationType(color: string, line: number, timestamp: number, type: 'inline' | 'panel') {
-        if (!decorations_active) {
-            return;
-        }
-        const decorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: color,
-            overviewRulerColor: color,
-            overviewRulerLane: vscode.OverviewRulerLane.Right,
-            // You can add more styling options here if needed
-        });
-        const decorationOptions: vscode.DecorationOptions[] = [{
-            range: new vscode.Range(line, 0, line, editor!.document.lineAt(line).text.length),
-        }];
-
-        const existingDecoration = lineDecorations.get(line);
-        if (!existingDecoration || (timestamp < existingDecoration.timestamp && type === 'inline') || (type === 'panel' && existingDecoration.type === 'panel')) {
-            lineDecorations.set(line, { timestamp, decorationType, decorationOptions, type });
-        }
-    }
-
-    let decorationIndex = 0;
-    const rangesToInline: Inline.InlineMatchedRange[] = [];
     for (const chat of Object.values(inlineChats)) {
         for (const diff of chat.file_diff) {
             if (diff.file_path !== baseName) {
                 continue;
             }
             const currentRanges = matchDiffToCurrentFile(editor.document, diff.diffs);
-            if (currentRanges.length > 0) {
-                decorationIndex += 1;
-                const color = generateColors(decorationIndex);
-                // Get content at document in the range
-
-                // Create a new decoration type with the unique color
-                currentRanges.forEach(range => {
-                    rangesToInline.push({
-                        range: range,
-                        inlineChat: chat,
-                    });
-                    addDecorationType(color, range.start.line, new Date(chat.timestamp).getTime(), 'inline');
-                });
-            }
+            currentRanges.forEach(range => {
+                for (let line = range.start.line; line <= range.end.line; line++) {
+                    decorationMap.set(line, { type: 'inline', inlineChat: chat, panelChat: undefined, messageId: undefined, id: chat.inline_chat_id });
+                }
+            });
         }
     }
-    
+
     const allPanelChats = [...stashedState.panelChats, ...(context.workspaceState.get<PanelChat[]>('currentPanelChats') || [])];
-// Filter out deleted panel chats
     const currentPanelChats = allPanelChats.filter(chat => 
         !stashedState.deletedChats.deletedPanelChatIDs.includes(chat.id)
     );
@@ -234,108 +181,152 @@ export function decorateActive(context: vscode.ExtensionContext, decorations_act
         return acc;
     }, [] as { message: MessageEntry, panelChat: PanelChat }[]);
 
-
-
     for (const {message, panelChat} of currentMessages) {
         if (message.kv_store && 'file_paths' in message.kv_store && !message.kv_store.file_paths.includes(baseName)) {
             continue;
         }
-        const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
-        if (already_associated) {
-            // console.log("Already associated: ", message.id);
-        }
         const codeBlocks = extractCodeBlocks(message.responseText);
-        decorationIndex += 1;
         for (const code of codeBlocks) {
             const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
-            if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
-                // If more than half of the code lines match, associate the file with the message
-                associateFileWithMessage(context, message, baseName, panelChat).catch(error => {
-                    console.error(`Failed to associate file with message: ${error}`);
-                });
-            }
-            if (currentRanges.length > 0) {
-                const color = generateColors(decorationIndex);
-
-                function lineInRangesToPanel(line: number) {
-                    return rangesToPanel.some(range => 
-                        range.range.start.line <= line && 
-                        range.range.end.line >= line
-                    );
-                }
-                function addRange(range: vscode.Range) {
-                    rangesToPanel.push({
-                        range: range,
-                        panelChat: panelChat,
-                        message_id: message.id,
-                    });
-                    addDecorationType(color, range.start.line, new Date(panelChat.created_on).getTime(), 'panel');
-                }
-
-                currentRanges.forEach(range => {
-                    let currentStart = range.start.line;
-                    let currentEnd = currentStart;
-
-                    for (let i = range.start.line; i <= range.end.line; i++) {
-                        if (lineInRangesToPanel(i)) {
-                            if (currentStart !== currentEnd) {
-                                addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length));
-                            }
-                            currentStart = i + 1;
-                            currentEnd = i + 1;
-                        } else {
-                            currentEnd = i;
-                        }
+            currentRanges.forEach(range => {
+                for (let line = range.start.line; line <= range.end.line; line++) {
+                    if (!decorationMap.has(line)) {
+                        decorationMap.set(line, { type: 'panel', inlineChat: undefined, panelChat: panelChat, messageId: message.id, id: message.id });
                     }
-
-                    if (currentStart <= range.end.line) {
-                        addRange(new vscode.Range(currentStart, 0, currentEnd, editor.document.lineAt(currentEnd).text.length));
-                    }
-                });
-            }
+                }
+            });
         }
     }
 
-    // Apply all decoration types
-    if (decorations_active) {
-        lineDecorations.forEach((value) => {
-            editor.setDecorations(value.decorationType, value.decorationOptions);
-            // Ensure decorationType is disposed when no longer needed
-            context.subscriptions.push(value.decorationType);
-        });
+    return decorationMap;
+}
+
+export function addDecorationForLine(
+    context: vscode.ExtensionContext,
+    editor: vscode.TextEditor,
+    lineNumber: number,
+    decorations: vscode.Disposable[],
+    gitHistory: GitHistoryData
+) {
+    decorations.forEach(decoration => decoration.dispose());
+    const decorationMap = context.workspaceState.get<Map<number, LineDecoration>>('decorationMap');
+    
+    if (!decorationMap) return [];
+
+    const decoration = decorationMap.get(lineNumber);
+    if (!decoration) return [];
+
+    const range = new vscode.Range(lineNumber, editor.document.lineAt(lineNumber).text.length, lineNumber, editor.document.lineAt(lineNumber).text.length);
+
+    let hoverMessage: vscode.MarkdownString | null = null;
+    let afterText = '';
+
+    const panelGitHistory = getMessageFromGitHistory(gitHistory);
+    const inlineGitHistory = getInlineChatFromGitHistory(gitHistory);
+    try {
+        if (decoration.type === 'inline' && decoration.inlineChat) {
+            hoverMessage = InlineHover.createHover(context, { range: new vscode.Range(lineNumber, 0, lineNumber, editor.document.lineAt(lineNumber).text.length), inlineChat: decoration.inlineChat }, editor.document, inlineGitHistory);
+            afterText = InlineHover.getAfterText(decoration.inlineChat, inlineGitHistory);
+        } else if (decoration.type === 'panel' && decoration.panelChat && decoration.messageId) {
+            hoverMessage = PanelHover.createPanelHover(context, { range: new vscode.Range(lineNumber, 0, lineNumber, editor.document.lineAt(lineNumber).text.length), panelChat: decoration.panelChat, message_id: decoration.messageId }, editor.document, panelGitHistory);
+            afterText = PanelHover.getAfterText(decoration.panelChat, decoration.messageId, panelGitHistory);
+        }
+    } catch (error) {
+        console.error('Error creating hover message:', error);
     }
 
-    const hoverProvider = vscode.languages.registerHoverProvider('*', {
-        async provideHover(document, position, token) {
-            const ranges = rangesToInline.filter(matchedRange => matchedRange.range.contains(position));
-            if (ranges.length === 0) {
-                const panelRanges = rangesToPanel.filter(matchedRange => matchedRange.range.contains(position));
-                if (panelRanges.length === 0) {
-                    return undefined;
-                }
-                const oldestRange = panelRanges.reduce((max, current) => 
-                    current.panelChat.created_on < max.panelChat.created_on ? current : max
-                );
-                posthog.capture('panel_hover');
-                const hover = await PanelHover.createPanelHover(context, oldestRange, editor.document);
-                return hover;
-            }
-            const oldestRange = ranges.reduce((max, current) => 
-                current.inlineChat.timestamp < max.inlineChat.timestamp ? current : max
-            );
-            posthog.capture('inline_hover');
-            const hover = await InlineHover.createHover(context, oldestRange, editor.document);
-            return hover;
-        }
+    // Filter decorationMap to get the lineNumbers that match the current decoration
+    const matchingLineNumbers = Array.from(decorationMap.entries())
+        .filter(([_, dec]) => 
+            (decoration.type === 'inline' && dec.type === 'inline' && dec.inlineChat?.inline_chat_id === decoration.inlineChat?.inline_chat_id) ||
+            (decoration.type === 'panel' && dec.type === 'panel' && dec.panelChat?.id === decoration.panelChat?.id && dec.messageId === decoration.messageId)
+        )
+        .map(([lineNum, _]) => lineNum);
+
+
+    const decorationType = vscode.window.createTextEditorDecorationType({});
+    const disposables: vscode.Disposable[] = [];
+
+    const highlightDecorationType = vscode.window.createTextEditorDecorationType({
+        backgroundColor: 'rgba(0, 255, 0, 0.1)',
+        isWholeLine: true,
     });
 
-    // Add the new hover provider to the subscriptions
-    if (decorations_active) {
+    if (hoverMessage) {
+        const decorationOptions: vscode.DecorationOptions = {
+            range,
+            renderOptions: {
+                after: {
+                    contentText: afterText,
+                    margin: '0 0 0 3em',
+                    color: '#A0A0A0',
+                }
+            },
+        };
+        const hoverProvider = vscode.languages.registerHoverProvider('*', {
+            async provideHover(document, position, token) {
+                let new_range = new vscode.Range(range.start, range.start.translate(0, afterText.length));
+                if (!new_range.contains(position)) {
+                    return;
+                }
+                const highlightRanges = matchingLineNumbers.map(lineNum => 
+                    new vscode.Range(lineNum, 0, lineNum, document.lineAt(lineNum).text.length)
+                );
+
+
+                editor.setDecorations(highlightDecorationType, highlightRanges);
+                disposables.push(highlightDecorationType);
+
+                return new vscode.Hover(hoverMessage);
+            }
+        });
+    
+        // Add the new hover provider to the subscriptions
         context.subscriptions.push(hoverProvider);
+        disposables.push(hoverProvider);
+        editor.setDecorations(decorationType, [decorationOptions]);
+        disposables.push(decorationType);
+    }
+    return disposables;
+}
+
+export function decorateActive(context: vscode.ExtensionContext, decorateAll: boolean = false) {
+    const editor = vscode.window.activeTextEditor;
+    
+    if (!editor) {
+        return [];
     }
 
-    return {
-        decorationTypes: Array.from(lineDecorations.values()).map((value) => value.decorationType),
-        hoverProvider: hoverProvider
-    };
+    const decorationMap = generateDecorationMap(context, editor);
+    context.workspaceState.update('decorationMap', decorationMap);
+
+    let disposables: vscode.Disposable[] = [];
+    if (decorateAll) {
+        const uniqueDecorations = new Map<string, LineDecoration>();
+        decorationMap.forEach((decoration, line) => {
+            if (!uniqueDecorations.has(decoration.id)) {
+                uniqueDecorations.set(decoration.id, decoration);
+            }
+        });
+
+        let colorIndex = 0;
+        uniqueDecorations.forEach((decoration, id) => {
+            const color = generateColors(colorIndex);
+            colorIndex++;
+
+            const decorationType = vscode.window.createTextEditorDecorationType({
+                backgroundColor: color,
+                isWholeLine: true,
+            });
+
+            const ranges = Array.from(decorationMap.entries())
+                .filter(([_, dec]) => dec.id === id)
+                .map(([line, _]) => new vscode.Range(line, 0, line, editor.document.lineAt(line).text.length));
+
+            editor.setDecorations(decorationType, ranges);
+            disposables.push(decorationType);
+        });
+    }
+    return disposables
 }
+
