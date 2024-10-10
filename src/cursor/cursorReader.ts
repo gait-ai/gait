@@ -105,8 +105,6 @@ export class CursorReader implements StateReader {
             }
             if (!matchedDiff) {
                 this.fileDiffCutoff = Math.min(this.fileDiffCutoff+ 10000, 60000);
-                vscode.window.showErrorMessage('Error: failed to match prompts to diffs!');
-                posthog.capture('no_file_diffs_for_new_prompts');
                 return false;
             }
             const inlineChatInfoObj: InlineChatInfo = {

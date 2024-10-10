@@ -272,7 +272,7 @@ export function addDecorationForLine(
                 const highlightRanges = matchingLineNumbers.map(lineNum => 
                     new vscode.Range(lineNum, 0, lineNum, document.lineAt(lineNum).text.length)
                 );
-
+                posthog.capture('hover');
 
                 editor.setDecorations(highlightDecorationType, highlightRanges);
                 disposables.push(highlightDecorationType);
