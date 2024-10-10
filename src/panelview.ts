@@ -491,7 +491,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         }
         .commit-header h3 {
             margin: 0;
-            font-size: 1.2em;
+            font-size: 1.1em;
         }
 
         details {
@@ -881,6 +881,50 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
         .vscode-dark .token.entity {
             cursor: help;
+        }
+
+        .info-icon {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: rgba(0, 122, 204, 0.6);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 10px;
+            font-size: 8px;
+            cursor: help;
+            margin-left: 3px;
+            position: relative;
+            vertical-align: middle;
+        }
+
+        .info-icon:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            white-space: normal;
+            max-width: 200px;
+            width: max-content;
+            z-index: 1;
+            font-size: 12px;
+            line-height: 14px;
+            text-align: center;
+        }
+
+        /* Ensure the tooltip doesn't go off-screen */
+        @media (max-width: 220px) {
+            .info-icon:hover::after {
+                left: auto;
+                right: 0;
+                transform: none;
+            }
         }
 
         /* Override Prism.js styles if necessary */
@@ -1442,6 +1486,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 const contentElement = document.getElementById('content');
                 contentElement.innerHTML = ''; // Clear existing content
 
+                const delineator = document.createElement('div');
+                delineator.className = 'commit-delineator';
+                delineator.innerHTML = \`
+                    <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Uncommited Chats
+                                        <span class="info-icon" data-tooltip="These are your uncommited chats. Staged chats will be commited to your repo, unstaged chats will not">i</span>
+                    </h3>
+                    <hr style="border: 1px solid var(--vscode-editorWidget-border);">
+                \`;
+                contentElement.appendChild(delineator);
+
                 if (message.commits && message.commits.length > 0) {
                     message.commits.forEach(commit => {
                         // Create commit container
@@ -1745,7 +1799,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                             const delineator = document.createElement('div');
                             delineator.className = 'commit-delineator';
                             delineator.innerHTML = \`
-                                <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Commit History</h3>
+                                <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Committed Chats
+                                                    <span class="info-icon" data-tooltip="These are the chats that happened with previous commits">i</span>
+                                </h3>
                                 <hr style="border: 1px solid var(--vscode-editorWidget-border);">
                             \`;
                             contentElement.appendChild(delineator);
