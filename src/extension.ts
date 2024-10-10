@@ -256,9 +256,9 @@ async function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFold
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
-   //const firstTime = context.globalState.get('firstTime', true);
+   const firstTime = context.globalState.get('firstTime', true);
 
-    if (true) {
+    if (firstTime) {
         // Mark that it's no longer the first time
         context.globalState.update('firstTime', false);
         posthog.capture('user_download');
