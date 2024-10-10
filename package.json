@@ -73,7 +73,12 @@
                 "command": "gait.handleMerge",
                 "title": "Handle Merge",
                 "category": "Gait"
-            }
+            }, 
+            {
+                "command": "gait.showIndividualPanelChat",
+                "title": "Show Individual Panel Chat",
+                "category": "Gait"
+              }
         ],
         "keybindings": [
             {
