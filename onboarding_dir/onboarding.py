@@ -14,12 +14,10 @@ def print_panel_chat_message():
 
 # Gait will track these automatically, no need for any work on your part!
 
-# You should see the panel chat in the Gait Panel
+# You should see the both chats in the Gait Panel
 
 # Here, you can choose which prompts you want to stage/unstage, much like git!
 
 # You can also continue off of conversations you've had before, just click the "Continue" button!
-
-
 
 
