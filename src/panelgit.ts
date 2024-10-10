@@ -217,11 +217,16 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
     const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
     let logData: string;
 
+
     try {
         logData = await git.raw(logArgs);
         log(`Retrieved git log data successfully.`, LogLevel.INFO);
     } catch (error) {
-        throw new Error(`Failed to retrieve git log: ${(error as Error).message}`);
+        if ((error as any).message.includes("does not have any commits yet")) {
+            logData = "";
+        } else {
+            throw new Error(`Failed to retrieve git log: ${(error as Error).message}`);
+        }
     }
 
     const logLines = logData.split('\n').filter(line => line.trim() !== '');
