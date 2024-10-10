@@ -4,6 +4,12 @@ Welcome to gait, your intelligent companion for storing and sharing codegen prom
 
 ## Usage
 
+### Drag Gait Panel to Right Side
+
+We recommend dragging the gait panel to the right side of your screen, in the same group as Cursor's side panel.
+
+![Drag Gait Panel to Right Side](gait_sidebar.gif)
+
 ### gait Automatically Records Chats
 
 No work on your end. There might be some delay! 
