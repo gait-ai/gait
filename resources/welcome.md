@@ -10,7 +10,7 @@ No work on your end. There might be some delay!
 
 ### gait blame: Viewing Saved Chats
 
-![Hover Demo](hoverdemo.gif)
+![Hover Demo](hoverdemo3.gif)
 
 Hover over AI-generated code to see the prompt that led to that particular code snippet.
 
@@ -26,10 +26,9 @@ Hover over AI-generated code to see the prompt that led to that particular code 
 ```
 
 
-
 ### Toggling Annotations (Hover and Highlight)
 
-Use the keyboard shortcut `Cmd+Shift+G` to toggle annotations on and off.
+Use the keyboard shortcut `Cmd+Shift+G` to toggle full color highlights on and off.
 
 ### Continuing a Chat
 
