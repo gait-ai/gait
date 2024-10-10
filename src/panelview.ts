@@ -1730,15 +1730,43 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             attachCodeBlockListeners();
         }
 
+        function formatRelativeTime(date) {
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            const fourWeeksInSeconds = 4 * 7 * 24 * 60 * 60;
+
+            if (diffInSeconds < fourWeeksInSeconds) {
+                if (diffInSeconds < 60) {
+                    return diffInSeconds === 1 ? \`1 second ago\` : \`\${diffInSeconds} seconds ago\`;
+                }
+                if (diffInSeconds < 3600) {
+                    const minutes = Math.floor(diffInSeconds / 60);
+                    return minutes === 1 ? \`1 minute ago\` : \`\${minutes} minutes ago\`;
+                }
+                if (diffInSeconds < 86400) {
+                    const hours = Math.floor(diffInSeconds / 3600);
+                    return hours === 1 ? \`1 hour ago\` : \`\${hours} hours ago\`;
+                }
+                if (diffInSeconds < 604800) {
+                    const days = Math.floor(diffInSeconds / 86400);
+                    return days === 1 ? \`1 day ago\` : \`\${days} days ago\`;
+                }
+                const weeks = Math.floor(diffInSeconds / 604800);
+                return weeks === 1 ? \`1 week ago\` : \`\${weeks} weeks ago\`;
+            }
+
+            return date.toLocaleString();
+        }
+
         function getCommitDateHtml(commit) {
             if (commit.commitHash === 'added' || commit.commitHash === 'uncommitted') {
                 const mostRecentTimestamp = getMostRecentMessageTimestamp(commit.panelChats);
                 if (mostRecentTimestamp) {
-                    return \`<span class="commit-date">\${new Date(mostRecentTimestamp).toLocaleString()}</span>\`;
+                    return \`<span class="commit-date">\${formatRelativeTime(new Date(mostRecentTimestamp))}</span>\`;
                 }
                 return ''; // Don't display time if there are no messages
             }
-            return \`<span class="commit-date">\${new Date(commit.date).toLocaleString()}</span>\`;
+            return \`<span class="commit-date">\${formatRelativeTime(new Date(commit.date))}</span>\`;
         }
 
         function getMostRecentMessageTimestamp(panelChats) {
@@ -1882,7 +1910,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                     panelChatInfo.innerHTML = \`
                                         <strong>Author:</strong> \${escapeHtml(commit.author || 'Unknown')}<br>
                                         <strong>AI Editor:</strong> \${escapeHtml(panelChat.ai_editor)}<br>
-                                        <strong>Created On:</strong> \${new Date(panelChat.created_on).toLocaleString()}<br>
+                                        <strong>Created On:</strong> \${formatRelativeTime(new Date(panelChat.created_on))}<br>
                                     \`;
                                     panelChatDetails.appendChild(panelChatInfo);
 
@@ -1940,7 +1968,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         messageDetails.style.color = 'var(--vscode-descriptionForeground)';
                                         messageDetails.innerHTML = \`
                                             <strong>Model:</strong> \${escapeHtml(messageEntry.model)}<br>
-                                            <strong>Timestamp:</strong> \${new Date(messageEntry.timestamp).toLocaleString()}
+                                            <strong>Timestamp:</strong> \${formatRelativeTime(new Date(messageEntry.timestamp))}
                                         \`;
                                         messageContainer.appendChild(messageDetails);
 
