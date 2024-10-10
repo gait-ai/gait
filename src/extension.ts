@@ -256,11 +256,20 @@ async function createGaitFolderIfNotExists(workspaceFolder: vscode.WorkspaceFold
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
-    const firstTime = context.globalState.get('firstTime', true);
-    if (firstTime) {
+   //const firstTime = context.globalState.get('firstTime', true);
+
+    if (true) {
         // Mark that it's no longer the first time
         context.globalState.update('firstTime', false);
         posthog.capture('user_download');
+
+        // Open the onboarding directory
+        const onboardingDir = vscode.Uri.joinPath(context.extensionUri, 'onboarding_dir');
+        vscode.commands.executeCommand('vscode.openFolder', onboardingDir);
+
+        // Open the onboarding file
+        const onboardingFile = vscode.Uri.joinPath(context.extensionUri, 'onboarding_dir', 'onboarding.py');
+        vscode.commands.executeCommand('vscode.open', onboardingFile);
 
         // Open the welcome markdown file
         const welcomeFile = vscode.Uri.joinPath(context.extensionUri, 'resources', 'welcome.md');
