@@ -263,10 +263,6 @@ export function activate(context: vscode.ExtensionContext) {
         context.globalState.update('firstTime', false);
         posthog.capture('user_download');
 
-        // Open the welcome markdown file
-        const welcomeFile = vscode.Uri.joinPath(context.extensionUri, 'resources', 'welcome.md');
-        vscode.commands.executeCommand('markdown.showPreview', welcomeFile);
-
         // Open the onboarding directory
         const onboardingDir = vscode.Uri.joinPath(context.extensionUri, 'onboarding_dir');
         vscode.commands.executeCommand('vscode.openFolder', onboardingDir);
@@ -274,6 +270,10 @@ export function activate(context: vscode.ExtensionContext) {
         // Open the onboarding file
         const onboardingFile = vscode.Uri.joinPath(context.extensionUri, 'onboarding_dir', 'onboarding.py');
         vscode.commands.executeCommand('vscode.open', onboardingFile);
+
+        // Open the welcome markdown file
+        const welcomeFile = vscode.Uri.joinPath(context.extensionUri, 'resources', 'welcome.md');
+        vscode.commands.executeCommand('markdown.showPreview', welcomeFile);
     }
     
     const tool: TOOL = checkTool();
