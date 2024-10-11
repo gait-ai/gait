@@ -189,7 +189,7 @@ export function generateDecorationMap(context: vscode.ExtensionContext, editor: 
         const codeBlocks = extractCodeBlocks(message.responseText);
         for (const code of codeBlocks) {
             const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
-            if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').length / 2) {
+            if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').filter(isMeaningfulLine).length / 2) {
                 associateFileWithMessage(context, message, baseName, panelChat).catch(error => {
                     console.error(`Failed to associate file with message: ${error}`);
                 });
