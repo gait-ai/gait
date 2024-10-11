@@ -25,16 +25,9 @@ export function createPanelHover(context: vscode.ExtensionContext, matchedRange:
     }
     const commitInfo = idToCommitInfo?.get(message.id);
 
-    if (commitInfo) {
-        commitInfo.inlineChats =[];
-        commitInfo.panelChats =[];
-    }
-
-    const markdownData = [{commit: commitInfo, panelChat: panelChat}];
-    const encodedData = Buffer.from(JSON.stringify(markdownData)).toString('base64');
  
     const continueCommand = vscode.Uri.parse(`command:gait.exportPanelChatsToMarkdown?${encodeURIComponent(
-        JSON.stringify({data: encodedData, continue_chat: false}))}`);
+        JSON.stringify({data: panelChat.id, continue_chat: false, commitInfo: commitInfo}))}`);
     markdown.appendMarkdown(`[Continue Chat](${continueCommand})  |  `);
     const deleteCommand = vscode.Uri.parse(`command:gait.removePanelChat?${encodeURIComponent(JSON.stringify({
         panelChatId: panelChat.id,
@@ -48,7 +41,7 @@ export function createPanelHover(context: vscode.ExtensionContext, matchedRange:
     
     // Find the message that resulted in the matched range
     // Append previous messages in small text
-    if (panelChat.messages.length > 1) {
+    if (panelChat.messages.length > 1 && message_id !== panelChat.messages[0].id) {
         markdown.appendMarkdown('#### Previous messages:\n\n');
         for (let i = 0; i < panelChat.messages.length; i++) {
             const prevMessage = panelChat.messages[i];
@@ -57,7 +50,7 @@ export function createPanelHover(context: vscode.ExtensionContext, matchedRange:
             }
             const prevCommitInfo = idToCommitInfo?.get(prevMessage.id);
             const prevAuthor = prevCommitInfo?.author ?? "You";
-            markdown.appendMarkdown(`<small>**${prevAuthor}**: ${prevMessage.messageText.substring(0, 50)}${prevMessage.messageText.length > 50 ? '...' : ''}</small>\n\n`);
+            markdown.appendMarkdown(`<small>**${prevAuthor}**: ${prevMessage.messageText.substring(0, 100)}${prevMessage.messageText.length > 100 ? '...' : ''}</small>\n\n`);
         }
         markdown.appendMarkdown('---\n\n');
     }

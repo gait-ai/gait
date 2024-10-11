@@ -9,7 +9,7 @@ import * as VSCodeReader from './vscode/vscodeReader';
 import { panelChatsToMarkdown } from './markdown';
 import * as CursorReader from './cursor/cursorReader';
 import { checkTool, TOOL } from './ide';
-import { AIChangeMetadata, PanelChatMode, StateReader } from './types';
+import { AIChangeMetadata, PanelChat, PanelChatMode, StateReader } from './types';
 import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
@@ -40,7 +40,7 @@ let isRedecorating = false;
 let changeQueue: { cursor_position: vscode.Position, 
     document_uri: string, 
     changes: vscode.TextDocumentContentChangeEvent[], 
-    timestamp: number,
+    timestamp: number, 
     document_content: string | null }[] = [];
 let triggerAcceptCount = 0;
 let lastInlineChatStart: Inline.InlineStartInfo | null = null;
@@ -377,9 +377,27 @@ export function activate(context: vscode.ExtensionContext) {
     // Register command to convert PanelChats to markdown and open in a new file
     const exportPanelChatsToMarkdownCommand = vscode.commands.registerCommand('gait.exportPanelChatsToMarkdown', async (args) => {
         try {
-            const decodedArgs = Buffer.from(args.data, 'base64').toString('utf-8');
-            const markdownData = JSON.parse(decodedArgs);
+            const  panelChatId  = args.data;
             const continue_chat = args.continue_chat;
+
+            // Retrieve the current panel chats from workspace state
+            const currentPanelChats: PanelChat[] | undefined = context.workspaceState.get('currentPanelChats');
+            if (!currentPanelChats) {
+                throw new Error('No panel chats found in workspace state');
+            }
+
+            // Find the specific panel chat
+            const panelChat = currentPanelChats.find(chat => chat.id === panelChatId);
+            if (!panelChat) {
+                throw new Error(`Panel chat with ID ${panelChatId} not found`);
+            }
+
+            // Create the markdown data
+            const markdownData = [{
+                commit: args.commitInfo,
+                panelChat: panelChat
+            }];
+
             const markdownContent = panelChatsToMarkdown(markdownData, continue_chat);
             const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
             fs.writeFileSync(filePath, markdownContent, 'utf8');
@@ -389,8 +407,9 @@ export function activate(context: vscode.ExtensionContext) {
                 await vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(filePath));
                 await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup');
             } else {
-                await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });            }
-                await vscode.commands.executeCommand(startPanelCommand);
+                await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
+            }
+            await vscode.commands.executeCommand(startPanelCommand);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to export panel chats: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
