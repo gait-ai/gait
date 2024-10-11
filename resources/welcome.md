@@ -16,7 +16,7 @@ No work on your end. There might be some delay!
 
 ### gait blame: Viewing Saved Chats
 
-![Hover Demo](hoverdemo3.gif)
+![Hover Demo](gait_blame_hover.gif)
 
 Hover over AI-generated code to see the prompt that led to that particular code snippet.
 

@@ -87,7 +87,7 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent) {
     // Check if the file is in the workspace directory
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showInformationMessage('Open a workspace to use gait!');
+        // vscode.window.showInformationMessage('Open a workspace to use gait!');
         return; // No workspace folder open
     }
 
@@ -287,7 +287,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
-        vscode.window.showInformationMessage('Open a workspace to use gait!');
+        // vscode.window.showInformationMessage('Open a workspace to use gait!');
         return;
     }
 
