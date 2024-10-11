@@ -1806,11 +1806,17 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                     const contentElement = document.getElementById('content');
                     contentElement.innerHTML = ''; // Clear existing content
 
+                    
                     const delineator = document.createElement('div');
                     delineator.className = 'commit-delineator';
-                    delineator.innerHTML = \`
-                        <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Uncommited Chats
-                                            <span class="info-icon" data-tooltip="These are your uncommited chats. Staged chats will be commited to your repo, unstaged chats will not">i</span>
+                    delineator.innerHTML = document.getElementById('viewSelect').value === 'filtered' ? \`
+                        <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Committed Chats
+                                            <span class="info-icon" data-tooltip="These are the chats committed to your repository">i</span>
+                        </h3>
+                        <hr style="border: 1px solid var(--vscode-editorWidget-border);">
+                    \` : \`
+                        <h3 style="text-align: center; color: var(--vscode-descriptionForeground);">Uncommitted Chats
+                                            <span class="info-icon" data-tooltip="These are your uncommitted chats. Staged chats will be committed to your repo, unstaged chats will not">i</span>
                         </h3>
                         <hr style="border: 1px solid var(--vscode-editorWidget-border);">
                     \`;
