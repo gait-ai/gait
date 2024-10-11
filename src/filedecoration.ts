@@ -214,6 +214,7 @@ export function addDecorationForLine(
     decorations: vscode.Disposable[],
     gitHistory: GitHistoryData
 ) {
+    gitHistory = structuredClone(gitHistory);
     decorations.forEach(decoration => decoration.dispose());
     const decorationMap = context.workspaceState.get<Map<number, LineDecoration>>('decorationMap');
     
