@@ -2,9 +2,9 @@
     "name": "gait",
     "displayName": "gait",
     "publisher": "gait",
-    "icon": "resources/Logo.jpg",
+    "icon": "resources/logo.png",
     "description": "Store and share your cursor and copilot conversations",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "engines": {
         "vscode": "^1.91.0"
     },
