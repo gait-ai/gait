@@ -9,7 +9,7 @@ import * as VSCodeReader from './vscode/vscodeReader';
 import { panelChatsToMarkdown } from './markdown';
 import * as CursorReader from './cursor/cursorReader';
 import { checkTool, TOOL } from './ide';
-import { AIChangeMetadata, PanelChat, PanelChatMode, StateReader } from './types';
+import { AIChangeMetadata, PanelChat, PanelChatMode, StashedState, StateReader } from './types';
 import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
@@ -238,8 +238,8 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
         ? fs.readFileSync(gitAttributesPath, 'utf-8')
         : '';
 
-    if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true`)) {
-        fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/** -diff -linguist-generated=true\n`);
+    if (!gitAttributesContent.includes(`${GAIT_FOLDER_NAME}/** -diff linguist-generated`)) {
+        fs.appendFileSync(gitAttributesPath, `\n${GAIT_FOLDER_NAME}/** -diff linguist-generated\n`);
         vscode.window.showInformationMessage('.gitattributes updated successfully');
     }
 }
@@ -385,9 +385,15 @@ export function activate(context: vscode.ExtensionContext) {
             if (!currentPanelChats) {
                 throw new Error('No panel chats found in workspace state');
             }
+            // Retrieve the stashed state from workspace state
+            const stashedState: StashedState = readStashedState(context);
 
+            const allPanelChats = [
+                ...(currentPanelChats || []),
+                ...stashedState.panelChats
+            ];
             // Find the specific panel chat
-            const panelChat = currentPanelChats.find(chat => chat.id === panelChatId);
+            const panelChat = allPanelChats.find(chat => chat.id === panelChatId);
             if (!panelChat) {
                 throw new Error(`Panel chat with ID ${panelChatId} not found`);
             }
@@ -689,7 +695,6 @@ exit 0
 
     InlineDecoration.writeMatchStatistics(context);
     updateTotalRepoLineCount(context);
-
 }
 
 /**
