@@ -477,10 +477,16 @@ function getAllDiffs(context: vscode.ExtensionContext, stashedState: StashedStat
     return allDiffs;
 }
 
+interface FileStatistics {
+    totalLines: number;
+    aiGeneratedLines: number;
+    aiGeneratedPercentage: number;
+}
 
 async function getMatchStatistics(context: vscode.ExtensionContext, stashedState: StashedState): Promise<{
     uniqueMatchedLinesCount: number,
-    bestPromptResponse: { prompt: string, response: string, matchCount: number, file: string } | null
+    bestPromptResponse: { prompt: string, response: string, matchCount: number, file: string } | null,
+    fileStatistics: Map<string, FileStatistics>
 }> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -494,6 +500,7 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
     const uniqueMatchedLines = new Set<string>();
     let maxMatches = 0;
     let bestPromptResponse: { prompt: string, response: string, matchCount: number, file: string } | null = null;
+    const fileStatistics = new Map<string, FileStatistics>();
 
     const trackedFiles = await git.raw(['ls-files']);
     const trackedFilePaths = trackedFiles.split('\n').filter(filePath => 
@@ -510,6 +517,8 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
         const fullPath = path.join(repoRoot.trim(), filePath);
         if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
             const fileContent = fs.readFileSync(fullPath, 'utf-8');
+            const totalLines = fileContent.split('\n').length;
+            let aiGeneratedLines = new Set<number>();
             
             for (const diffInfo of allDiffs) {
                 const matches = matchDiffToFileContent(fileContent, diffInfo.diff);
@@ -519,6 +528,7 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
                 for (const match of matches) {
                     for (let i = match.start; i <= match.end; i++) {
                         uniqueMatchedLines.add(`${filePath}:${i}`);
+                        aiGeneratedLines.add(i);
                     }
                 }
 
@@ -533,18 +543,29 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
                     };
                 }
             }
+
+            // Calculate AI-generated percentage for this file
+            const aiGeneratedCount = aiGeneratedLines.size;
+            const aiGeneratedPercentage = (aiGeneratedCount / totalLines) * 100;
+
+            fileStatistics.set(filePath, {
+                totalLines,
+                aiGeneratedLines: aiGeneratedCount,
+                aiGeneratedPercentage
+            });
         }
     }
 
     return {
         uniqueMatchedLinesCount: uniqueMatchedLines.size,
-        bestPromptResponse
+        bestPromptResponse,
+        fileStatistics
     };
 }
 
 export async function writeMatchStatistics(context: vscode.ExtensionContext) {
     const stashedState = readStashedState(context);
-    const { uniqueMatchedLinesCount, bestPromptResponse } = await getMatchStatistics(context, stashedState);
+    const { uniqueMatchedLinesCount, bestPromptResponse, fileStatistics } = await getMatchStatistics(context, stashedState);
     
     stashedState.kv_store['unique_matched_lines_count'] = uniqueMatchedLinesCount;
     
@@ -558,6 +579,16 @@ export async function writeMatchStatistics(context: vscode.ExtensionContext) {
     } else {
         stashedState.kv_store['best_prompt_response'] = null;
     }
+    
+    // Store file statistics
+    const fileStatsArray = Array.from(fileStatistics.entries()).map(([file, stats]) => ({
+        file,
+        total_lines: stats.totalLines,
+        ai_generated_lines: stats.aiGeneratedLines,
+        ai_generated_percentage: stats.aiGeneratedPercentage
+    }));
+    
+    stashedState.kv_store['file_statistics'] = fileStatsArray;
     
     writeStashedState(context, stashedState);
 }
