@@ -517,6 +517,8 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
     let maxMatches = 0;
     let bestPromptResponse: { prompt: string, response: string, matchCount: number, file: string } | null = null;
     const fileStatistics = new Map<string, FileStatistics>();
+    // Exclude binary object types from tracked files
+    const binaryExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.so', '.dylib'];
 
     const trackedFiles = await git.raw(['ls-files']);
     const trackedFilePaths = trackedFiles.split('\n').filter(filePath => 
@@ -525,7 +527,10 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
         !filePath.includes('.git') && 
         !filePath.includes('package-lock.json') && 
         !filePath.includes('yarn.lock')
-    );
+    ).filter(filePath => {
+        const ext = path.extname(filePath).toLowerCase();
+        return !binaryExtensions.includes(ext);
+    });
 
     const allDiffs = getAllDiffs(context, stashedState);
 

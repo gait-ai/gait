@@ -663,6 +663,7 @@ exit 0
             if (lastPanelChatNum !== context.workspaceState.get('panelChatNum')) {
                 lastPanelChatNum = context.workspaceState.get('panelChatNum') || 0;
                 debouncedRedecorate(context);
+                InlineDecoration.writeMatchStatistics(context);
             }
         } catch (error) {
             console.log("Error in accept interval", error);
