@@ -13,7 +13,7 @@ import { AIChangeMetadata, PanelChat, PanelChatMode, StateReader } from './types
 import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
-import { getRelativePath } from './utils';
+import { getRelativePath, updateTotalRepoLineCount } from './utils';
 import { readStashedStateFromFile, writeStashedState, readStashedState, removePanelChatFromStashedState } from './stashedState';
 import * as child_process from 'child_process';
 import posthog from 'posthog-js';
@@ -686,6 +686,9 @@ exit 0
     context.subscriptions.push({
         dispose: () => clearInterval(acceptInterval)
     });
+
+    InlineDecoration.writeMatchStatistics(context);
+    updateTotalRepoLineCount(context);
 
 }
 

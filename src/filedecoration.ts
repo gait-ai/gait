@@ -1,12 +1,14 @@
 import * as vscode from 'vscode';
 import * as Inline from './inline';
 import * as Diff from 'diff';
+import * as fs from 'fs';
+import simpleGit, { SimpleGit } from 'simple-git';
 import * as levenshtein from 'fast-levenshtein';
 import * as path from 'path';
 import * as InlineHover from './inlinehover';
 import { associateFileWithMessage } from './panelChats';
 import { MessageEntry, PanelChat, PanelMatchedRange, StashedState } from './types';
-import { readStashedState } from './stashedState';
+import { readStashedState, writeStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
 import posthog from 'posthog-js';
 import { getInlineChatFromGitHistory, getInlineChatIdToCommitInfo, getMessageFromGitHistory, GitHistoryData } from './panelgit';
@@ -337,3 +339,225 @@ export function decorateActive(context: vscode.ExtensionContext, decorateAll: bo
     return disposables
 }
 
+
+export function matchDiffToFileContent(
+    fileContent: string,
+    diff: Diff.Change[]
+): { start: number; end: number }[] {
+    const documentLines = fileContent.split('\n');
+
+    const addedLinesSet = new Set(
+        diff.filter(change => change.added)
+           .flatMap(change => change.value.split('\n').map(line => line.trim()))
+           .filter(line => line.trim().length > 0)
+    );
+
+    const matchedLinesSet = new Set();
+
+    if (addedLinesSet.size === 0) {
+        return [];
+    }
+
+    const matchingLineNumbers: number[] = [];
+    const lineOccurrences: Map<string, number> = new Map();
+
+    for (let i = 0; i < documentLines.length; i++) {
+        const trimmedLine = documentLines[i].trim();
+        if (addedLinesSet.has(trimmedLine)) {
+            matchingLineNumbers.push(i);
+            matchedLinesSet.add(trimmedLine);
+            lineOccurrences.set(trimmedLine, (lineOccurrences.get(trimmedLine) || 0) + 1);
+        }
+    }
+
+    if (addedLinesSet.size < 5) {
+        return matchingLineNumbers
+            .filter(line => {
+                const trimmedLine = documentLines[line].trim();
+                return isMeaningfulLine(documentLines[line]) && lineOccurrences.get(trimmedLine) === 1;
+            })
+            .map(line => ({ start: line, end: line }));
+    }
+
+    if (addedLinesSet.size * 0.2 > matchedLinesSet.size) {
+        return [];
+    }
+    let start = -1;
+    let end = -1;
+    const multiLineRanges: { start: number; end: number }[] = [];
+
+    for (let i = 0; i < matchingLineNumbers.length; i++) {
+        const currentLine = matchingLineNumbers[i];
+        const nextLine = matchingLineNumbers[i + 1];
+
+        if (start === -1) {
+            start = currentLine;
+        }
+
+        if (nextLine === undefined || nextLine !== currentLine + 1) {
+            end = currentLine;
+
+            let meaningfulLines = 0;
+            for (let j = start; j <= end; j++) {
+                const line = documentLines[j].trim();
+                if (isMeaningfulLine(line)) {
+                    meaningfulLines++;
+                }
+            }
+
+            if (meaningfulLines >= 2) {
+                multiLineRanges.push({ start, end });
+            } else if (meaningfulLines === 1) {
+                const trimmedLine = documentLines[start].trim();
+                if (lineOccurrences.get(trimmedLine) === 1 && isMeaningfulLine(trimmedLine)) {
+                    multiLineRanges.push({ start, end: start });
+                }
+            }
+
+            start = -1;
+            end = -1;
+        }
+    }
+
+    return multiLineRanges;
+}
+
+interface DiffInfo {
+    diff: Diff.Change[];
+    source: {
+        type: 'inline' | 'panel';
+        chatId: string;
+        messageId?: string;
+        userText?: string;
+        responseText?: string;
+    };
+}
+
+function getAllDiffs(context: vscode.ExtensionContext, stashedState: StashedState): DiffInfo[] {
+    const allDiffs: DiffInfo[] = [];
+
+    // Get diffs from inline chats
+    for (const inlineChat of Object.values(stashedState.inlineChats)) {
+        for (const fileDiff of inlineChat.file_diff) {
+            allDiffs.push({
+                diff: fileDiff.diffs,
+                source: {
+                    type: 'inline',
+                    chatId: inlineChat.inline_chat_id
+                }
+            });
+        }
+    }
+
+    // Get diffs from panel chats
+    const allPanelChats = stashedState.panelChats;
+
+    for (const panelChat of allPanelChats) {
+        if (!stashedState.deletedChats.deletedPanelChatIDs.includes(panelChat.id)) {
+            for (const message of panelChat.messages) {
+                if (!stashedState.deletedChats.deletedMessageIDs.includes(message.id)) {
+                    const codeBlocks = extractCodeBlocks(message.responseText);
+                    for (const code of codeBlocks) {
+                        allDiffs.push({
+                            diff: [{ value: code, added: true }],
+                            source: {
+                                type: 'panel',
+                                chatId: panelChat.id,
+                                messageId: message.id,
+                                userText: message.messageText,
+                                responseText: message.responseText
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    return allDiffs;
+}
+
+
+async function getMatchStatistics(context: vscode.ExtensionContext, stashedState: StashedState): Promise<{
+    uniqueMatchedLinesCount: number,
+    bestPromptResponse: { prompt: string, response: string, matchCount: number, file: string } | null
+}> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        throw new Error('No workspace folder found');
+    }
+    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+    const git: SimpleGit = simpleGit(workspaceRoot);
+    let repoRoot = workspaceRoot;
+
+    const uniqueMatchedLines = new Set<string>();
+    let maxMatches = 0;
+    let bestPromptResponse: { prompt: string, response: string, matchCount: number, file: string } | null = null;
+
+    const trackedFiles = await git.raw(['ls-files']);
+    const trackedFilePaths = trackedFiles.split('\n').filter(filePath => 
+        !filePath.includes('.gait') && 
+        !filePath.includes('gait_context.md') && 
+        !filePath.includes('.git') && 
+        !filePath.includes('package-lock.json') && 
+        !filePath.includes('yarn.lock')
+    );
+
+    const allDiffs = getAllDiffs(context, stashedState);
+
+    for (const filePath of trackedFilePaths) {
+        const fullPath = path.join(repoRoot.trim(), filePath);
+        if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+            const fileContent = fs.readFileSync(fullPath, 'utf-8');
+            
+            for (const diffInfo of allDiffs) {
+                const matches = matchDiffToFileContent(fileContent, diffInfo.diff);
+                const matchCount = matches.reduce((sum, match) => sum + (match.end - match.start + 1), 0);
+
+                // Update unique matched lines count
+                for (const match of matches) {
+                    for (let i = match.start; i <= match.end; i++) {
+                        uniqueMatchedLines.add(`${filePath}:${i}`);
+                    }
+                }
+
+                // Update best prompt-response if it's from a panel chat
+                if (diffInfo.source.type === 'panel' && matchCount > maxMatches) {
+                    maxMatches = matchCount;
+                    bestPromptResponse = {
+                        prompt: diffInfo.source.userText || '',
+                        response: diffInfo.source.responseText || '',
+                        matchCount: matchCount,
+                        file: filePath
+                    };
+                }
+            }
+        }
+    }
+
+    return {
+        uniqueMatchedLinesCount: uniqueMatchedLines.size,
+        bestPromptResponse
+    };
+}
+
+export async function writeMatchStatistics(context: vscode.ExtensionContext) {
+    const stashedState = readStashedState(context);
+    const { uniqueMatchedLinesCount, bestPromptResponse } = await getMatchStatistics(context, stashedState);
+    
+    stashedState.kv_store['unique_matched_lines_count'] = uniqueMatchedLinesCount;
+    
+    if (bestPromptResponse) {
+        stashedState.kv_store['best_prompt_response'] = {
+            prompt: bestPromptResponse.prompt,
+            response: bestPromptResponse.response,
+            match_count: bestPromptResponse.matchCount,
+            file: bestPromptResponse.file
+        };
+    } else {
+        stashedState.kv_store['best_prompt_response'] = null;
+    }
+    
+    writeStashedState(context, stashedState);
+}
