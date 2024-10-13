@@ -4,4 +4,4 @@
 .gait/ -diff
 
 .gait/state.json merge=custom-stashed-state
-.gait/** -diff -linguist-generated=true
+.gait/** -diff linguist-generated

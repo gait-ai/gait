@@ -24,9 +24,20 @@ export async function calculateTotalRepoLines(context: vscode.ExtensionContext):
     let totalLines = 0;
 
     // Get list of tracked files
-    const trackedFiles = await git.raw(['ls-files']);
-    const trackedFilePaths = trackedFiles.split('\n').filter(filePath => !filePath.includes('.gait') && !filePath.includes('gait_context.md') && !filePath.includes('.git') && !filePath.includes('package-lock.json') && !filePath.includes('yarn.lock'));
+    const binaryExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.so', '.dylib'];
 
+    const trackedFiles = await git.raw(['ls-files']);
+    const trackedFilePaths = trackedFiles.split('\n').filter(filePath => 
+        !filePath.includes('.gait') && 
+        !filePath.includes('gait_context.md') && 
+        !filePath.includes('.git') && 
+        !filePath.includes('package-lock.json') && 
+        !filePath.includes('yarn.lock')
+    ).filter(filePath => {
+        const ext = path.extname(filePath).toLowerCase();
+        return !binaryExtensions.includes(ext);
+    });
+    
     for (const filePath of trackedFilePaths) {
         const fullPath = path.join(repoRoot.trim(), filePath);
         if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
