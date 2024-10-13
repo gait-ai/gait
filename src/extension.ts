@@ -210,14 +210,13 @@ async function triggerAccept(stateReader: StateReader, context: vscode.Extension
  * Function to redecorate the editor with debounce.
  */
 const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
-    if (isRedecorating) {return;}
     isRedecorating = true;
 
     if (disposibleDecorations) {
         disposibleDecorations.forEach(decoration => decoration.dispose());
     }
 
-    disposibleDecorations = InlineDecoration.decorateActive(context, decorationsActive);
+    disposibleDecorations = InlineDecoration.decorateActive(context, gitHistory, decorationsActive);
 
     isRedecorating = false;
 }, 300); // 300ms debounce time

@@ -209,12 +209,15 @@ export function generateDecorationMap(context: vscode.ExtensionContext, editor: 
     return decorationMap;
 }
 
+
+
 export function addDecorationForLine(
     context: vscode.ExtensionContext,
     editor: vscode.TextEditor,
     lineNumber: number,
     decorations: vscode.Disposable[],
-    gitHistory: GitHistoryData
+    gitHistory: GitHistoryData,
+    excludeAfterText: boolean = false
 ) {
     gitHistory = structuredClone(gitHistory);
     decorations.forEach(decoration => decoration.dispose());
@@ -227,22 +230,6 @@ export function addDecorationForLine(
 
     const range = new vscode.Range(lineNumber, editor.document.lineAt(lineNumber).text.length, lineNumber, editor.document.lineAt(lineNumber).text.length);
 
-    let hoverMessage: vscode.MarkdownString | null = null;
-    let afterText = '';
-
-    const panelGitHistory = getMessageFromGitHistory(gitHistory);
-    const inlineGitHistory = getInlineChatFromGitHistory(gitHistory);
-    try {
-        if (decoration.type === 'inline' && decoration.inlineChat) {
-            hoverMessage = InlineHover.createHover(context, { range: new vscode.Range(lineNumber, 0, lineNumber, editor.document.lineAt(lineNumber).text.length), inlineChat: decoration.inlineChat }, editor.document, inlineGitHistory);
-            afterText = InlineHover.getAfterText(decoration.inlineChat, inlineGitHistory);
-        } else if (decoration.type === 'panel' && decoration.panelChat && decoration.messageId) {
-            hoverMessage = PanelHover.createPanelHover(context, { range: new vscode.Range(lineNumber, 0, lineNumber, editor.document.lineAt(lineNumber).text.length), panelChat: decoration.panelChat, message_id: decoration.messageId }, editor.document, panelGitHistory);
-            afterText = PanelHover.getAfterText(decoration.panelChat, decoration.messageId, panelGitHistory);
-        }
-    } catch (error) {
-        console.error('Error creating hover message:', error);
-    }
 
     // Filter decorationMap to get the lineNumbers that match the current decoration
     const matchingLineNumbers = Array.from(decorationMap.entries())
@@ -261,6 +248,22 @@ export function addDecorationForLine(
         isWholeLine: true,
     });
 
+    let hoverMessage: vscode.MarkdownString | null = null;
+    let afterText = '';
+
+    const panelGitHistory = getMessageFromGitHistory(gitHistory);
+    const inlineGitHistory = getInlineChatFromGitHistory(gitHistory);
+    try {
+        if (decoration.type === 'inline' && decoration.inlineChat) {
+            hoverMessage = InlineHover.createHover(context, { range: new vscode.Range(lineNumber, 0, lineNumber, editor.document.lineAt(lineNumber).text.length), inlineChat: decoration.inlineChat }, editor.document, inlineGitHistory);
+            afterText = InlineHover.getAfterText(decoration.inlineChat, inlineGitHistory);
+        } else if (decoration.type === 'panel' && decoration.panelChat && decoration.messageId) {
+            hoverMessage = PanelHover.createPanelHover(context, { range: new vscode.Range(lineNumber, 0, lineNumber, editor.document.lineAt(lineNumber).text.length), panelChat: decoration.panelChat, message_id: decoration.messageId }, editor.document, panelGitHistory);
+            afterText = PanelHover.getAfterText(decoration.panelChat, decoration.messageId, panelGitHistory);
+        }
+    } catch (error) {
+        console.error('Error creating hover message:', error);
+    }
     if (hoverMessage) {
         const decorationOptions: vscode.DecorationOptions = {
             range,
@@ -274,18 +277,26 @@ export function addDecorationForLine(
         };
         const hoverProvider = vscode.languages.registerHoverProvider('*', {
             async provideHover(document, position, token) {
-                let new_range = new vscode.Range(range.start, range.start.translate(0, afterText.length));
+                let start = range.start;
+                let end = range.end;
+                if (excludeAfterText) {
+                    start = new vscode.Position(range.start.line, 0);
+                    end = new vscode.Position(range.end.line, document.lineAt(range.end.line).text.length);
+                }
+                let new_range = new vscode.Range(start, end);
                 if (!new_range.contains(position)) {
                     return;
                 }
-                const highlightRanges = matchingLineNumbers.map(lineNum => 
-                    new vscode.Range(lineNum, 0, lineNum, document.lineAt(lineNum).text.length)
-                );
+                if (!excludeAfterText) {
+                    const highlightRanges = matchingLineNumbers.map(lineNum => 
+                        new vscode.Range(lineNum, 0, lineNum, document.lineAt(lineNum).text.length)
+                    );
+
+                    editor.setDecorations(highlightDecorationType, highlightRanges);
+                    disposables.push(highlightDecorationType);
+                }
+
                 posthog.capture('hover');
-
-                editor.setDecorations(highlightDecorationType, highlightRanges);
-                disposables.push(highlightDecorationType);
-
                 return new vscode.Hover(hoverMessage);
             }
         });
@@ -293,13 +304,15 @@ export function addDecorationForLine(
         // Add the new hover provider to the subscriptions
         context.subscriptions.push(hoverProvider);
         disposables.push(hoverProvider);
-        editor.setDecorations(decorationType, [decorationOptions]);
-        disposables.push(decorationType);
+        if (!excludeAfterText) {
+            editor.setDecorations(decorationType, [decorationOptions]);
+            disposables.push(decorationType);
+        }
     }
     return disposables;
 }
 
-export function decorateActive(context: vscode.ExtensionContext, decorateAll: boolean = false) {
+export function decorateActive(context: vscode.ExtensionContext, gitHistory: GitHistoryData | null, decorateAll: boolean = false) {
     const editor = vscode.window.activeTextEditor;
     
     if (!editor) {
@@ -310,7 +323,7 @@ export function decorateActive(context: vscode.ExtensionContext, decorateAll: bo
     context.workspaceState.update('decorationMap', decorationMap);
 
     let disposables: vscode.Disposable[] = [];
-    if (decorateAll) {
+    if (decorateAll && gitHistory) {
         const uniqueDecorations = new Map<string, LineDecoration>();
         decorationMap.forEach((decoration, line) => {
             if (!uniqueDecorations.has(decoration.id)) {
@@ -335,6 +348,9 @@ export function decorateActive(context: vscode.ExtensionContext, decorateAll: bo
             editor.setDecorations(decorationType, ranges);
             disposables.push(decorationType);
         });
+        for (const [line, decoration] of decorationMap.entries()) {
+            disposables = disposables.concat(addDecorationForLine(context, editor, line, [], gitHistory, true));
+        }
     }
     return disposables
 }

@@ -23,9 +23,13 @@ export function createPanelHover(context: vscode.ExtensionContext, matchedRange:
     if (!message) {
         return new vscode.MarkdownString();
     }
-    const commitInfo = idToCommitInfo?.get(message.id);
+    let commitInfo = idToCommitInfo?.get(message.id);
 
- 
+    if (commitInfo) {
+        commitInfo.panelChats = [];
+        commitInfo.inlineChats = [];
+    }
+
     const continueCommand = vscode.Uri.parse(`command:gait.exportPanelChatsToMarkdown?${encodeURIComponent(
         JSON.stringify({data: panelChat.id, continue_chat: false, commitInfo: commitInfo}))}`);
     markdown.appendMarkdown(`[Continue Chat](${continueCommand})  |  `);
