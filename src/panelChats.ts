@@ -69,7 +69,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       // Parse the current panelChats
       const incomingPanelChats = sanitizePanelChats(await stateReader.parsePanelChatAsync());
       // Check for new panel chats or messages
-      context.workspaceState.update('panelChatNum', incomingPanelChats.length);
+      context.workspaceState.update('panelChatMessageNum', incomingPanelChats.reduce((acc, chat) => acc + chat.messages.length, 0));
       context.workspaceState.update('currentPanelChats', incomingPanelChats);
       const stashedState = readStashedStateFromFile();
       context.workspaceState.update('stashedState', stashedState);

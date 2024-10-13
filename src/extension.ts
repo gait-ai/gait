@@ -13,7 +13,7 @@ import { AIChangeMetadata, PanelChat, PanelChatMode, StashedState, StateReader }
 import { generateKeybindings } from './keybind';
 import { handleMerge } from './automerge';
 import {diffLines} from 'diff';
-import { getRelativePath, updateTotalRepoLineCount } from './utils';
+import { getRelativePath } from './utils';
 import { readStashedStateFromFile, writeStashedState, readStashedState, removePanelChatFromStashedState } from './stashedState';
 import * as child_process from 'child_process';
 import posthog from 'posthog-js';
@@ -44,7 +44,7 @@ let changeQueue: { cursor_position: vscode.Position,
     document_content: string | null }[] = [];
 let triggerAcceptCount = 0;
 let lastInlineChatStart: Inline.InlineStartInfo | null = null;
-let lastPanelChatNum: number = 0;
+let lastPanelChatMessageNum: number = 0;
 
 let fileState: { [key: string]: string } = {};
 let gitHistory: GitHistoryData | null = null;
@@ -660,8 +660,8 @@ exit 0
             if (triggerAcceptCount % 4000 === 0) {
                 triggerAcceptCount = 0;
             }
-            if (lastPanelChatNum !== context.workspaceState.get('panelChatNum')) {
-                lastPanelChatNum = context.workspaceState.get('panelChatNum') || 0;
+            if (lastPanelChatMessageNum !== context.workspaceState.get('panelChatMessageNum')) {
+                lastPanelChatMessageNum = context.workspaceState.get('panelChatMessageNum') || 0;
                 debouncedRedecorate(context);
                 InlineDecoration.writeMatchStatistics(context);
             }
@@ -694,7 +694,6 @@ exit 0
     });
 
     InlineDecoration.writeMatchStatistics(context);
-    updateTotalRepoLineCount(context);
 }
 
 /**

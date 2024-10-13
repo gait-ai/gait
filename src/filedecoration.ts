@@ -12,8 +12,9 @@ import { readStashedState, writeStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
 import posthog from 'posthog-js';
 import { getInlineChatFromGitHistory, getInlineChatIdToCommitInfo, getMessageFromGitHistory, GitHistoryData } from './panelgit';
-type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 
+// Define color types and their corresponding hue values
+type ColorType = 'blue' | 'green' | 'purple' | 'orange';
 const colorHueMap: Record<ColorType, number> = {
     blue: 210,
     green: 110,
@@ -22,8 +23,9 @@ const colorHueMap: Record<ColorType, number> = {
 };
 
 /**
- * Utility function to generate different colors with similar lightness.
- * Ensures colors are distinct by cycling through different hues.
+ * Generates a color based on the given index.
+ * @param index The index used to determine the color.
+ * @returns A string representing the color in HSLA format.
  */
 function generateColors(index: number): string {
     const colorTypes: ColorType[] = ['blue', 'green', 'purple', 'orange'];
@@ -281,7 +283,7 @@ export function addDecorationForLine(
                 let end = range.end;
                 if (excludeAfterText) {
                     start = new vscode.Position(range.start.line, 0);
-                    end = new vscode.Position(range.end.line, document.lineAt(range.end.line).text.length);
+                    end = new vscode.Position(range.start.line, 50);
                 }
                 let new_range = new vscode.Range(start, end);
                 if (!new_range.contains(position)) {
@@ -502,7 +504,8 @@ interface FileStatistics {
 async function getMatchStatistics(context: vscode.ExtensionContext, stashedState: StashedState): Promise<{
     uniqueMatchedLinesCount: number,
     bestPromptResponse: { prompt: string, response: string, matchCount: number, file: string } | null,
-    fileStatistics: Map<string, FileStatistics>
+    fileStatistics: Map<string, FileStatistics>,
+    totalRepoLineCount: number
 }> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -533,12 +536,14 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
     });
 
     const allDiffs = getAllDiffs(context, stashedState);
+    let totalRepoLineCount = 0;
 
     for (const filePath of trackedFilePaths) {
         const fullPath = path.join(repoRoot.trim(), filePath);
         if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
             const fileContent = fs.readFileSync(fullPath, 'utf-8');
             const totalLines = fileContent.split('\n').length;
+            totalRepoLineCount += totalLines;
             let aiGeneratedLines = new Set<number>();
             
             for (const diffInfo of allDiffs) {
@@ -580,15 +585,17 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
     return {
         uniqueMatchedLinesCount: uniqueMatchedLines.size,
         bestPromptResponse,
-        fileStatistics
+        fileStatistics,
+        totalRepoLineCount
     };
 }
 
 export async function writeMatchStatistics(context: vscode.ExtensionContext) {
     const stashedState = readStashedState(context);
-    const { uniqueMatchedLinesCount, bestPromptResponse, fileStatistics } = await getMatchStatistics(context, stashedState);
+    const { uniqueMatchedLinesCount, bestPromptResponse, fileStatistics, totalRepoLineCount } = await getMatchStatistics(context, stashedState);
     
     stashedState.kv_store['unique_matched_lines_count'] = uniqueMatchedLinesCount;
+    stashedState.kv_store['total_repo_line_count'] = totalRepoLineCount;
     
     if (bestPromptResponse) {
         stashedState.kv_store['best_prompt_response'] = {
