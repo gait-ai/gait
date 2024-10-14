@@ -3,6 +3,9 @@
 Welcome to gait, an extension for storing and sharing Github Copilot or Cursor prompts and conversations!
 
 [Visit our website](https://getgait.com)
+[Join our discord](https://discord.gg/yKvt3mWyM4)
+[Download for Cursor](cursor:extension/gait.gait)
+[Download for Github Copilot](vscode:extension/gait.gait)
 
 ## Usage
 
