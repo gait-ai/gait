@@ -2,6 +2,8 @@
 
 Welcome to gait, an extension for storing and sharing Github Copilot or Cursor prompts and conversations!
 
+[Visit our website](https://getgait.com)
+
 ## Usage
 
 ### gait Automatically Records Cursor + Copilot Chats
@@ -46,6 +48,12 @@ Use the keyboard shortcut `Cmd+Shift+G` to toggle full color highlights on and o
 3. **AI-Blame**: Hover over AI-generated code to view the prompt that led to that commit.
 4. **Decoration Toggle**: Easily toggle decorations (hover and highlights) with a keyboard shortcut.
 5. **Continuous Chat**: Pick up where you or your coworker left off by continuing the chat.
+
+### Dashboard: View Your Stats
+
+Check out our [dashboard](https://getgait.com/auth) to see usage statistics and insights from your chats.
+
+For an example, check out [the dashboard for this repo!](https://getgait.com/stats/f8f91b89e0)
 
 ## Support
 
