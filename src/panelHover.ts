@@ -102,7 +102,7 @@ export function getAfterText(panelChat: PanelChat, messageId: string, gitHistory
             author = commitData.author;
         }
     }
-    afterText += ` ${author}: ${timeAgo} - ${message.messageText.slice(0, 30)}${message.messageText.length > 30 ? '...' : ''}`;
+    afterText += ` ${author}: ${timeAgo} - ${message.messageText.slice(0, 100)}${message.messageText.length > 100 ? '...' : ''}`;
 
     return afterText.trim();
 }

@@ -119,7 +119,6 @@
       {
         "file": "onboarding.py",
         "total_lines": 36,
-        "meaningful_lines": 16,
         "ai_generated_lines": 5,
         "ai_generated_percentage": 13.88888888888889
       }
