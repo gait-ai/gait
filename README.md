@@ -2,7 +2,7 @@
 
 Welcome to gait, an extension for storing and sharing Github Copilot or Cursor prompts and conversations!
 
-[Visit our website](https://getgait.com)
+[Download and use gait](https://getgait.com/getting-started)
 
 [Join our discord](https://discord.gg/yKvt3mWyM4)
 
