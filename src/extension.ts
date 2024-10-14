@@ -265,6 +265,14 @@ export function activate(context: vscode.ExtensionContext) {
         // Open the welcome markdown file
         const welcomeFile = vscode.Uri.joinPath(context.extensionUri, 'resources', 'welcome.md');
         vscode.commands.executeCommand('markdown.showPreview', welcomeFile);
+        setTimeout(() => {
+            vscode.window.showInformationMessage('View your codebase stats', 'View Stats')
+                .then((selection: string | undefined) => {
+                    if (selection === 'View Your Stats!') {
+                        vscode.env.openExternal(vscode.Uri.parse('https://getgait.com/auth'));
+                    }
+                });
+        }, 120000); // 2 minutes
     }
     
     const tool: TOOL = checkTool();
@@ -455,9 +463,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 
     try {
-        const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-        addGaitSearchExclusion();
-        // Define the custom merge driver script content
+        const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);        // Define the custom merge driver script content
         const customMergeDriverScript = `#!/bin/bash
 
 # custom-merge-driver.sh
@@ -614,10 +620,21 @@ exit 0
         vscode.window.showErrorMessage('Failed to set up custom merge driver.');
     }
 
+    const excludeSearchCommand = vscode.commands.registerCommand('gait.excludeSearch', async () => {
+        try {
+            await addGaitSearchExclusion();
+            vscode.window.showInformationMessage('Excluded .gait files from search.');
+        } catch (error) {
+            console.error('Error excluding .gait files from search:', error);
+            vscode.window.showErrorMessage('Failed to exclude .gait files from search.');
+        }
+    });
+
     // Register all commands
     context.subscriptions.push(
         removePanelChatCommand,
         inlineChatStartOverride, 
+        excludeSearchCommand,
         deleteInlineChatCommand, 
         openFileWithContentCommand,
         toggleHoverCommand,

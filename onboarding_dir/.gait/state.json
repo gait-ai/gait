@@ -18,8 +18,8 @@
               "context_type": "file",
               "key": "4f3f6417-d16c-4230-8633-190409c26d69",
               "value": {
-                "human_readable": "/Users/alex/Documents/GitHub/gait-copilot/onboarding_dir/onboarding.py",
-                "uri": "/Users/alex/Documents/GitHub/gait-copilot/onboarding_dir/onboarding.py",
+                "human_readable": "/Users/kyle/Documents/GitHub/gait-copilot/onboarding_dir/onboarding.py",
+                "uri": "/Users/kyle/Documents/GitHub/gait-copilot/onboarding_dir/onboarding.py",
                 "isCurrentFile": true
               }
             }
@@ -98,5 +98,31 @@
     "deletedPanelChatIDs": [],
     "deletedInlineChatIDs": []
   },
-  "kv_store": {}
+  "kv_store": {
+    "unique_matched_lines_count": 5,
+    "total_repo_line_count": 36,
+    "total_ai_chat_messages": 2,
+    "model_to_messages": {
+      "claude-3.5-sonnet": 2
+    },
+    "model_to_matched_lines": {
+      "claude-3.5-sonnet": 5
+    },
+    "total_meaningful_lines": 16,
+    "best_prompt_response": {
+      "prompt": "write a function that prints \"This was generated using a panel chat\"",
+      "response": "Certainly! I'll add a new function to print the requested message. Here's the updated code with the new function:\n\n```python:onboarding.py\n# ... existing code ...\n\ndef print_panel_chat_message():\n    \"\"\"\n    Prints a message indicating that this function was generated using a panel chat.\n    \"\"\"\n    print(\"This was generated using a panel chat\")\n\n# ... existing code ...\n```\n\nI've added a new function called `print_panel_chat_message()` that simply prints the requested message. This function can be placed anywhere in the file, but I've shown it after the existing code for clarity.\n\nTo use this function, you can call it anywhere in your code like this:\n\n```python\nprint_panel_chat_message()\n```\n\nThis will output the message \"This was generated using a panel chat\" to the console when executed.",
+      "match_count": 5,
+      "file": "onboarding.py"
+    },
+    "file_statistics": [
+      {
+        "file": "onboarding.py",
+        "total_lines": 36,
+        "meaningful_lines": 16,
+        "ai_generated_lines": 5,
+        "ai_generated_percentage": 13.88888888888889
+      }
+    ]
+  }
 }

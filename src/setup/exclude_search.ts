@@ -9,36 +9,33 @@ export async function addGaitSearchExclusion(): Promise<void> {
     }
 
     const workspaceRoot = workspaceFolders[0].uri.fsPath;
-    const settingsPath = path.join(workspaceRoot, '.vscode', 'settings.json');
+    const vscodePath = path.join(workspaceRoot, '.vscode');
+    const settingsPath = path.join(vscodePath, 'settings.json');
 
-    if (!fs.existsSync(settingsPath)) {
-        return;
+    let settings: any = { "search.exclude": {} };
+
+    if (!fs.existsSync(vscodePath)) {
+        fs.mkdirSync(vscodePath);
     }
 
-    try {
-        const settingsContent = fs.readFileSync(settingsPath, 'utf8');
-        const settingsWithoutComments = settingsContent.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-        let settings;
+    if (fs.existsSync(settingsPath)) {
         try {
+            const settingsContent = fs.readFileSync(settingsPath, 'utf8');
+            const settingsWithoutComments = settingsContent.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
             settings = JSON.parse(settingsWithoutComments);
-        } catch (jsonError) {
-            console.error('Error parsing settings.json:', jsonError);
-            vscode.window.showErrorMessage('Failed to parse settings.json');
-            return;
+            if (!settings['search.exclude']) {
+                settings['search.exclude'] = {};
+            }
+        } catch (error) {
+            console.error('Error reading or parsing settings.json:', error);
+            vscode.window.showErrorMessage('Failed to read or parse settings.json');
         }
+    }
 
-        if (!settings['search.exclude']) {
-            settings['search.exclude'] = {};
-        }
-
-        if (!settings['search.exclude']['**/.gait'] || !settings['search.exclude']['**/gait_context.md']) {
-            settings['search.exclude']['**/.gait'] = true;
-            settings['search.exclude']['**/gait_context.md'] = true;
-            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-            vscode.window.showInformationMessage('Added .gait files to search exclusions in settings.json');
-        }
-    } catch (error) {
-        console.error('Error updating settings.json:', error);
-        vscode.window.showErrorMessage('Failed to update settings.json');
+    if (!settings['search.exclude']['.gait/**'] || !settings['search.exclude']['**/gait_context.md']) {
+        settings['search.exclude']['.gait/**'] = true;
+        settings['search.exclude']['**/gait_context.md'] = true;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+        vscode.window.showInformationMessage('Added .gait files to search exclusions in settings.json');
     }
 }

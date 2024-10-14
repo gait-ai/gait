@@ -51,11 +51,6 @@
                 "category": "gait"
             },
             {
-                "command": "gait.updateSidebar",
-                "title": "Update Sidebar",
-                "category": "gait"
-            },
-            {
                 "command": "gait.removeInlineChat",
                 "title": "Remove Inline Chat",
                 "category": "gait"
@@ -71,13 +66,13 @@
                 "category": "gait"
             },
             {
-                "command": "gait.handleMerge",
-                "title": "Handle Merge",
-                "category": "Gait"
-            }, 
-            {
                 "command": "gait.showIndividualPanelChat",
                 "title": "Show Individual Panel Chat",
+                "category": "Gait"
+              },
+              {
+                "command": "gait.excludeSearch",
+                "title": "Exclude .gait files from search",
                 "category": "Gait"
               }
         ],

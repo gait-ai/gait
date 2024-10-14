@@ -344,6 +344,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 case 'switchToListView':
                     this.handleSwitchToListView();
                     break;
+                case 'openStatsPage':
+                    vscode.env.openExternal(vscode.Uri.parse('https://getgait.com/auth'));
+                    break;
                 default:
                     break;
             }
@@ -476,7 +479,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Git Commit History</title>
+    <title>Gait Commit History</title>
     
  <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
@@ -1045,13 +1048,122 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         pre[class*="language-"] {
             background: var(--vscode-textCodeBlock-background) !important;
         }
+
+        .button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 6px 12px;
+            margin: 0 4px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        .button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .button:active {
+            background-color: var(--vscode-button-activeBackground);
+        }
+
+        .button-secondary {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+        }
+
+        .button-secondary:hover {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        .button-icon {
+            background-color: transparent;
+            color: var(--vscode-editor-foreground);
+            font-size: 16px;
+            padding: 4px;
+            margin: 0 2px;
+        }
+
+        .button-icon:hover {
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+
+        .button-danger {
+            background-color: var(--vscode-inputValidation-errorBackground);
+            color: var(--vscode-inputValidation-errorForeground);
+        }
+
+        .button-danger:hover {
+            background-color: var(--vscode-inputValidation-errorBorder);
+        }
+
+        /* Update existing button styles */
+        .delete-button,
+        .delete-panelchat-button,
+        .append-context-button,
+        .write-chat-button,
+        .remove-chat-button {
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            margin: 0 2px;
+            transition: background-color 0.2s;
+        }
+
+        .delete-button:hover,
+        .delete-panelchat-button:hover,
+        .append-context-button:hover,
+        .write-chat-button:hover,
+        .remove-chat-button:hover {
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+
+        /* Specific colors for different actions */
+        .delete-button,
+        .delete-panelchat-button {
+            color: var(--vscode-inputValidation-errorForeground);
+        }
+
+        .append-context-button {
+            color: var(--vscode-symbolIcon-functionForeground);
+        }
+
+        .write-chat-button {
+            color: var(--vscode-gitDecoration-addedResourceForeground);
+        }
+
+        .remove-chat-button {
+            color: var(--vscode-gitDecoration-modifiedResourceForeground);
+        }
+
+        /* Update specific buttons */
+        #viewStatsButton {
+            composes: button;
+        }
+
+        #confirmYes {
+            composes: button button-danger;
+        }
+
+        #confirmNo {
+            composes: button button-secondary;
+        }
+
+        .back-button {
+            composes: button-icon;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="listView">
         <div class="header">
-            <h2>Git Commit History</h2>
+            <h2>Gait Commit History</h2>
+            <button id="viewStatsButton" class="button" title="View Stats">📊 Stats</button>
             <button id="refreshButton" title="Refresh Commit History">🔄</button>
         </div>
 
@@ -1079,8 +1191,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         <div class="modal-content">
             <p>Are you sure you want to delete this item?</p>
             <div class="modal-buttons">
-                <button id="confirmYes">Yes</button>
-                <button id="confirmNo">No</button>
+                <button id="confirmYes" class="button button-danger">Yes</button>
+                <button id="confirmNo" class="button button-secondary">No</button>
             </div>
         </div>
     </div>
@@ -1457,6 +1569,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             vscode.postMessage({ command: 'refresh' });
         });
 
+        document.getElementById('viewStatsButton').addEventListener('click', () => {
+            vscode.postMessage({ command: 'openStatsPage' });
+        });
+
         /**
          * Attaches an event listener to the view dropdown to switch views.
          */
@@ -1627,10 +1743,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
                 // Delete button
                 const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-button';
+                deleteBtn.className = 'button-icon delete-button';
                 deleteBtn.setAttribute('data-id', messageEntry.id);
                 deleteBtn.title = 'Delete Message';
-                deleteBtn.textContent = '×';
+                deleteBtn.textContent = '🗑️';
                 messageContainer.appendChild(deleteBtn);
 
                 // Delete button event
@@ -1866,9 +1982,9 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                     panelChatHeader.setAttribute('data-panel-chat-id', \`\${commit.commitHash}-\${panelChat.id}\`); // Add data attribute for identification
                                     panelChatHeader.innerHTML = \`
                                         Title: \${escapeHtml(panelChat.customTitle)}
-                                        <button class="delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete Chat">🗑️</button>
+                                        <button class="button-icon delete-panelchat-button" data-id="\${escapeHtml(panelChat.id)}" title="Delete Chat">🗑️</button>
                                         <button 
-                                            class="append-context-button" 
+                                            class="button-icon append-context-button" 
                                             data-commit="\${escapeHtml(commit.commitHash)}" 
                                             data-id="\${escapeHtml(panelChat.id)}" 
                                             title="Add Chat to LLM Context"
@@ -1884,7 +2000,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         // Add Write Chat Button for Uncommitted Changes
                                         panelChatHeader.innerHTML += \`
                                             <button 
-                                                class="write-chat-button" 
+                                                class="button-icon write-chat-button" 
                                                 data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
                                                 title="Stage Chat"
                                             >
@@ -1895,7 +2011,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         // Add Remove Chat Button for Added Changes
                                         panelChatHeader.innerHTML += \`
                                             <button 
-                                                class="remove-chat-button" 
+                                                class="button-icon remove-chat-button" 
                                                 data-panel-chat-id="\${escapeHtml(panelChat.id)}" 
                                                 title="Unstage Chat"
                                             >
@@ -1927,10 +2043,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
                                         // Delete button
                                         const deleteBtn = document.createElement('button');
-                                        deleteBtn.className = 'delete-button';
+                                        deleteBtn.className = 'button-icon delete-button';
                                         deleteBtn.setAttribute('data-id', messageEntry.id);
                                         deleteBtn.title = 'Delete Message';
-                                        deleteBtn.textContent = '×';
+                                        deleteBtn.textContent = '🗑️';
                                         messageContainer.appendChild(deleteBtn);
 
                                         // Determine if the commit is an uncommitted change
@@ -1940,7 +2056,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         if (isUnaddedMessage) {
                                             // Add Write Chat Button for Messages
                                             const writeBtn = document.createElement('button');
-                                            writeBtn.className = 'write-chat-button';
+                                            writeBtn.className = 'button-icon write-chat-button';
                                             writeBtn.setAttribute('data-message-id', messageEntry.id); // Changed to 'data-message-id'
                                             writeBtn.title = 'Write Message to Stashed State';
                                             writeBtn.textContent = '➕';
@@ -1948,7 +2064,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                         } else if (commit.commitHash === 'added') {
                                             // Add Remove Chat Button for Messages
                                             const removeBtn = document.createElement('button');
-                                            removeBtn.className = 'remove-chat-button';
+                                            removeBtn.className = 'button-icon remove-chat-button';
                                             removeBtn.setAttribute('data-message-id', messageEntry.id); // Changed to 'data-message-id'
                                             removeBtn.title = 'Remove Message from Stashed State';
                                             removeBtn.textContent = '➖';
@@ -2084,7 +2200,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                                     inlineChatHeader.innerHTML = \`
                                         <span>\${escapeHtml(inlineChat.prompt)}</span>
                                         <div>
-                                            <button class="delete-inlinechat-button" data-id="\${escapeHtml(inlineChat.inline_chat_id)}" title="Delete Inline Chat">🗑️</button>
+                                            <button class="button-icon delete-inlinechat-button" data-id="\${escapeHtml(inlineChat.inline_chat_id)}" title="Delete Inline Chat">🗑️</button>
                                         </div>
                                     \`;
                                     inlineChatDiv.appendChild(inlineChatHeader);
