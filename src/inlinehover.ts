@@ -98,7 +98,7 @@ export function getAfterText(inlineChat: Inline.InlineChatInfo, gitHistory: Map<
     let afterText = '';
 
     if (inlineChat.prompt) {
-        afterText += `"${inlineChat.prompt.slice(0, 30)}${inlineChat.prompt.length > 30 ? '...' : ''}"`;
+        afterText += `"${inlineChat.prompt.slice(0, 100)}${inlineChat.prompt.length > 100 ? '...' : ''}"`;
     }
     if (gitHistory && gitHistory.get(inlineChat.inline_chat_id)) {
         const commitData = gitHistory.get(inlineChat.inline_chat_id);
@@ -106,7 +106,7 @@ export function getAfterText(inlineChat: Inline.InlineChatInfo, gitHistory: Map<
             const { author, date } = commitData;
             const timeAgo = getTimeAgo(date.toISOString());
 
-            afterText += ` - ${author}: ${timeAgo} - ${inlineChat.prompt.slice(0, 30)}${inlineChat.prompt.length > 30 ? '...' : ''}`;
+            afterText += ` - ${author}: ${timeAgo} - ${inlineChat.prompt.slice(0, 100)}${inlineChat.prompt.length > 100 ? '...' : ''}`;
         }
     }
 
