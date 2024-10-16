@@ -226,7 +226,16 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        return;
+    }
    const firstTime = context.globalState.get('firstTime', true);
+
+   const provider = new PanelViewProvider(context);
+   context.subscriptions.push(
+       vscode.window.registerWebviewViewProvider(PanelViewProvider.viewType, provider, { webviewOptions: { retainContextWhenHidden: true } })
+   );
 
     if (firstTime) {
         // Mark that it's no longer the first time
@@ -249,7 +258,9 @@ export function activate(context: vscode.ExtensionContext) {
     const initializeGaitCommand = vscode.commands.registerCommand('gait.initializeGait', async () => {
         context.workspaceState.update('usingGait', 'true');
         initializeGait();
-        vscode.commands.executeCommand('workbench.action.reloadWindow');
+        setTimeout(() => {
+            vscode.commands.executeCommand('workbench.action.reloadWindow');
+        }, 1000);
     });
 
     context.subscriptions.push(
@@ -257,6 +268,13 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     const usingGait = context.workspaceState.get('usingGait', 'false');
+    console.log("usingGait", usingGait);
+    // If .gait is in the directory, then set usingGait to true
+    const gaitFolder = path.join(workspaceFolder.uri.fsPath, '.gait');
+    if (fs.existsSync(gaitFolder)) {
+        context.workspaceState.update('usingGait', 'true');
+    }
+
     if (usingGait === 'false') {
         // Register dummy commands
         const dummyCommands = [
@@ -297,7 +315,6 @@ export function activate(context: vscode.ExtensionContext) {
     const startInlineCommand = tool === "Cursor" ? "aipopup.action.modal.generate" : "inlineChat.start";
     const startPanelCommand = tool === "Cursor" ? "aichat.newchataction" : "workbench.action.chat.openInSidebar";
 
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         // vscode.window.showInformationMessage('Open a workspace to use gait!');
         return;
@@ -318,11 +335,6 @@ export function activate(context: vscode.ExtensionContext) {
         const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`;
         gitHistory = await getGitHistory(context, workspaceFolder.uri.fsPath, filePath);
     }, 3000); // Delay to ensure initial setup
-
-    const provider = new PanelViewProvider(context);
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(PanelViewProvider.viewType, provider, { webviewOptions: { retainContextWhenHidden: true } })
-    );
 
     //console.log('WebviewViewProvider registered for', PanelViewProvider.viewType);
 

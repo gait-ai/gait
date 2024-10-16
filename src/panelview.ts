@@ -12,6 +12,7 @@ import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 import posthog from 'posthog-js';
 import { identifyUser } from './identify_user';
 import { InlineChatInfo, removeInlineChat } from './inline'; 
+import { initializeGait } from './initialize_gait';
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'gait.panelView';
@@ -114,7 +115,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 }
             }
         } catch (error: any) {
-            vscode.window.showErrorMessage(`Error loading git history: ${error.message}`);
+            //vscode.window.showErrorMessage(`Error loading git history: ${error.message}`);
             this._commits = [];
         }
     }
@@ -188,9 +189,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
     constructor(private readonly _context: vscode.ExtensionContext) {
         // Initialize by loading commits and chats
-        this.loadCommitsAndChats().catch(error => {
-            vscode.window.showErrorMessage(`Initialization error: ${(error as Error).message}`);
-        });
+        const usingGait = this._context.workspaceState.get('usingGait', 'false');
+        if (usingGait === 'false') {
+            return;
+        }
+        this.loadCommitsAndChats();
     }
 
     private async handleDeletePanelChat(panelChatId: string) {
@@ -273,9 +276,35 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken
     ) {
+        console.log("resolveWebviewView");
         identifyUser();
         posthog.capture('$pageview');
         this._view = webviewView;
+
+        webviewView.webview.options = {
+            enableScripts: true,
+        };
+
+        const usingGait = this._context.workspaceState.get('usingGait', 'false');
+
+        console.log("usingGait in resolveWebviewView", usingGait);
+
+        if (usingGait === 'false') {
+            // Render the "Not Initialized" view
+            console.log("Not Initialized");
+            webviewView.webview.html = this.getNotInitializedHtml(webviewView.webview);
+            webviewView.webview.onDidReceiveMessage(message => {
+                switch (message.command) {
+                    case 'initializeGait':
+                        vscode.commands.executeCommand('gait.initializeGait');
+                        break;
+                    default:
+                        break;
+                }
+            });
+            return;
+        }
+
         // Add analytics for the number of inlineChats and panelChats saved
         const stashedState = readStashedState(this._context);
         const panelChatsCount = stashedState.panelChats.length;
@@ -287,9 +316,6 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
             repo: this._context.workspaceState.get('repoid')
         });
 
-        webviewView.webview.options = {
-            enableScripts: true,
-        };
 
         webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
 
@@ -2305,8 +2331,72 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         `;
     }
 
-}
 
+// PanelViewProvider.getNotInitializedHtml
+private getNotInitializedHtml(webview: vscode.Webview): string {
+    const nonce = getNonce();
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gait Initialization</title>
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'none';
+        style-src 'nonce-${nonce}' ${webview.cspSource};
+        script-src 'nonce-${nonce}' ${webview.cspSource};
+        connect-src 'self';
+        img-src 'self';
+        font-src 'self';
+    ">
+    <style nonce="${nonce}">
+        body {
+            font-family: var(--vscode-font-family);
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .message {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+        .button {
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+        }
+        .button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+    </style>
+</head>
+<body>
+    <div class="message">Gait is not yet initialized.</div>
+    <button class="button" id="initializeButton">Initialize Gait</button>
+
+    <script nonce="${nonce}">
+        const vscode = acquireVsCodeApi();
+
+        document.getElementById('initializeButton').addEventListener('click', () => {
+            vscode.postMessage({ command: 'initializeGait' });
+        });
+    </script>
+</body>
+</html>
+    `;
+}
+}
 /**
  * Generates a random nonce for Content Security Policy.
  * @returns {string} - A random 32-character string.
