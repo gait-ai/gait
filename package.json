@@ -4,7 +4,7 @@
     "publisher": "gait",
     "icon": "resources/logo.png",
     "description": "Store and share your cursor and copilot conversations",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "engines": {
         "vscode": "^1.91.0"
     },
@@ -74,7 +74,17 @@
                 "command": "gait.excludeSearch",
                 "title": "Exclude .gait files from search",
                 "category": "Gait"
-              }
+            },
+            {
+                "command": "gait.initializeGait",
+                "title": "Initialize Gait",
+                "category": "Gait"
+            },
+            {
+                "command": "gait.removeGait",
+                "title": "Remove Gait",
+                "category": "Gait"
+            }
         ],
         "keybindings": [
             {
