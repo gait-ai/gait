@@ -22,19 +22,21 @@ export function removeGait() {
         if (fs.existsSync(gitAttributesPath)) {
             let content = fs.readFileSync(gitAttributesPath, 'utf8');
             content = content.replace(/^.*gait.*$\n?/gm, '');
-            if (!content.trim()) {
+            if (!/[a-zA-Z0-9]/.test(content)) {
                 fs.unlinkSync(gitAttributesPath);
+            } else {
+                fs.writeFileSync(gitAttributesPath, content.trim());
             }
-            fs.writeFileSync(gitAttributesPath, content.trim());
         }
 
         if (fs.existsSync(gitignorePath)) {
             let content = fs.readFileSync(gitignorePath, 'utf8');
             content = content.replace(/^.*gait.*$\n?/gm, '');
-            if (!content.trim()) {
+            if (!/[a-zA-Z0-9]/.test(content)) {
                 fs.unlinkSync(gitignorePath);
+            } else {
+                fs.writeFileSync(gitignorePath, content.trim());
             }
-            fs.writeFileSync(gitignorePath, content.trim());
         }
 
         vscode.window.showInformationMessage('gait-related files and entries removed from .gitattributes and .gitignore.');
@@ -43,4 +45,3 @@ export function removeGait() {
         vscode.window.showErrorMessage('Failed to remove gait completely. Please manually remove gait-related entries from .gitattributes and .gitignore.');
     }
 }
-

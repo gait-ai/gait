@@ -249,6 +249,7 @@ export function activate(context: vscode.ExtensionContext) {
     const initializeGaitCommand = vscode.commands.registerCommand('gait.initializeGait', async () => {
         context.workspaceState.update('usingGait', 'true');
         initializeGait();
+        vscode.commands.executeCommand('workbench.action.reloadWindow');
     });
 
     context.subscriptions.push(
@@ -257,6 +258,25 @@ export function activate(context: vscode.ExtensionContext) {
 
     const usingGait = context.workspaceState.get('usingGait', 'false');
     if (usingGait === 'false') {
+        // Register dummy commands
+        const dummyCommands = [
+            'gait.startInlineChat',
+            'gait.openFileWithContent',
+            'gait.removeInlineChat',
+            'gait.exportPanelChatsToMarkdown',
+            'gait.removePanelChat',
+            'gait.toggleHover',
+            'gait.excludeSearch',
+            'gait.showIndividualPanelChat'
+        ];
+
+        dummyCommands.forEach(commandId => {
+            const disposable = vscode.commands.registerCommand(commandId, () => {
+                vscode.window.showInformationMessage('Please activate gait in the gait panel to use this command.');
+            });
+            context.subscriptions.push(disposable);
+        });
+
         return;
     }
     

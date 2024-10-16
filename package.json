@@ -74,7 +74,17 @@
                 "command": "gait.excludeSearch",
                 "title": "Exclude .gait files from search",
                 "category": "Gait"
-              }
+            },
+            {
+                "command": "gait.initializeGait",
+                "title": "Initialize Gait",
+                "category": "Gait"
+            },
+            {
+                "command": "gait.removeGait",
+                "title": "Remove Gait",
+                "category": "Gait"
+            }
         ],
         "keybindings": [
             {
