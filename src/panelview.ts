@@ -373,6 +373,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
                 case 'openStatsPage':
                     vscode.env.openExternal(vscode.Uri.parse('https://getgait.com/auth'));
                     break;
+                case 'openInfoPage':
+                    const welcomeFile = vscode.Uri.joinPath(this._context.extensionUri, 'resources', 'welcome.md');
+                    vscode.commands.executeCommand('markdown.showPreview', welcomeFile);
+                    break;
                 default:
                     break;
             }
@@ -1170,6 +1174,12 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         #viewStatsButton {
             composes: button;
         }
+        #viewInfoButton {
+            composes: button;
+        }
+        #refreshButton {
+            composes: button;
+        }
 
         #confirmYes {
             composes: button button-danger;
@@ -1189,7 +1199,8 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         <div id="listView">
         <div class="header">
             <h2>Gait Commit History</h2>
-            <button id="viewStatsButton" class="button" title="View Stats">📊 Stats</button>
+            <button id="viewInfoButton" class="button">ℹ️</button>
+            <button id="viewStatsButton" class="button" title="View Stats">📊</button>
             <button id="refreshButton" title="Refresh Commit History">🔄</button>
         </div>
 
@@ -1597,6 +1608,10 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 
         document.getElementById('viewStatsButton').addEventListener('click', () => {
             vscode.postMessage({ command: 'openStatsPage' });
+        });
+
+        document.getElementById('viewInfoButton').addEventListener('click', () => {
+            vscode.postMessage({ command: 'openInfoPage' });
         });
 
         /**
@@ -2382,8 +2397,8 @@ private getNotInitializedHtml(webview: vscode.Webview): string {
     </style>
 </head>
 <body>
-    <div class="message">Gait is not yet initialized.</div>
-    <button class="button" id="initializeButton">Initialize Gait</button>
+    <div class="message">Gait is not enabled for this repository. Activating will add some metadata files to your repository.</div>
+    <button class="button" id="initializeButton">Activate Gait</button>
 
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
