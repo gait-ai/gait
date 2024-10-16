@@ -4,23 +4,33 @@ Welcome to gait, your intelligent companion for storing and sharing codegen prom
 
 ## Usage
 
-### Drag Gait Panel to Right Side
+### 1. Drag Gait Panel to Right Side
 
 We recommend dragging the gait panel to the right side of your screen, in the same group as Cursor's side panel.
 
-![Drag Gait Panel to Right Side](gait_sidebar.gif)
+<img src="gait_sidebar.gif" alt="Drag Panel to Right Side" width="600"/>
 
-### gait Automatically Records Chats
+### 2. gait Automatically Records Chats
 
 No work on your end. There might be some delay! 
 
-### gait blame: Viewing Saved Chats
+### 3. gait blame: Viewing Saved Chats
 
-![Hover Demo](gait_blame_hover.gif)
+<img src="gait_blame_hover.gif" alt="AI Git Blame" width="600"/>
 
 Hover over AI-generated code to see the prompt that led to that particular code snippet.
 
-### Stage, Unstage, and Delete Chats
+**IMPORTANT NOTE**: When you first start gait, the extension will read the chats in your history and attempt to match 
+them to files. View chats that have "matched" pieces of code in the STAGED CHATS section. 
+
+### 4. highlight mode: Toggle using Command-Shift-G
+
+See all the code in a file that has been AI-generated. Colors correspond to one message.
+
+<img src="highlight.png" alt="AI Git Blame" width="400"/>
+
+
+### 5. Stage, Unstage, and Delete Chats
 <img src="paneldemo.gif" alt="Panel Demo" width="400"/>
 
 1. Open the gait side view by clicking on the gait icon in the Activity Bar.
@@ -31,12 +41,7 @@ Hover over AI-generated code to see the prompt that led to that particular code 
 > git add .gait/
 ```
 
-
-### Toggling Annotations (Hover and Highlight)
-
-Use the keyboard shortcut `Cmd+Shift+G` to toggle full color highlights on and off.
-
-### Continuing a Chat
+### 6. Continuing a Chat
 
 1. Select a previous chat from the Panel View.
 2. Click the "resume" button to continue the chat.
