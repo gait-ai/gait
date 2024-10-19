@@ -91,7 +91,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
  * @param filePath The path of the file to associate.
  */
 
-export async function associateFileWithMessage(context: vscode.ExtensionContext, message: MessageEntry, filePath: string, newPanelChat: PanelChat): Promise<void> {
+export async function associateFileWithMessageCodeblock(context: vscode.ExtensionContext, message: MessageEntry, filePath: string, newPanelChat: PanelChat, index_of_code_block: number): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     const messageId = message.id;
     if (!workspaceFolder) {
@@ -105,8 +105,17 @@ export async function associateFileWithMessage(context: vscode.ExtensionContext,
             if (message.id === messageId) {
                 message.kv_store = { 
                     ...message.kv_store, 
-                    file_paths: [...(message.kv_store?.file_paths || []), filePath]
+                    file_path_dict: {
+                      ...message.kv_store?.file_path_dict,
+                      [index_of_code_block]: filePath
+                    }
                 };
+                if (!((message.kv_store?.file_paths || []).includes(filePath))) {
+                  message.kv_store = {
+                    ...message.kv_store,
+                    file_paths: [...(message.kv_store?.file_paths || []), filePath]
+                    }
+                }
                 messageFound = true;
                 break;
             }

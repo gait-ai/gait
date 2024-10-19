@@ -9,7 +9,6 @@ import { FileDiff, InlineChatInfo } from '../inline';
 import posthog from 'posthog-js';
 const SCHEMA_VERSION = '1.0';
 
-
 /**
  * Interface representing an interactive session.
  */
@@ -61,7 +60,25 @@ export class CursorReader implements StateReader {
     private inlineChats: CursorInlines[] | null = null;
     private inlineStartInfo: Inline.InlineStartInfo | null = null;
     private timedFileDiffs: TimedFileDiffs[] = [];
-    private fileDiffCutoff: number  = 60000;
+    private fileDiffCutoff: number = 60000;
+    private hasComposerData: boolean = false;
+
+    constructor(context: vscode.ExtensionContext) {
+        this.context = context;
+        this.initialize(); // Call the async initializer
+    }
+
+    private async initialize() {
+        try {
+            const composerData = await readVSCodeState(getDBPath(this.context), 'composer.composerData');
+            if (composerData) {
+                this.hasComposerData = true;
+            }
+        } catch (error) {
+            // If the key doesn't exist, keep hasComposerData as false
+            this.hasComposerData = false;
+        }
+    }
 
     public pushFileDiffs(file_diffs: FileDiff[], metadata: AIChangeMetadata): void {
         this.timedFileDiffs.push({
@@ -74,13 +91,16 @@ export class CursorReader implements StateReader {
     public async matchPromptsToDiff(): Promise<boolean> {
         if (this.inlineChats === null) {
             const inlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
-            this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
+            this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 1 || (!this.hasComposerData && chat.commandType === 4));
             return false;
         }
         const oldInlineChats = this.inlineChats;
         const newInlineChats =  await readVSCodeState(getDBPath(this.context), 'aiService.prompts') || oldInlineChats;
-        const newChats =  getSingleNewEditorText(oldInlineChats, newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4));
-        this.inlineChats = newInlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
+        const newChats =  getSingleNewEditorText(
+            oldInlineChats,
+            newInlineChats.filter((chat: any) => this.hasComposerData ? chat.commandType === 1 : (chat.commandType === 1 || chat.commandType === 4))
+        );
+        this.inlineChats = newInlineChats.filter((chat: any) => this.hasComposerData ? chat.commandType === 1 : (chat.commandType === 1 || chat.commandType === 4));
         if (newChats.length === 0) {
             const oneMinuteAgo = new Date(Date.now() - this.fileDiffCutoff).toISOString();
             while (this.timedFileDiffs.length > 0 && this.timedFileDiffs[0].timestamp < oneMinuteAgo) {
@@ -128,16 +148,12 @@ export class CursorReader implements StateReader {
         return added;
     }
 
-    constructor(context: vscode.ExtensionContext) {
-        this.context = context;
-    }
-
     /**
      * Initializes the extension by reading interactive sessions.
      */
     public async startInline(inlineStartInfo: Inline.InlineStartInfo) {
         const inlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
-        this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 1 || chat.commandType === 4);
+        this.inlineChats= inlineChats.filter((chat: any) => chat.commandType === 1 || (!this.hasComposerData && chat.commandType === 4));
         this.inlineStartInfo = inlineStartInfo;
     }
 
@@ -268,6 +284,53 @@ export class CursorReader implements StateReader {
             });
             // Filter out empty panelChats
             const nonEmptyPanelChats = panelChats.filter((chat: PanelChat) => chat.messages.length > 0);
+
+           // Process composer chats if composerData exists
+        if (this.hasComposerData) {
+            const composerData = await readVSCodeState(getDBPath(this.context), 'composer.composerData');
+            if (composerData && Array.isArray(composerData.allComposers)) {
+                composerData.allComposers.forEach((composer: any) => {
+                    const panelChat: PanelChat = {
+                        ai_editor: "cursor",
+                        customTitle: composer.composerId || '',
+                        id: composer.composerId,
+                        parent_id: null,
+                        created_on: new Date().toISOString(),
+                        messages: [],
+                        kv_store: { "isComposer": true }
+                    };
+
+                    // Pair conversations sequentially: user message (type=1) followed by AI response (type=2)
+                    for (let i = 0; i < composer.conversation.length - 1; ) {
+                        const conv = composer.conversation[i];
+                        const nextConv = composer.conversation[i + 1];
+
+                        if (conv.type === 1 && nextConv.type === 2) {
+                            const messageEntry: MessageEntry = {
+                                id: conv.bubbleId, // Using userConv.bubbleId for the message ID
+                                messageText: conv.text || '',
+                                responseText: nextConv.text || '',
+                                model: nextConv.modelType || 'Unknown',
+                                timestamp: new Date(conv.timestamp || Date.now()).toISOString(),
+                                context: this.parseContext(conv),
+                                kv_store: {}
+                            };
+                            panelChat.messages.push(messageEntry);
+                            i += 2; // Move to the next pair
+                        } else {
+                            // If the current pair doesn't match, move to the next conversation
+                            i += 1;
+                        }
+                    }
+
+                    if (panelChat.messages.length > 0) {
+                        panelChat.customTitle = panelChat.messages[0].messageText;
+                        nonEmptyPanelChats.push(panelChat);
+                    }
+                });
+                }
+            }
+
             return nonEmptyPanelChats;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to parse panel chat: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -6,7 +6,7 @@ import simpleGit, { SimpleGit } from 'simple-git';
 import * as levenshtein from 'fast-levenshtein';
 import * as path from 'path';
 import * as InlineHover from './inlinehover';
-import { associateFileWithMessage } from './panelChats';
+import { associateFileWithMessageCodeblock } from './panelChats';
 import { MessageEntry, PanelChat, PanelMatchedRange, StashedState } from './types';
 import { readStashedState, writeStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
@@ -186,15 +186,23 @@ export function generateDecorationMap(context: vscode.ExtensionContext, editor: 
     }, [] as { message: MessageEntry, panelChat: PanelChat }[]);
 
     for (const {message, panelChat} of currentMessages) {
-        if (message.kv_store && 'file_paths' in message.kv_store && !message.kv_store.file_paths.includes(baseName)) {
+        if (message.kv_store && 'file_paths' in message.kv_store && !message.kv_store.file_paths.includes(baseName) && (('isComposer' in panelChat.kv_store && !panelChat.kv_store.isComposer) || !('isComposer' in panelChat.kv_store)) && false) {
             continue;
         }
         const already_associated = (message.kv_store?.file_paths ?? []).includes(baseName);
         const codeBlocks = extractCodeBlocks(message.responseText);
-        for (const code of codeBlocks) {
+        let file_path_dict = {};
+        if ('file_path_dict' in message.kv_store){
+            file_path_dict = message.kv_store.file_path_dict;
+        }
+        for (let i = 0; i < codeBlocks.length; i++) {
+            if (i in file_path_dict){
+                continue;
+            }
+            const code = codeBlocks[i];
             const currentRanges = matchDiffToCurrentFile(editor.document, [{value: code, added: true}] as Diff.Change[]);
             if (!already_associated && currentRanges.reduce((sum, range) => sum + (range.end.line - range.start.line + 1), 0) > code.split('\n').filter(isMeaningfulLine).length / 2) {
-                associateFileWithMessage(context, message, baseName, panelChat).catch(error => {
+                associateFileWithMessageCodeblock(context, message, baseName, panelChat, i).catch(error => {
                     console.error(`Failed to associate file with message: ${error}`);
                 });
             }
