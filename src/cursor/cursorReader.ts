@@ -159,6 +159,9 @@ export class CursorReader implements StateReader {
 
     private parseContext(userMessage: any): Context[] {
         let context: Context[] = [];
+        if (!userMessage) {
+            return context;
+        }
         // Parse and add selections to panelChat.context if available
         if (userMessage.selections && Array.isArray(userMessage.selections)) {
             userMessage.selections.forEach((selection: any) => (
@@ -290,12 +293,13 @@ export class CursorReader implements StateReader {
             const composerData = await readVSCodeState(getDBPath(this.context), 'composer.composerData');
             if (composerData && Array.isArray(composerData.allComposers)) {
                 composerData.allComposers.forEach((composer: any) => {
+                    const created_on = new Date(parseInt(composer.createdAt)).toISOString();
                     const panelChat: PanelChat = {
                         ai_editor: "cursor",
                         customTitle: composer.composerId || '',
                         id: composer.composerId,
                         parent_id: null,
-                        created_on: new Date().toISOString(),
+                        created_on: created_on,
                         messages: [],
                         kv_store: { "isComposer": true }
                     };
@@ -311,8 +315,8 @@ export class CursorReader implements StateReader {
                                 messageText: conv.text || '',
                                 responseText: nextConv.text || '',
                                 model: nextConv.modelType || 'Unknown',
-                                timestamp: new Date(conv.timestamp || Date.now()).toISOString(),
-                                context: this.parseContext(conv),
+                                timestamp: (conv.timestamp ? new Date(conv.timestamp).toISOString() : created_on),
+                                context: this.parseContext(conv.context),
                                 kv_store: {}
                             };
                             panelChat.messages.push(messageEntry);
