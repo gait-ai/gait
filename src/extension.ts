@@ -566,6 +566,30 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     InlineDecoration.writeMatchStatistics(context);
+
+    const addUserCommentCommand = vscode.commands.registerCommand('gait.addUserComment', async (args) => {
+        const inlineChatId = args.inline_chat_id;
+        const stashedState = readStashedState(context);
+        const inlineChat = stashedState.inlineChats.find(chat => chat.inline_chat_id === inlineChatId);
+
+        if (inlineChat) {
+            const userComment = await vscode.window.showInputBox({
+                prompt: 'Enter a comment or context for this inline chat',
+                value: inlineChat.userComment || ''
+            });
+
+            if (userComment !== undefined) {
+                inlineChat.userComment = userComment;
+                writeStashedState(context, stashedState);
+                debouncedRedecorate(context);
+                vscode.window.showInformationMessage('User comment updated.');
+            }
+        } else {
+            vscode.window.showErrorMessage('Inline chat not found.');
+        }
+    });
+
+    context.subscriptions.push(addUserCommentCommand);
 }
 
 /**

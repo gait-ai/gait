@@ -84,6 +84,10 @@
                 "command": "gait.removeGait",
                 "title": "Remove Gait",
                 "category": "Gait"
+            },
+            {
+                "command": "gait.addUserComment",
+                "title": "Gait: Add/Edit User Comment"
             }
         ],
         "keybindings": [

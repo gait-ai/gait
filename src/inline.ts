@@ -34,6 +34,7 @@ export interface InlineChatInfo {
     timestamp: string;
     prompt: string;
     parent_inline_chat_id: string | null;
+    userComment?: string;
 }
 
 

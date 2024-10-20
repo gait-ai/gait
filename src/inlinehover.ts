@@ -84,6 +84,15 @@ export function createHoverContent(context: vscode.ExtensionContext, markdown: v
             createHoverContent(context, markdown, parentInlineChat, document, null, idToCommitInfo);
         }
     }
+    if (inlineChat.userComment) {
+        markdown.appendMarkdown(`\n\n**User Comment:** ${inlineChat.userComment}\n\n---\n`);
+    }
+    const addCommentCommand = vscode.Uri.parse(`command:gait.addUserComment?${encodeURIComponent(JSON.stringify({
+        inline_chat_id: inlineChat.inline_chat_id
+    }))}`);
+
+    markdown.appendMarkdown(`[Add/Edit Comment](${addCommentCommand})`);
+    markdown.appendMarkdown(`\n\n`);
     return markdown;
 }
 
