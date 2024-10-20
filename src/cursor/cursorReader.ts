@@ -295,7 +295,7 @@ export class CursorReader implements StateReader {
                 composerData.allComposers.forEach((composer: any) => {
                     const created_on = new Date(parseInt(composer.createdAt)).toISOString();
                     const panelChat: PanelChat = {
-                        ai_editor: "cursor",
+                        ai_editor: "cursor-composer",
                         customTitle: composer.composerId || '',
                         id: composer.composerId,
                         parent_id: null,
