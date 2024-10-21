@@ -18,23 +18,46 @@ type CursorInlines  = {
 }
 
 /**
- * Retrieves a single new editor text from the sessions.
+ * @description Computes the differences between two lists of `CursorInlines` objects.
+ * It identifies the elements present in the first list that are not present in the
+ * second list, and returns these elements as a new list.
+ *
+ * @param {CursorInlines[]} oldSessions - Used to store the content of editor sessions
+ * from a previous state.
+ *
+ * @param {CursorInlines[]} newSessions - Used to compare with the `oldSessions`
+ * parameter and identify new elements.
+ *
+ * @returns {CursorInlines[]} An array of objects containing cursor position information
+ * and text.
  */
 function getSingleNewEditorText(oldSessions: CursorInlines[], newSessions: CursorInlines[]): CursorInlines[] {
     const list1Count: { [key: string]: number } = {};
     const newElements: CursorInlines[] = [];
 
+    /**
+     * @description Concatenates two properties of a `CursorInlines` object, `text` and
+     * `commandType`, to form a string key.
+     *
+     * @param {CursorInlines} item - Used to generate a unique key combining the inline
+     * text and command type.
+     *
+     * @returns {string} A concatenation of two strings: the text of an item and its
+     * command type.
+     */
     function inlineToKey(item: CursorInlines): string {
         return item.text + item.commandType;
     }
 
     // Count occurrences of each string in list1
     oldSessions.forEach((item) => {
+        // Counts occurrences of each item in oldSessions.
         list1Count[inlineToKey(item)] = (list1Count[inlineToKey(item)] || 0) + 1;
     });
 
     // Compare each string in list2 with list1
     newSessions.forEach((item) => {
+        // Decrements a count or adds an item to a list.
         if (list1Count[inlineToKey(item)]) {
             list1Count[inlineToKey(item)]--;
         } else {
@@ -46,6 +69,16 @@ function getSingleNewEditorText(oldSessions: CursorInlines[], newSessions: Curso
 
 
 
+/**
+ * @description Determines the path to a database file named 'state.vscdb' within the
+ * storage directory of a Visual Studio Code extension, relative to the workspace
+ * folder or the extension's storage URI if no workspace folder exists.
+ *
+ * @param {vscode.ExtensionContext} context - Used to access the storage URI of the
+ * extension.
+ *
+ * @returns {string} A file path to a database file named `state.vscdb`.
+ */
 function getDBPath(context: vscode.ExtensionContext): string {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder || !context.storageUri) {
@@ -55,6 +88,13 @@ function getDBPath(context: vscode.ExtensionContext): string {
     return dbPath;
 }
 
+/**
+ * @description Maintains state and reads data from the VS Code environment to
+ * facilitate interactions with the AI chat service, processing user input, and storing
+ * chat history for analysis and recording purposes.
+ *
+ * @implements {StateReader}
+ */
 export class CursorReader implements StateReader {
     private context: vscode.ExtensionContext;
     private inlineChats: CursorInlines[] | null = null;
@@ -63,11 +103,23 @@ export class CursorReader implements StateReader {
     private fileDiffCutoff: number = 60000;
     private hasComposerData: boolean = false;
 
+    /**
+     * @description Assigns the provided `vscode.ExtensionContext` to the instance variable
+     * `context` and initiates the initialization process through the `initialize` method.
+     *
+     * @param {vscode.ExtensionContext} context - A reference to the current extension's
+     * context, providing access to its configuration and other resources.
+     */
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
         this.initialize(); // Call the async initializer
     }
 
+    /**
+     * @description Retrieves composer data from the database based on the current context.
+     * If the data exists, it sets the `hasComposerData` property to `true`; otherwise,
+     * it catches the error and keeps `hasComposerData` as `false`.
+     */
     private async initialize() {
         try {
             const composerData = await readVSCodeState(getDBPath(this.context), 'composer.composerData');
@@ -80,6 +132,15 @@ export class CursorReader implements StateReader {
         }
     }
 
+    /**
+     * @description Stores a collection of file differences along with their metadata at
+     * a specific timestamp in a list, allowing for tracking of file changes over time.
+     *
+     * @param {FileDiff[]} file_diffs - Used to store changes made to files.
+     *
+     * @param {AIChangeMetadata} metadata - Used to store additional information about
+     * the file changes.
+     */
     public pushFileDiffs(file_diffs: FileDiff[], metadata: AIChangeMetadata): void {
         this.timedFileDiffs.push({
             timestamp: new Date().toISOString(),
@@ -88,6 +149,13 @@ export class CursorReader implements StateReader {
         });
     }
 
+    /**
+     * @description Matches newly received inline chat prompts to existing file diffs,
+     * writes the matched diffs to the database, and updates the file diff cutoff time.
+     *
+     * @returns {Promise<boolean>} Resolved to a boolean value indicating whether any new
+     * inline chats were added.
+     */
     public async matchPromptsToDiff(): Promise<boolean> {
         if (this.inlineChats === null) {
             const inlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
@@ -149,7 +217,12 @@ export class CursorReader implements StateReader {
     }
 
     /**
-     * Initializes the extension by reading interactive sessions.
+     * @description Fetches existing inline chats from a database, filters them based on
+     * specific command types, and stores the filtered chats and the provided `inlineStartInfo`
+     * in instance properties.
+     *
+     * @param {Inline.InlineStartInfo} inlineStartInfo - Used to initialize the
+     * `inlineStartInfo` property of the class instance.
      */
     public async startInline(inlineStartInfo: Inline.InlineStartInfo) {
         const inlineChats = await readVSCodeState(getDBPath(this.context), 'aiService.prompts');
@@ -157,6 +230,17 @@ export class CursorReader implements StateReader {
         this.inlineStartInfo = inlineStartInfo;
     }
 
+    /**
+     * @description Extracts relevant information from a `userMessage` object and returns
+     * an array of `Context` objects, which represent selections, files, folders, and
+     * documents selected by the user.
+     *
+     * @param {any} userMessage - Exchanged with data from an external source, likely a
+     * messaging system or event.
+     *
+     * @returns {Context[]} An array of objects containing contextual information about
+     * the user's input.
+     */
     private parseContext(userMessage: any): Context[] {
         let context: Context[] = [];
         if (!userMessage) {
@@ -185,6 +269,7 @@ export class CursorReader implements StateReader {
         // Parse and add file selections to context if available
         if (userMessage.fileSelections && Array.isArray(userMessage.fileSelections)) {
             userMessage.fileSelections.forEach((fileSelection: any) => {
+                // Processes each file selection and adds its data to a context array.
                 if (fileSelection.uri) {
                     context.push({
                         context_type: "file",
@@ -201,6 +286,7 @@ export class CursorReader implements StateReader {
         // Parse and add folder selections to context if available
         if (userMessage.folderSelections && Array.isArray(userMessage.folderSelections)) {
             userMessage.folderSelections.forEach((folderSelection: any) => {
+                // Processes folder selections.
                 if (folderSelection.relativePath) {
                     context.push({
                         context_type: "folder",
@@ -217,6 +303,7 @@ export class CursorReader implements StateReader {
         // Parse and add selected docs to context if available
         if (userMessage.selectedDocs && Array.isArray(userMessage.selectedDocs)) {
             userMessage.selectedDocs.forEach((doc: any) => {
+                // Pushes a selected document context to an array.
                 if (doc.docId) {
                     context.push({
                         context_type: "selected_doc",
@@ -235,7 +322,13 @@ export class CursorReader implements StateReader {
     }
 
     /**
-     * Parses the panel chat from interactive sessions and assigns UUIDs based on existing order.
+     * @description Extracts chat data from the VS Code state, processes it into a
+     * structured format, and returns a list of non-empty panel chats. It also handles
+     * composer chats and pairs user messages with AI responses to create a conversation
+     * history.
+     *
+     * @returns {Promise<PanelChat[]>} An array of objects that represent conversations
+     * in a chat panel.
      */
     public async parsePanelChatAsync(): Promise<PanelChat[]> {
         try {
@@ -252,6 +345,7 @@ export class CursorReader implements StateReader {
             }
             let panelChats: PanelChat[] = [];
             raw_data.tabs.forEach((tab: any) => {
+                // Transforms raw chat data into structured panel chats.
                 if (tab.bubbles.length >= 2) {
                     const panelChat: PanelChat = {
                         ai_editor: "cursor",
@@ -293,6 +387,7 @@ export class CursorReader implements StateReader {
             const composerData = await readVSCodeState(getDBPath(this.context), 'composer.composerData');
             if (composerData && Array.isArray(composerData.allComposers)) {
                 composerData.allComposers.forEach((composer: any) => {
+                    // Processes composer data.
                     const created_on = new Date(parseInt(composer.createdAt)).toISOString();
                     const panelChat: PanelChat = {
                         ai_editor: "cursor-composer",
