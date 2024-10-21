@@ -4,7 +4,7 @@
     "publisher": "gait",
     "icon": "resources/logo.png",
     "description": "Store and share your cursor and copilot conversations",
-    "version": "0.0.12",
+    "version": "0.0.13",
     "engines": {
         "vscode": "^1.91.0"
     },
@@ -69,8 +69,8 @@
                 "command": "gait.showIndividualPanelChat",
                 "title": "Show Individual Panel Chat",
                 "category": "Gait"
-              },
-              {
+            },
+            {
                 "command": "gait.excludeSearch",
                 "title": "Exclude .gait files from search",
                 "category": "Gait"
