@@ -18,7 +18,12 @@ export async function readVSCodeState(dbPath: string, key: string): Promise<any>
         const escapedDbPath = `"${dbPath}"`;
         const tempFilePath = path.join(os.tmpdir(), `vscode_state_${Date.now()}.csv`);
         
-        await execAsync(`sqlite3 ${escapedDbPath} -readonly -csv "SELECT key, value FROM ItemTable WHERE key = '${key}';" > ${tempFilePath}`);
+        let sqliteCommand = 'sqlite3';
+        if (process.platform === 'win32') {
+            sqliteCommand = path.join(__dirname, '..', 'bin', 'sqlite3_win.exe');
+        }
+        
+        await execAsync(`"${sqliteCommand}" ${escapedDbPath} -readonly -csv "SELECT key, value FROM ItemTable WHERE key = '${key}';" > ${tempFilePath}`);
 
         const fileContent = await readFileAsync(tempFilePath, 'utf-8');
         
