@@ -4,7 +4,7 @@
     "publisher": "gait",
     "icon": "resources/logo.png",
     "description": "Store and share your cursor and copilot conversations",
-    "version": "0.0.11",
+    "version": "0.0.12",
     "engines": {
         "vscode": "^1.91.0"
     },
@@ -134,9 +134,7 @@
         "test": "vscode-test"
     },
     "devDependencies": {
-        "@types/better-sqlite3": "^7.6.11",
         "@types/diff": "^5.2.2",
-        "@types/fast-levenshtein": "^0.0.4",
         "@types/mocha": "^10.0.7",
         "@types/node": "20.x",
         "@types/uuid": "^10.0.0",
@@ -152,11 +150,8 @@
         "webpack-cli": "^5.1.4"
     },
     "dependencies": {
-        "@sqlite.org/sqlite-wasm": "^3.46.1-build3",
-        "better-sqlite3": "^11.3.0",
         "csv-parse": "^5.5.6",
         "diff": "^7.0.0",
-        "fast-levenshtein": "^3.0.0",
         "file-uri-to-path": "^2.0.0",
         "posthog-js": "^1.166.1",
         "simple-git": "^3.26.0",

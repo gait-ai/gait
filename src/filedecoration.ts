@@ -3,7 +3,6 @@ import * as Inline from './inline';
 import * as Diff from 'diff';
 import * as fs from 'fs';
 import simpleGit, { SimpleGit } from 'simple-git';
-import * as levenshtein from 'fast-levenshtein';
 import * as path from 'path';
 import * as InlineHover from './inlinehover';
 import { associateFileWithMessageCodeblock } from './panelChats';
