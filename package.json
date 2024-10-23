@@ -4,7 +4,7 @@
     "publisher": "gait",
     "icon": "resources/logo.png",
     "description": "Store and share your cursor and copilot conversations",
-    "version": "0.0.13",
+    "version": "0.0.15",
     "engines": {
         "vscode": "^1.91.0"
     },

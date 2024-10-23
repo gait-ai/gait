@@ -29,6 +29,7 @@ export function registerSetToolCommand(context: vscode.ExtensionContext) {
             context.globalState.update("toolOverride", selectedTool);
             vscode.window.showInformationMessage(`Tool override set to: ${selectedTool}`);
         }
+        vscode.commands.executeCommand("workbench.action.reloadWindow");
     });
 
     context.subscriptions.push(disposable);
