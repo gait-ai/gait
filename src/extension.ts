@@ -22,7 +22,7 @@ import { getGitHistory, GitHistoryData } from './panelgit';
 import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 import { removeGait } from './remove_gait';
 import { initializeGait } from './initialize_gait';
-
+import { registerSetToolCommand } from './ide';
 posthog.init('phc_vosMtvFFxCN470e8uHGDYCD6YuuSRSoFoZeLuciujry',
     {
         api_host: 'https://us.i.posthog.com',
@@ -285,7 +285,8 @@ export function activate(context: vscode.ExtensionContext) {
             'gait.removePanelChat',
             'gait.toggleHover',
             'gait.excludeSearch',
-            'gait.showIndividualPanelChat'
+            'gait.showIndividualPanelChat',
+            'gait.setTool'
         ];
 
         dummyCommands.forEach(commandId => {
@@ -298,7 +299,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
     }
     
-    const tool: TOOL = checkTool();
+    const tool: TOOL = checkTool(context);
     // Set panelChatMode in extension workspaceStorage
     const panelChatMode = "OnlyMatchedChats";
     context.workspaceState.update('panelChatMode', panelChatMode);
@@ -493,8 +494,9 @@ export function activate(context: vscode.ExtensionContext) {
         toggleHoverCommand,
         exportPanelChatsToMarkdownCommand,
         removeGaitCommand,
-        initializeGaitCommand
+        initializeGaitCommand,
     );
+    registerSetToolCommand(context);
 
     debouncedRedecorate(context);
     vscode.window.onDidChangeActiveTextEditor(() => {

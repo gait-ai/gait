@@ -88,6 +88,11 @@
             {
                 "command": "gait.addUserComment",
                 "title": "Gait: Add/Edit User Comment"
+            },
+            {
+                "command": "gait.setTool",
+                "title": "Set IDE Tool Override",
+                "category": "Gait"
             }
         ],
         "keybindings": [
