@@ -4,18 +4,22 @@ import { isStashedState, PanelChat, StashedState } from './types';
 import vscode from 'vscode';
 import { InlineChatInfo } from './inline';
 import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
+import { getWorkspaceFolderPath } from './utils';
 
 /**
  * Returns the file path for the stashed state.
  */
 export function stashedStateFilePath(): string {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-        throw new Error('No workspace folder found.');
+    try {
+        const repoPath = getWorkspaceFolderPath();
+        return path.join(repoPath, `.gait/${STASHED_GAIT_STATE_FILE_NAME}`);
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get stashed state file path: ${error.message}`);
+        } else {
+            throw new Error('Failed to get stashed state file path: Unknown error');
+        }
     }
-
-    const repoPath = workspaceFolder.uri.fsPath;
-    return path.join(repoPath, `.gait/${STASHED_GAIT_STATE_FILE_NAME}`);
 }
 
 export function readStashedState(context: vscode.ExtensionContext): StashedState {

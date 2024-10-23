@@ -1,20 +1,16 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getWorkspaceFolderPath } from './utils';
 import { GAIT_FOLDER_NAME } from "./constants";
 
-export function removeGait() {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-        vscode.window.showErrorMessage('No workspace folder found.');
-        return;
-    }
-
-    const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
-    const gitAttributesPath = path.join(workspaceFolder.uri.fsPath, '.gitattributes');
-    const gitignorePath = path.join(workspaceFolder.uri.fsPath, '.gitignore');
-
+export async function removeGait() {
     try {
+        const workspacePath = getWorkspaceFolderPath();
+        const gaitFolderPath = path.join(workspacePath, GAIT_FOLDER_NAME);
+        const gitAttributesPath = path.join(workspacePath, '.gitattributes');
+        const gitignorePath = path.join(workspacePath, '.gitignore');
+
         if (fs.existsSync(gaitFolderPath)) {
             fs.rmdirSync(gaitFolderPath, { recursive: true });
         }
@@ -40,8 +36,11 @@ export function removeGait() {
         }
 
         vscode.window.showInformationMessage('gait-related files and entries removed from .gitattributes and .gitignore.');
-    } catch (error) {
-        console.error('Error removing gait:', error);
-        vscode.window.showErrorMessage('Failed to remove gait completely. Please manually remove gait-related entries from .gitattributes and .gitignore.');
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            vscode.window.showErrorMessage(`Failed to remove Gait: ${error.message}`);
+        } else {
+            vscode.window.showErrorMessage('Failed to remove Gait: An unknown error occurred');
+        }
     }
 }

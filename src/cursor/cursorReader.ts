@@ -7,6 +7,9 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { FileDiff, InlineChatInfo } from '../inline';
 import posthog from 'posthog-js';
+import { getWorkspaceFolder, getWorkspaceFolderPath } from '../utils';
+import * as fs from 'fs/promises';
+
 const SCHEMA_VERSION = '1.0';
 
 /**
@@ -47,7 +50,7 @@ function getSingleNewEditorText(oldSessions: CursorInlines[], newSessions: Curso
 
 
 function getDBPath(context: vscode.ExtensionContext): string {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder || !context.storageUri) {
         throw new Error('No workspace folder or storage URI found');
     }
@@ -339,6 +342,31 @@ export class CursorReader implements StateReader {
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to parse panel chat: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return [];
+        }
+    }
+
+    public async readCursor(): Promise<string | undefined> {
+        try {
+            const workspacePath = getWorkspaceFolderPath();
+            const cursorFilePath = path.join(workspacePath, '.gait', 'cursor');
+            
+            const cursorContent = await fs.readFile(cursorFilePath, 'utf-8');
+            return cursorContent.trim();
+        } catch (error) {
+            console.error(`Failed to read cursor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            return undefined;
+        }
+    }
+
+    public async writeCursor(cursor: string): Promise<void> {
+        try {
+            const workspacePath = getWorkspaceFolderPath();
+            const cursorFilePath = path.join(workspacePath, '.gait', 'cursor');
+            
+            await fs.writeFile(cursorFilePath, cursor, 'utf-8');
+        } catch (error) {
+            console.error(`Failed to write cursor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw error;
         }
     }
 }

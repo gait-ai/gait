@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getWorkspaceFolder } from './utils';
 
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
@@ -54,11 +55,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
     const oldPanelChats: PanelChat[] | undefined = context.workspaceState.get('currentPanelChats');
     isAppending = true;
     try {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      if (!workspaceFolder) {
-        throw new Error('No workspace folder found');
-      }
-
+      const workspaceFolder = getWorkspaceFolder();
       const gaitDir = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);
       // Ensure the .gait directory exists
       if (!fs.existsSync(gaitDir)) {
@@ -81,7 +78,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
     } finally {
       isAppending = false;
     }
-  }, 4000); // Runs 4 seconds
+  }, 4000); // Runs every 4 seconds
 }
 
 
@@ -92,60 +89,64 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
  */
 
 export async function associateFileWithMessageCodeblock(context: vscode.ExtensionContext, message: MessageEntry, filePath: string, newPanelChat: PanelChat, index_of_code_block: number): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const messageId = message.id;
-    if (!workspaceFolder) {
-        throw new Error('No workspace folder found');
-    }
-    let stashedState = readStashedState(context);
+    try {
+        const workspaceFolder = getWorkspaceFolder();
+        const messageId = message.id;
+        let stashedState = readStashedState(context);
 
-    let messageFound = false;
-    for (const panelChat of stashedState.panelChats) {
-        for (const message of panelChat.messages) {
-            if (message.id === messageId) {
-                message.kv_store = { 
-                    ...message.kv_store, 
-                    file_path_dict: {
-                      ...message.kv_store?.file_path_dict,
-                      [index_of_code_block]: filePath
+        let messageFound = false;
+        for (const panelChat of stashedState.panelChats) {
+            for (const message of panelChat.messages) {
+                if (message.id === messageId) {
+                    message.kv_store = { 
+                        ...message.kv_store, 
+                        file_path_dict: {
+                          ...message.kv_store?.file_path_dict,
+                          [index_of_code_block]: filePath
+                        }
+                    };
+                    if (!((message.kv_store?.file_paths || []).includes(filePath))) {
+                      message.kv_store = {
+                        ...message.kv_store,
+                        file_paths: [...(message.kv_store?.file_paths || []), filePath]
+                        }
                     }
-                };
-                if (!((message.kv_store?.file_paths || []).includes(filePath))) {
-                  message.kv_store = {
-                    ...message.kv_store,
-                    file_paths: [...(message.kv_store?.file_paths || []), filePath]
-                    }
+                    messageFound = true;
+                    break;
                 }
-                messageFound = true;
+            }
+            if (messageFound) {
                 break;
             }
         }
-        if (messageFound) {
-            break;
-        }
-    }
 
-    if (!messageFound) {
-        let truncatedMessage = message.messageText.substring(0, 50);
-        if (message.messageText.length > 50) {
-            truncatedMessage += '...';
+        if (!messageFound) {
+            let truncatedMessage = message.messageText.substring(0, 50);
+            if (message.messageText.length > 50) {
+                truncatedMessage += '...';
+            }
+            // Find the message in newPanelChat with the matching messageId
+            const targetMessage = newPanelChat.messages.find(message => message.id === messageId);
+            if (targetMessage) {
+                // Set the kv_store with the file_paths including the new filePath
+                targetMessage.kv_store = {
+                    ...targetMessage.kv_store,
+                    file_paths: [...(targetMessage.kv_store?.file_paths || []), filePath]
+                };
+            } else {
+              throw new Error(`Message with ID ${messageId} not found in the new panel chat.`);
+            }
+            writeChatToStashedState(context, newPanelChat);
+            return;
         }
-        // Find the message in newPanelChat with the matching messageId
-        const targetMessage = newPanelChat.messages.find(message => message.id === messageId);
-        if (targetMessage) {
-            // Set the kv_store with the file_paths including the new filePath
-            targetMessage.kv_store = {
-                ...targetMessage.kv_store,
-                file_paths: [...(targetMessage.kv_store?.file_paths || []), filePath]
-            };
-        } else {
-          throw new Error(`Message with ID ${messageId} not found in the new panel chat.`);
-        }
+        vscode.window.showInformationMessage(`Associated file with message: ${messageId}`);
+
         writeChatToStashedState(context, newPanelChat);
-        return;
+    } catch (error) {
+        console.error('Error associating file with message:', error);
+        vscode.window.showErrorMessage(`Error associating file with message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw error;
     }
-    vscode.window.showInformationMessage(`Associated file with message: ${messageId}`);
-
-    writeChatToStashedState(context, newPanelChat);
 }
+
 

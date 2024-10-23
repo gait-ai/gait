@@ -12,12 +12,11 @@ import { checkTool, TOOL } from './ide';
 import { AIChangeMetadata, PanelChat, PanelChatMode, StashedState, StateReader } from './types';
 import { generateKeybindings } from './keybind';
 import {diffLines} from 'diff';
-import { getRelativePath } from './utils';
+import { getRelativePath, getWorkspaceFolder } from './utils';
 import { readStashedStateFromFile, writeStashedState, readStashedState, removePanelChatFromStashedState } from './stashedState';
 import posthog from 'posthog-js';
 import { identifyRepo, identifyUser } from './identify_user';
 import simpleGit from 'simple-git';
-import { addGaitSearchExclusion } from './setup/exclude_search';
 import { getGitHistory, GitHistoryData } from './panelgit';
 import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 import { removeGait } from './remove_gait';
@@ -85,13 +84,13 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent) {
     
     const editor = vscode.window.activeTextEditor;
     // Check if the file is in the workspace directory
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    const workspaceFolders = getWorkspaceFolder();
+    if (!workspaceFolders) {
         // vscode.window.showInformationMessage('Open a workspace to use gait!');
         return; // No workspace folder open
     }
 
-    const workspacePath = workspaceFolders[0].uri.fsPath;
+    const workspacePath = workspaceFolders.uri.fsPath;
     const filePath = event.document.uri.fsPath;
 
 
@@ -226,7 +225,7 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder) {
         return;
     }
@@ -321,7 +320,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
     }
 
-    if((vscode.workspace.workspaceFolders?.length ?? 0) > 1){
+    if((getWorkspaceFolder()?.uri.fsPath.length ?? 0) > 1){
         vscode.window.showInformationMessage('gait currently only supports single folder workspaces. Please close other folders.');
         return;
     }
@@ -419,7 +418,7 @@ export function activate(context: vscode.ExtensionContext) {
             }];
 
             const markdownContent = panelChatsToMarkdown(markdownData, continue_chat);
-            const filePath = path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', 'gait_context.md');
+            const filePath = path.join(getWorkspaceFolder().uri.fsPath || '', 'gait_context.md');
             fs.writeFileSync(filePath, markdownContent, 'utf8');
             if (continue_chat){
                 posthog.capture('continue_chat');
@@ -599,4 +598,8 @@ export function activate(context: vscode.ExtensionContext) {
  */
 export function deactivate() {
     posthog.capture('deactivate');
+}
+
+function addGaitSearchExclusion() {
+    throw new Error('Function not implemented.');
 }

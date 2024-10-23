@@ -11,6 +11,7 @@ import { readStashedState, writeStashedState } from './stashedState';
 import * as PanelHover from './panelHover';
 import posthog from 'posthog-js';
 import { getInlineChatFromGitHistory, getInlineChatIdToCommitInfo, getMessageFromGitHistory, GitHistoryData } from './panelgit';
+import { getWorkspaceFolder } from './utils';
 
 // Define color types and their corresponding hue values
 type ColorType = 'blue' | 'green' | 'purple' | 'orange';
@@ -514,11 +515,11 @@ async function getMatchStatistics(context: vscode.ExtensionContext, stashedState
     fileStatistics: Map<string, FileStatistics>,
     totalRepoLineCount: number
 }> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    const workspaceFolders = getWorkspaceFolder();
+    if (!workspaceFolders) {
         throw new Error('No workspace folder found');
     }
-    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+    const workspaceRoot = workspaceFolders.uri.fsPath;
 
     const git: SimpleGit = simpleGit(workspaceRoot);
     let repoRoot = workspaceRoot;
