@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { FileDiff, InlineChatInfo } from '../inline';
 import posthog from 'posthog-js';
-
+import { getWorkspaceFolder } from '../utils';
 function fnv1aHash(str: string): number {
     let hash = 2166136261; // FNV offset basis
     for (let i = 0; i < str.length; i++) {
@@ -72,7 +72,7 @@ function getSingleNewEditorText(oldSessions: InteractiveSession, newSessions: In
 }
 
 function getDBPath(context: vscode.ExtensionContext): string {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder()
     if (!workspaceFolder || !context.storageUri) {
         throw new Error('No workspace folder or storage URI found');
     }

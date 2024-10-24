@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getWorkspaceFolder } from './utils';
 
 const GAIT_FOLDER_NAME = '.gait';
 const SCHEMA_VERSION = '1.0';
@@ -54,7 +55,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
     const oldPanelChats: PanelChat[] | undefined = context.workspaceState.get('currentPanelChats');
     isAppending = true;
     try {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      const workspaceFolder = getWorkspaceFolder()
       if (!workspaceFolder) {
         throw new Error('No workspace folder found');
       }
@@ -92,7 +93,7 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
  */
 
 export async function associateFileWithMessageCodeblock(context: vscode.ExtensionContext, message: MessageEntry, filePath: string, newPanelChat: PanelChat, index_of_code_block: number): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder()
     const messageId = message.id;
     if (!workspaceFolder) {
         throw new Error('No workspace folder found');
@@ -148,4 +149,3 @@ export async function associateFileWithMessageCodeblock(context: vscode.Extensio
 
     writeChatToStashedState(context, newPanelChat);
 }
-

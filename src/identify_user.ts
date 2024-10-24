@@ -3,6 +3,7 @@ import posthog from "posthog-js";
 import simpleGit, { SimpleGit } from 'simple-git';
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
+import { getWorkspaceFolder } from './utils';
 
 export async function identifyUser(): Promise<void> {
     const git: SimpleGit = simpleGit();
@@ -24,7 +25,7 @@ export async function identifyUser(): Promise<void> {
 }
 
 export async function identifyRepo(context: vscode.ExtensionContext): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder) {
         return;
     }

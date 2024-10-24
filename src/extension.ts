@@ -23,6 +23,8 @@ import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 import { removeGait } from './remove_gait';
 import { initializeGait } from './initialize_gait';
 import { registerSetToolCommand } from './ide';
+import { getWorkspaceFolders , getWorkspaceFolder } from './utils';
+
 posthog.init('phc_vosMtvFFxCN470e8uHGDYCD6YuuSRSoFoZeLuciujry',
     {
         api_host: 'https://us.i.posthog.com',
@@ -85,7 +87,7 @@ async function handleFileChange(event: vscode.TextDocumentChangeEvent) {
     
     const editor = vscode.window.activeTextEditor;
     // Check if the file is in the workspace directory
-    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspaceFolders = getWorkspaceFolders()
     if (!workspaceFolders || workspaceFolders.length === 0) {
         // vscode.window.showInformationMessage('Open a workspace to use gait!');
         return; // No workspace folder open
@@ -226,7 +228,7 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder()
     if (!workspaceFolder) {
         return;
     }

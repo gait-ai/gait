@@ -13,6 +13,7 @@ import posthog from 'posthog-js';
 import { identifyUser } from './identify_user';
 import { InlineChatInfo, removeInlineChat } from './inline'; 
 import { initializeGait } from './initialize_gait';
+import { getWorkspaceFolder, getWorkspaceFolderPath } from './utils';
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'gait.panelView';
@@ -28,7 +29,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * Supports both default and filtered views based on _isFilteredView.
      */
     private async loadCommitsAndChats(additionalFilePath?: string) {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder =getWorkspaceFolder()
         if (!workspaceFolder) {
             //vscode.window.showErrorMessage('No workspace folder found.');
             return;
@@ -420,7 +421,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
      * @param panelChatId - The ID of the panelChat to append.
      */
     private async handleAppendContext(commitHash: string, panelChatId: string) {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = getWorkspaceFolder()
         if (!workspaceFolder) {
             //vscode.window.showErrorMessage('No workspace folder found.');
             return;
@@ -470,7 +471,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     private async handleOpenFile(filePath: string) {
         // console.log(`Opening file: ${filePath}`);
         try {
-            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            const workspaceFolder =  getWorkspaceFolder()
             if (!workspaceFolder) {
                 vscode.window.showErrorMessage('No workspace folder found.');
                 return;
@@ -497,7 +498,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         const prismCssUri = webview.asWebviewUri(prismCssPath);
         const prismJsUri = webview.asWebviewUri(prismJsPath);
         const markedJsUri = webview.asWebviewUri(markedJsPath); // URI for Marked.js
-        const workspaceFolderPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const workspaceFolderPath = getWorkspaceFolderPath()
 
         return `
 <!DOCTYPE html>

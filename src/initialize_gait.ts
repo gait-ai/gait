@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import simpleGit from "simple-git";
 import * as child_process from 'child_process';
-
+import { getWorkspaceFolderPath } from './utils';
 function mergeDriver(workspaceFolder: vscode.WorkspaceFolder){
     try {
         const gaitFolderPath = path.join(workspaceFolder.uri.fsPath, GAIT_FOLDER_NAME);        // Define the custom merge driver script content
@@ -199,10 +199,9 @@ exit 0
 
 
 export function initializeGait() {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolderPath();
     if (workspaceFolder) {
-        createGaitFolderIfNotExists(workspaceFolder);
-        mergeDriver(workspaceFolder);
+        createGaitFolderIfNotExists({ uri: { fsPath: workspaceFolder } } as vscode.WorkspaceFolder);
+        mergeDriver({ uri: { fsPath: workspaceFolder } } as vscode.WorkspaceFolder);
     }
 }
-

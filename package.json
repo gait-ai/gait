@@ -136,7 +136,9 @@
         "watch-tests": "tsc -p . -w --outDir out",
         "pretest": "npm run compile-tests && npm run compile && npm run lint",
         "lint": "eslint src",
-        "test": "vscode-test"
+        "test": "vscode-test",
+        "build": "webpack --mode production --devtool hidden-source-map"
+       
     },
     "devDependencies": {
         "@types/diff": "^5.2.2",

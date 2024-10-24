@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getWorkspaceFolders } from '../utils';
 
 export async function addGaitSearchExclusion(): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspaceFolders = getWorkspaceFolders();
     if (!workspaceFolders || workspaceFolders.length === 0) {
         return;
     }

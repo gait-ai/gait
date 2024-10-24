@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { GAIT_FOLDER_NAME } from "./constants";
+import { getWorkspaceFolder } from './utils';
 
 export function removeGait() {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('No workspace folder found.');
         return;
