@@ -9,6 +9,7 @@ const SCHEMA_VERSION = '1.0';
 import { MessageEntry, PanelChat, PanelChatMode, StashedState, StateReader } from './types';
 import { readStashedState, readStashedStateFromFile, writeChatToStashedState } from './stashedState';
 import posthog from 'posthog-js';
+import { debug } from './debug';
 
 
 
@@ -73,8 +74,9 @@ export async function monitorPanelChatAsync(stateReader: StateReader, context: v
       context.workspaceState.update('currentPanelChats', incomingPanelChats);
       const stashedState = readStashedStateFromFile();
       context.workspaceState.update('stashedState', stashedState);
-
+      debug("State updated");
     } catch (error) {
+      debug("Error updating state: " + error);
       console.error(`Error monitoring and saving state:`, error);
       vscode.window.showErrorMessage(`Error monitoring and saving state: ${error instanceof Error ? error.message : 'Unknown error'}`);
       posthog.capture('error_monitoring_and_saving_state', { error: error instanceof Error ? error.message : 'Unknown error' });
@@ -126,6 +128,7 @@ export async function associateFileWithMessageCodeblock(context: vscode.Extensio
     }
 
     if (!messageFound) {
+        debug("Message association not found in stashed state: new chat into stashed state");
         let truncatedMessage = message.messageText.substring(0, 50);
         if (message.messageText.length > 50) {
             truncatedMessage += '...';

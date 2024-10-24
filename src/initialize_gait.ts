@@ -4,6 +4,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import simpleGit from "simple-git";
 import * as child_process from 'child_process';
+import { debug } from "./debug";
+import { StashedState } from "./types";
+import { writeStashedStateToFile } from "./stashedState";
 
 function mergeDriver(workspaceFolder: vscode.WorkspaceFolder){
     try {
@@ -160,6 +163,7 @@ exit 0
             }
         }
     } catch (error) {
+        debug("Error setting up custom merge driver: " + error);
         console.error('Error setting up custom merge driver:', error);
         vscode.window.showErrorMessage('Failed to set up custom merge driver.');
     }
@@ -174,6 +178,18 @@ exit 0
         fs.mkdirSync(gaitFolderPath);
         vscode.window.showInformationMessage(`${GAIT_FOLDER_NAME} folder created successfully. Please commit this folder to save your chats.`);
     }
+
+    const emptyStashedState: StashedState = {
+        panelChats: [],
+        inlineChats: [],
+        schemaVersion: "1.0",
+        deletedChats: {
+            deletedMessageIDs: [],
+            deletedPanelChatIDs: []
+        },
+        kv_store: {}
+    };
+    writeStashedStateToFile(emptyStashedState);
 
     setTimeout(async () => {
         try {

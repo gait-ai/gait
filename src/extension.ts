@@ -23,6 +23,7 @@ import { STASHED_GAIT_STATE_FILE_NAME } from './constants';
 import { removeGait } from './remove_gait';
 import { initializeGait } from './initialize_gait';
 import { registerSetToolCommand } from './ide';
+import { debug, registerDebugCommand } from './debug';
 posthog.init('phc_vosMtvFFxCN470e8uHGDYCD6YuuSRSoFoZeLuciujry',
     {
         api_host: 'https://us.i.posthog.com',
@@ -226,18 +227,28 @@ const debouncedRedecorate = debounce((context: vscode.ExtensionContext) => {
  * Activates the extension.
  */
 export function activate(context: vscode.ExtensionContext) {
+    debug("Activating extension");
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
+        debug("No workspace folder found");
         return;
     }
+    if((vscode.workspace.workspaceFolders?.length ?? 0) > 1){
+        debug("Multiple workspace folders found");
+        vscode.window.showInformationMessage('gait currently only supports single folder workspaces. Please close other folders.');
+        return;
+    }
+    
    const firstTime = context.globalState.get('firstTime', true);
 
    const provider = new PanelViewProvider(context);
    context.subscriptions.push(
        vscode.window.registerWebviewViewProvider(PanelViewProvider.viewType, provider, { webviewOptions: { retainContextWhenHidden: true } })
    );
+   registerDebugCommand(context);
 
     if (firstTime) {
+        debug("First time user");
         // Mark that it's no longer the first time
         context.globalState.update('firstTime', false);
         posthog.capture('user_download');
@@ -267,15 +278,24 @@ export function activate(context: vscode.ExtensionContext) {
         initializeGaitCommand
     );
 
+    // If .gait is in the directory, then set usingGait to true
+    const gaitFolder = path.join(workspaceFolder.uri.fsPath, '.gait', "state.json");
+    if (fs.existsSync(gaitFolder)) {
+        debug("Gait folder found");
+        context.workspaceState.update('usingGait', 'true');
+    } else {
+        debug("Gait folder not found");
+        context.workspaceState.update('usingGait', 'false');
+    }
     const usingGait = context.workspaceState.get('usingGait', 'false');
     console.log("usingGait", usingGait);
-    // If .gait is in the directory, then set usingGait to true
-    const gaitFolder = path.join(workspaceFolder.uri.fsPath, '.gait');
-    if (fs.existsSync(gaitFolder)) {
-        context.workspaceState.update('usingGait', 'true');
-    }
+
+    context.subscriptions.push(vscode.commands.registerCommand('gait.focusPanel', () => {
+        vscode.commands.executeCommand('gait.panelView.focus');
+    }));
 
     if (usingGait === 'false') {
+        debug("Set dummy commands");
         // Register dummy commands
         const dummyCommands = [
             'gait.startInlineChat',
@@ -300,6 +320,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
     
     const tool: TOOL = checkTool(context);
+    debug("Tool found: " + tool);
     // Set panelChatMode in extension workspaceStorage
     const panelChatMode = "OnlyMatchedChats";
     context.workspaceState.update('panelChatMode', panelChatMode);
@@ -316,25 +337,16 @@ export function activate(context: vscode.ExtensionContext) {
     const startInlineCommand = tool === "Cursor" ? "aipopup.action.modal.generate" : "inlineChat.start";
     const startPanelCommand = tool === "Cursor" ? "aichat.newchataction" : "workbench.action.chat.openInSidebar";
 
-    if (!workspaceFolder) {
-        // vscode.window.showInformationMessage('Open a workspace to use gait!');
-        return;
-    }
-
-    if((vscode.workspace.workspaceFolders?.length ?? 0) > 1){
-        vscode.window.showInformationMessage('gait currently only supports single folder workspaces. Please close other folders.');
-        return;
-    }
 
     identifyRepo(context);
     const stateReader: StateReader = tool === 'Cursor' ? new CursorReader.CursorReader(context) : new VSCodeReader.VSCodeReader(context);
 
     writeStashedState(context, readStashedStateFromFile());
-    context.workspaceState.update('stashedState', readStashedStateFromFile());
     setTimeout(async () => {
         monitorPanelChatAsync(stateReader, context);
         const filePath = `.gait/${STASHED_GAIT_STATE_FILE_NAME}`;
         gitHistory = await getGitHistory(context, workspaceFolder.uri.fsPath, filePath);
+        debug("Git history + file state loaded");
     }, 3000); // Delay to ensure initial setup
 
     //console.log('WebviewViewProvider registered for', PanelViewProvider.viewType);

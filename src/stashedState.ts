@@ -112,7 +112,7 @@ export function removePanelChatFromStashedState(context: vscode.ExtensionContext
 /**
  * Writes the stashed state to the file.
  */
-function writeStashedStateToFile(stashedState: StashedState): void {
+export function writeStashedStateToFile(stashedState: StashedState): void {
     const filePath = stashedStateFilePath();
     try {
         // Convert the stashed state to a JSON string with indentation

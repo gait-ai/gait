@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { FileDiff, InlineChatInfo } from '../inline';
 import posthog from 'posthog-js';
+import { debug } from '../debug';
 const SCHEMA_VERSION = '1.0';
 
 /**
@@ -242,8 +243,10 @@ export class CursorReader implements StateReader {
             const raw_data = await readVSCodeState(getDBPath(this.context), 'workbench.panel.aichat.view.aichat.chatdata');
 
             if (!raw_data) {
+                debug("No cursor raw data found");
                 return [];
             }
+            debug("Cursor raw data found");
 
             if (!Array.isArray(raw_data.tabs)) {
                 vscode.window.showErrorMessage('Invalid internal chat data structure.');
@@ -291,6 +294,7 @@ export class CursorReader implements StateReader {
            // Process composer chats if composerData exists
         if (this.hasComposerData) {
             const composerData = await readVSCodeState(getDBPath(this.context), 'composer.composerData');
+            debug("Composer data found");
             if (composerData && Array.isArray(composerData.allComposers)) {
                 composerData.allComposers.forEach((composer: any) => {
                     const created_on = new Date(parseInt(composer.createdAt)).toISOString();

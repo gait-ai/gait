@@ -93,6 +93,16 @@
                 "command": "gait.setTool",
                 "title": "Set IDE Tool Override",
                 "category": "Gait"
+            },
+            {
+                "command": "gait.debugFile",
+                "title": "Debug File",
+                "category": "Gait"
+            },
+            {
+                "command": "gait.focusPanel",
+                "title": "Focus Gait Panel",
+                "category": "Gait"
             }
         ],
         "keybindings": [

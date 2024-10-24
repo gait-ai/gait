@@ -7,7 +7,7 @@ import { StashedState, PanelChat, isStashedState, isPanelChat } from './types';
 import { InlineChatInfo } from './inline';
 import { readStashedState } from './stashedState'; // Ensure this does not use gzip
 import { execFile } from 'child_process';
-import { promisify } from 'util';
+import { debug, promisify } from 'util';
 import posthog from 'posthog-js';
 
 const SCHEMA_VERSION = '1.0';
@@ -345,6 +345,7 @@ export async function getGitHistory(context: vscode.ExtensionContext, repoPath: 
                 inlineChats: []
             };
     } catch (error) {
+        debug("Error reading current uncommitted content: " + (error as Error).message);
         log(`Warning: Failed to read current uncommitted content: ${(error as Error).message}`, LogLevel.WARN);
     }
 
