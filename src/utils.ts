@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-function getWorkspaceFolders(): readonly vscode.WorkspaceFolder[] | undefined {
+export function getWorkspaceFolders(): readonly vscode.WorkspaceFolder[] | undefined {
     return vscode.workspace.workspaceFolders;
 }
 

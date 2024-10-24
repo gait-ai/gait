@@ -25,22 +25,20 @@ export async function identifyUser(): Promise<void> {
 }
 
 export async function identifyRepo(context: vscode.ExtensionContext): Promise<void> {
-    try {
-        const workspaceFolder = getWorkspaceFolder();
-        // Check if repo global state exists, if not, set it to the first commit hash
-        const repoId = context.workspaceState.get('repoid');
-        if (!repoId) {
-            try {
-                const git: SimpleGit = simpleGit(workspaceFolder.uri.fsPath);
-                const log = await git.raw('rev-list', '--max-parents=0', 'HEAD');
-                const firstCommitHash = log.trim();
-                context.workspaceState.update('repoid', firstCommitHash);
-            } catch (error) {
-                console.error('Error getting first commit hash:', error);
-            }
-        }   
-    } catch (error) {
-        console.error('Error identifying repo:', error);
-       
+    const workspaceFolder = getWorkspaceFolder();
+    if (!workspaceFolder) {
+        return;
     }
+    // Check if repo global state exists, if not, set it to the first commit hash
+    const repoId = context.workspaceState.get('repoid');
+    if (!repoId) {
+        try {
+            const git: SimpleGit = simpleGit(workspaceFolder.uri.fsPath);
+            const log = await git.raw('rev-list', '--max-parents=0', 'HEAD');
+            const firstCommitHash = log.trim();
+            context.workspaceState.update('repoid', firstCommitHash);
+        } catch (error) {
+            console.error('Error getting first commit hash:', error);
+        }
+    }   
 }

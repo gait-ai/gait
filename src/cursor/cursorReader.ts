@@ -9,7 +9,6 @@ import { FileDiff, InlineChatInfo } from '../inline';
 import posthog from 'posthog-js';
 const SCHEMA_VERSION = '1.0';
 import { getWorkspaceFolder } from '../utils';
-
 /**
  * Interface representing an interactive session.
  */
@@ -48,7 +47,7 @@ function getSingleNewEditorText(oldSessions: CursorInlines[], newSessions: Curso
 
 
 function getDBPath(context: vscode.ExtensionContext): string {
-    const workspaceFolder = getWorkspaceFolder();
+    const workspaceFolder = getWorkspaceFolder()
     if (!workspaceFolder || !context.storageUri) {
         throw new Error('No workspace folder or storage URI found');
     }

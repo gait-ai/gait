@@ -9,7 +9,6 @@ import { readStashedState } from './stashedState'; // Ensure this does not use g
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import posthog from 'posthog-js';
-import { getWorkspaceFolderPath } from './utils';
 
 const SCHEMA_VERSION = '1.0';
 
@@ -199,102 +198,161 @@ function aggregateCurrentIds(parsedCurrent: StashedState) {
  * @returns A Promise resolving to GitHistoryData containing commit history and uncommitted changes.
  */
 export async function getGitHistory(context: vscode.ExtensionContext, repoPath: string, filePath: string): Promise<GitHistoryData> {
-    console.log('Starting getGitHistory function');
-    try {
-        const workspacePath = getWorkspaceFolderPath();
-        console.log('Workspace path:', workspacePath);
+    const git: SimpleGit = simpleGit(repoPath);
+    log("Starting getGitHistory", LogLevel.INFO);
 
-        const git: SimpleGit = simpleGit(workspacePath);
-        console.log('SimpleGit initialized');
-
-        if (!fs.existsSync(path.join(workspacePath, '.git'))) {
-            console.log('Not a git repository');
-            throw new Error('Not a git repository');
-        }
-
-        console.log('Fetching git logs');
-        const logs = await git.log({ file: filePath });
-        console.log(`Found ${logs.all.length} commits`);
-
-        // Get the current branch name
-        const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
-        console.log(`Current branch: ${currentBranch}`);
-
-        const commits: CommitData[] = [];
-
-        for (const log of logs.all) {
-            console.log(`Processing commit: ${log.hash}`);
-            const commitHash = log.hash;
-            
-            console.log(`Checking out commit: ${commitHash}`);
-            await git.checkout(commitHash);
-
-            const fullFilePath = path.join(workspacePath, filePath);
-            console.log(`Checking file: ${fullFilePath}`);
-
-            let panelChats: PanelChat[] = [];
-            let inlineChats: InlineChatInfo[] = [];
-
-            if (fs.existsSync(fullFilePath)) {
-                console.log('File exists, reading content');
-                const fileContent = fs.readFileSync(fullFilePath, 'utf8');
-                try {
-                    const stashedState = JSON.parse(fileContent);
-                    panelChats = stashedState.panelChats || [];
-                    inlineChats = stashedState.inlineChats || [];
-                    console.log(`Found ${panelChats.length} panel chats and ${inlineChats.length} inline chats`);
-                } catch (parseError) {
-                    console.error('Error parsing file content:', parseError);
-                }
-            } else {
-                console.log('File does not exist in this commit');
-            }
-
-            commits.push({
-                commitHash: commitHash,
-                author: log.author_name,
-                date: new Date(log.date),
-                commitMessage: log.message,
-                panelChats: panelChats,
-                inlineChats: inlineChats
-            });
-        }
-
-        console.log(`Checking out back to original branch: ${currentBranch}`);
-        await git.checkout(currentBranch);
-
-        console.log('Getting uncommitted changes');
-        const stashedState = readStashedState(context);
-        const uncommitted = {
-            panelChats: stashedState.panelChats,
-            inlineChats: stashedState.inlineChats
-        };
-
-        console.log('Getting staged changes');
-        const stagedFiles = await git.diff(['--cached', '--name-only']);
-        const added = {
-            panelChats: [] as PanelChat[],
-            inlineChats: [] as InlineChatInfo[]
-        };
-
-        if (stagedFiles.includes(filePath)) {
-            console.log('File is staged, reading staged content');
-            const stagedContent = await git.show([':', filePath]);
-            try {
-                const stagedState = JSON.parse(stagedContent);
-                added.panelChats = stagedState.panelChats || [];
-                added.inlineChats = stagedState.inlineChats || [];
-            } catch (parseError) {
-                console.error('Error parsing staged content:', parseError);
-            }
-        }
-
-        console.log('Finished processing git history');
-        return { commits, uncommitted, added };
-    } catch (error) {
-        console.error('Error in getGitHistory:', error);
-        throw error;
+    // Ensure the file exists in the repository
+    const absoluteFilePath = path.resolve(repoPath, filePath);
+    if (!fs.existsSync(absoluteFilePath)) {
+        throw new Error(`File not found: ${absoluteFilePath}`);
     }
+
+    // Step 1: Read and validate the current state.json
+    const parsedCurrent = readStashedState(context); 
+    const { currentMessageIds, currentPanelChatIds, currentInlineChatIds } = aggregateCurrentIds(parsedCurrent);
+    const seenMessageIds: Set<string> = new Set();
+    const seenInlineChatIds: Set<string> = new Set();
+
+    // Step 2: Get the commit history for the file with --follow to track renames
+    const logArgs = ['log', '--reverse', '--follow', '--pretty=format:%H%x09%an%x09%ad%x09%s', '--', filePath];
+    let logData: string;
+
+
+    try {
+        logData = await git.raw(logArgs);
+        log(`Retrieved git log data successfully.`, LogLevel.INFO);
+    } catch (error) {
+        if ((error as any).message.includes("does not have any commits yet")) {
+            logData = "";
+        } else {
+            throw new Error(`Failed to retrieve git log: ${(error as Error).message}`);
+        }
+    }
+
+    const logLines = logData.split('\n').filter(line => line.trim() !== '');
+    log(`Processing ${logLines.length} commits from git log.`, LogLevel.INFO);
+
+    const allCommitsMap: Map<string, CommitData> = new Map();
+
+    for (const line of logLines) {
+        const [commitHash, authorName, dateStr, ...commitMsgParts] = line.split('\t');
+        const commitMessage = commitMsgParts.join('\t');
+
+        // Get the file content at this commit using child_process
+        let fileContent: string;
+        try {
+            fileContent = await gitShowString(['show', `${commitHash}:${filePath}`], repoPath);
+            log(`Retrieved file content for commit ${commitHash}.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Could not retrieve file ${filePath} at commit ${commitHash}. Error: ${(error as Error).message}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Parse JSON
+        let parsedContent: StashedState;
+        try {
+            parsedContent = JSON.parse(fileContent);
+            if (!isStashedState(parsedContent)) {
+                throw new Error('Parsed content does not match StashedState structure.');
+            }
+            log(`Parsed state.json for commit ${commitHash} successfully.`, LogLevel.INFO);
+        } catch (error) {
+            log(`Warning: Failed to parse JSON for commit ${commitHash}: ${(error as Error).message}`, LogLevel.WARN);
+            log(`Content: ${fileContent}`, LogLevel.WARN);
+            continue; // Skip this commit
+        }
+
+        // Initialize or retrieve existing CommitData for this commit
+        let commitData = allCommitsMap.get(commitHash);
+        if (!commitData) {
+            commitData = {
+                commitHash,
+                date: new Date(dateStr),
+                commitMessage,
+                author: authorName,
+                panelChats: [],
+                inlineChats: [],
+            };
+            allCommitsMap.set(commitHash, commitData);
+            log(`Initialized CommitData for commit ${commitHash}.`, LogLevel.INFO);
+        }
+
+        // Process the commit's panelChats and inlineChats
+        processCommit(parsedContent, currentMessageIds, seenInlineChatIds, seenMessageIds, commitData, commitHash);
+
+        // Add all inline chat ids from parsedContent to the seenInlineChats set
+        parsedContent.inlineChats.forEach(inlineChat => {
+            seenInlineChatIds.add(inlineChat.inline_chat_id);
+        });
+    }
+
+    // Convert the map to an array and filter out empty commits
+    let allCommits: CommitData[] = Array.from(allCommitsMap.values())
+        .map(commit => ({
+            ...commit,
+            panelChats: commit.panelChats.filter(pc => pc.messages.length > 0)
+        }))
+        .filter(commit => commit.panelChats.length > 0 || commit.inlineChats.length > 0);
+
+    log(`Filtered commits to exclude empty ones. Remaining commits count: ${allCommits.length}`, LogLevel.INFO);
+
+    // Step 3: Aggregate uncommitted added content
+    const allAddedPanelChats: PanelChat[] = parsedCurrent.panelChats
+        .filter(pc => !parsedCurrent.deletedChats.deletedPanelChatIDs.includes(pc.id))
+        .map(pc => ({
+            ...pc,
+            messages: pc.messages.filter(msg => 
+                !parsedCurrent.deletedChats.deletedMessageIDs.includes(msg.id) && 
+                !seenMessageIds.has(msg.id)
+            )
+        }))
+        .filter(pc => pc.messages.length > 0);
+
+    // Add all seen messages to seenMessageIds
+    for (const panelChat of parsedCurrent.panelChats) {
+        for (const message of panelChat.messages) {
+            seenMessageIds.add(message.id);
+        }
+    }
+
+    const added: UncommittedData = {
+        panelChats: allAddedPanelChats,
+        inlineChats: parsedCurrent.inlineChats.filter(ic => currentInlineChatIds.has(ic.inline_chat_id) && !seenInlineChatIds.has(ic.inline_chat_id))
+    };
+
+    // Step 4: Handle uncommitted changes
+    let uncommitted: UncommittedData | null = null;
+    try {
+        const currentUncommittedContent = context.workspaceState.get<PanelChat[]>('currentPanelChats') || [];
+
+        if (!Array.isArray(currentUncommittedContent) || !currentUncommittedContent.every(isPanelChat)) {
+            throw new Error('Parsed content does not match PanelChat structure.');
+        }
+
+        const allCurrentPanelChats: PanelChat[] = currentUncommittedContent
+            .filter(pc => !parsedCurrent.deletedChats.deletedPanelChatIDs.includes(pc.id))
+            .map(pc => ({
+                ...pc,
+                messages: pc.messages.filter(msg => 
+                    !parsedCurrent.deletedChats.deletedMessageIDs.includes(msg.id) && 
+                    !seenMessageIds.has(msg.id)
+                )
+            }))
+            .filter(pc => pc.messages.length > 0);
+
+            uncommitted = {
+                panelChats: allCurrentPanelChats,
+                inlineChats: []
+            };
+    } catch (error) {
+        log(`Warning: Failed to read current uncommitted content: ${(error as Error).message}`, LogLevel.WARN);
+    }
+
+    return {
+        commits: allCommits,
+        added,
+        uncommitted
+    };
 }
 
 /**
@@ -409,4 +467,3 @@ export function getInlineChatFromGitHistory(gitHistory: GitHistoryData): Map<str
 
     return idToCommitInfo;
 }
-
